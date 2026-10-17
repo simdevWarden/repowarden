@@ -297,6 +297,7 @@ _msg_en() {
         ci.proteger.no_delivery_env) _M="main will require a successful \"%s\" deployment, but no workflow creates that deployment: a deployment nothing creates would block main forever. Call release-auto.yml with delivery-environment (see docs/releases.md, develop flow), or set deliveryApproval = review in .repowarden.conf." ;;
         ci.proteger.stale_concurrency) _M="%s: a pending delivery request (manual or scheduled) would silently block the next ones. Set cancel-in-progress: \${{ github.event_name != 'push' }} (a new request replaces the pending one) and one group per trigger: release-\${{ github.ref_name }}-\${{ github.event.schedule || github.event_name }}." ;;
         ci.proteger.urgent) _M="  \"urgent\" label created (its merge triggers the delivery request)" ;;
+        ci.proteger.urgent_dry) _M="  \"urgent\" label will be created (its merge triggers the delivery request)" ;;
         ci.proteger.verify_missing) _M="%s: ruleset missing online" ;;
         ci.proteger.verify_diff) _M="%s: online rules differ\n    online:   %s\n    expected: %s" ;;
         ci.proteger.verify_fix) _M="Outdated rules: run repowarden proteger again to update them." ;;

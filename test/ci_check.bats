@@ -563,6 +563,24 @@ print(json.dumps(out))' <<<"$(sed -n '/^{/,$p' <<<"$1")"
     [[ "$output" == *"urgent"* ]] || false
 }
 
+@test "proteger : etiquette urgent annoncee au futur en dry-run, creee sinon" {
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    # --dry-run : rien n'est cree, l'annonce est au futur
+    GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
+    [[ "$output" == *"étiquette « urgent » sera créée"* ]] || false
+    [[ "$output" != *"étiquette « urgent » créée"* ]] || false
+    # hors dry-run : l'etiquette est creee, annonce au present
+    GH_BRANCHES="main develop" run "$PROTEGER"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"étiquette « urgent » créée"* ]] || false
+    [[ "$output" != *"sera créée"* ]] || false
+    # meme cle, message anglais
+    REPOWARDEN_LANG=en GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
+    [[ "$output" == *"will be created"* ]] || false
+}
+
 @test "proteger --verifier : regles en ligne comparees a celles attendues" {
     require python3
     fake_gh_repo
@@ -728,6 +746,31 @@ ancien_ruleset() {
     git config repowarden.deliveryApproval review
     GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
     [[ "$output" != *"déploiement que rien ne crée"* ]] || false
+}
+
+@test "proteger : concurrence en mode pr -> pas d'avertissement de livraison en attente" {
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    mkdir -p .github/workflows
+    # mode pr : aucune demande de livraison, cancel-in-progress: false sans risque
+    printf 'on:\n  workflow_dispatch:\nconcurrency:\n  group: g\n  cancel-in-progress: false\njobs:\n  r:\n    uses: o/r/.github/workflows/release-auto.yml@v4\n    with:\n      mode: pr\n' >.github/workflows/release.yml
+    GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"remplace celle en attente"* ]] || false
+}
+
+@test "proteger : concurrence signalee seulement pour le mode tag avec delivery-environment" {
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    mkdir -p .github/workflows
+    printf 'on:\n  workflow_dispatch:\nconcurrency:\n  group: g\n  cancel-in-progress: false\njobs:\n  r:\n    uses: o/r/.github/workflows/release-auto.yml@v4\n    with:\n      mode: pr\n' >.github/workflows/preversion.yml
+    printf 'on:\n  workflow_dispatch:\nconcurrency:\n  group: g\n  cancel-in-progress: false\njobs:\n  r:\n    uses: o/r/.github/workflows/release-auto.yml@v4\n    with:\n      delivery-environment: production\n' >.github/workflows/livraison.yml
+    GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
+    [ "$status" -eq 0 ]
+    [[ "$output" == *".github/workflows/livraison.yml : une demande de livraison"* ]] || false
+    [[ "$output" != *".github/workflows/preversion.yml : une demande de livraison"* ]] || false
 }
 
 @test "proteger : livraison automatique -> verifications exigees gardees, ni deploiement ni environnement" {
