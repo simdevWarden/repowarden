@@ -4,6 +4,11 @@
 HOOKS="$(cd "$BATS_TEST_DIRNAME/../hooks" && pwd -P)"
 # Messages attendus en français (les tests anglais fixent REPOWARDEN_LANG=en)
 export REPOWARDEN_LANG=fr
+# Entrée standard hors du terminal, comme en CI : lancés depuis un terminal,
+# install.sh, cc, npm-publication… poseraient leurs questions ([ -t 0 ]) et
+# le test attendrait une réponse invisible. Un test qui veut une entrée la
+# donne lui-même (<<<, REPOWARDEN_INTERACTIF).
+exec </dev/null
 
 setup_repo() {
     REPO="$BATS_TEST_TMPDIR/repo"
