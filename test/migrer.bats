@@ -137,6 +137,8 @@ YML
     copie="$BATS_TEST_TMPDIR/repowarden-sans-tags"
     mkdir -p "$copie"
     cp -R "$BATS_TEST_DIRNAME/../bin" "$BATS_TEST_DIRNAME/../hooks" "$BATS_TEST_DIRNAME/../package.json" "$copie/"
+    # Chemin réel, comme migrer l'affiche (macOS : /var → /private/var)
+    copie="$(cd "$copie" && pwd -P)"
     avant="$(git status --porcelain)"
     run "$copie/bin/migrer"
     [ "$status" -ne 0 ]
