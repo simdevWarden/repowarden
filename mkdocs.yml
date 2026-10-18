@@ -50,6 +50,7 @@ nav:
   - Validation humaine: validation.md
   - Tickets: tickets.md
   - Code mort: code-mort.md
+  - Agents IA: agents.md
   - En organisation: industrialisation.md
   - Désinstallation: desinstallation.md
   - Passer à la v4: migration-v4.md
@@ -87,6 +88,7 @@ plugins:
             Versions et releases: Versions and releases
             Validation humaine: Human approval
             Code mort: Dead code
+            Agents IA: AI agents
             En organisation: In an organisation
             Désinstallation: Uninstalling
             Limites: Limitations

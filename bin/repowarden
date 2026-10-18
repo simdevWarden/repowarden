@@ -21,6 +21,8 @@
 #   repowarden npm-publication                     publication npm automatique
 #   repowarden app init                            GitHub App des workflows (une fois)
 #   repowarden bot [init|rapport]                  bot d'organisation (dépôt de pilotage)
+#   repowarden agents init [--claude] [--opencode] garde-fou des agents IA
+#   repowarden garde [--format claude|opencode]    vérifie une action d'agent
 #   repowarden --version
 set -euo pipefail
 
@@ -45,6 +47,8 @@ help_key_r() {
         uninstall) REPLY=help.uninstall ;;
         bots) REPLY=help.bots ;;
         bot) REPLY=help.bot ;;
+        agents) REPLY=help.agents ;;
+        garde | guard) REPLY=help.garde ;;
         cc | commit) REPLY=help.cc ;;
         code-mort | deadcode) REPLY=help.code-mort ;;
         ticket) REPLY=help.ticket ;;
@@ -133,6 +137,8 @@ case "$cmd" in
     app) exec bash "$ROOT/bin/app" "$@" ;;
     bots) exec bash "$ROOT/bin/bots" "$@" ;;
     bot) exec bash "$ROOT/bin/bot" "$@" ;;
+    agents) exec bash "$ROOT/bin/agents" "$@" ;;
+    garde | guard) exec bash "$ROOT/bin/garde" "$@" ;;
     -v | --version | version)
         repowarden_version_r "$ROOT"
         echo "$REPLY"

@@ -28,7 +28,7 @@ GH
 @test "aide : chaque commande --help donne l'usage (code 0, rien n'est fait)" {
     avant_head="$(git rev-parse HEAD)"
     for cmd in statut install uninstall cc code-mort ticket tickets pr run \
-        proteger migrer npm-publication app bots bot \
+        proteger migrer npm-publication app bots bot agents garde \
         "ticket comment" "ticket label"; do
         run "$RW" $cmd --help
         if [ "$status" -ne 0 ]; then
