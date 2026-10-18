@@ -258,9 +258,12 @@ if [ -n "$integration" ]; then
         attention_t ci.proteger.no_delivery_auto
     fi
     # Demande de livraison (manuelle, planifiée) qui ne remplace pas celle en
-    # attente : une demande oubliée bloquerait en silence les suivantes
+    # attente : une demande oubliée bloquerait en silence les suivantes.
+    # Seulement en mode tag avec livraison approuvée (delivery-environment) :
+    # en mode pr, ou sans environnement, il n'y a pas de demande à remplacer.
     for wf in "$GIT_TOPLEVEL"/.github/workflows/*.y*ml; do
         grep -qs "release-auto.yml" "$wf" && grep -qsE "workflow_dispatch|schedule:" "$wf" &&
+            grep -qs "delivery-environment:" "$wf" &&
             grep -qs "cancel-in-progress: false" "$wf" &&
             attention_t ci.proteger.stale_concurrency "${wf#"$GIT_TOPLEVEL"/}"
     done
@@ -453,7 +456,11 @@ fi
 urgent=""
 if [ -n "$integration" ] && ! gh api "repos/$REPO/labels/urgent" --silent 2>/dev/null; then
     urgent=1
-    info_t ci.proteger.urgent
+    if [ -n "$DRY_RUN" ]; then
+        info_t ci.proteger.urgent_dry
+    else
+        info_t ci.proteger.urgent
+    fi
 fi
 
 if [ -n "$DRY_RUN" ]; then
