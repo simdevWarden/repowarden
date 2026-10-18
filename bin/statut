@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
+# Usage : repowarden statut   (ou repowarden, sans argument)
+#
 # État de repowarden sur ce poste et dans le dépôt courant, puis la commande
-# suivante à lancer (l'équivalent de « gh auth status » ou « brew doctor ») :
-#   repowarden statut        (ou repowarden, sans argument)
+# suivante à lancer (l'équivalent de « gh auth status » ou « brew doctor »).
 # Lecture seule : rien n'est modifié.
 set -euo pipefail
 

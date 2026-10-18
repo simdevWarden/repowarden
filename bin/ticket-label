@@ -10,20 +10,13 @@ source "$ROOT/hooks/lib/common.sh"
 source "$ROOT/hooks/lib/i18n.sh"
 
 aide() {
-    cat <<EOF
-Usage: repowarden ticket label <n> <label> [--remove]
-
-Ajoute ou retire un label sur le ticket #<n>.
-
-Options:
-  --remove    Retire le label au lieu de l'ajouter
-
-Exemples:
-  repowarden ticket label 123 "validé"
-  repowarden ticket label 123 "statut: backlog"
-  repowarden ticket label 123 "wip" --remove
-EOF
+    _tr help.ticket
+    printf '%b\n' "$_T"
 }
+
+case "${1:-}" in
+    -h | --help) aide; exit 0 ;;
+esac
 
 [ $# -ge 2 ] || { aide >&2; exit 1; }
 command -v gh >/dev/null || { err_t bot.no_gh; exit 1; }

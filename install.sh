@@ -43,7 +43,8 @@ while [ $# -gt 0 ]; do
             SCAN="${1:?--scan attend un dossier}"
             ;;
         -h | --help)
-            sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+            _tr help.install
+            printf '%b\n' "$_T"
             exit 0
             ;;
         *)
