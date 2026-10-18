@@ -84,3 +84,4 @@ Three paths, depending on your use case. The fastest way to try it: **On my mach
 | git + bash | yes | macOS, Linux, Windows via [Git for Windows](https://gitforwindows.org) |
 | Tools for the languages used | depending on the projects | a missing tool is skipped on the developer machine |
 | [gitleaks](https://github.com/gitleaks/gitleaks) | recommended | `brew install gitleaks` · `apt install gitleaks` · `winget install gitleaks` |
+| [GitHub CLI (`gh`)](https://cli.github.com) | optional | GitHub tickets and repository management: `gh auth login -s workflow` (the `workflow` scope allows changing `.github/workflows/`) |

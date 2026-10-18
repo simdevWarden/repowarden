@@ -449,6 +449,70 @@ load_engine() {
     [[ "$output" == *"brew install shellcheck"* || "$output" == *"apt-get install shellcheck"* || "$output" == *"choco install shellcheck"* || "$output" == *"https://www.shellcheck.net/"* ]] || false
 }
 
+# --- Jeton gh sans le scope workflow (pre-push) ----------------------------------
+
+# gh simulé : connecté (scopes FAKE_GH_SCOPES) ou non (FAKE_GH_OK=0).
+# Chaque appel est journalisé dans $GHBIN/log (preuve qu'il a été appelé).
+fake_gh() {
+    GHBIN="$BATS_TEST_TMPDIR/ghbin"
+    mkdir -p "$GHBIN"
+    : >"$GHBIN/log"
+    cat >"$GHBIN/gh" <<'GH'
+#!/usr/bin/env bash
+echo "$*" >>"$(dirname "$0")/log"
+case "$1 $2" in
+    "auth status")
+        [ "${FAKE_GH_OK:-1}" = 1 ] || exit 1
+        printf "Token scopes: '%s'\n" "${FAKE_GH_SCOPES:-gist, read:org, repo}"
+        ;;
+esac
+exit 0
+GH
+    chmod +x "$GHBIN/gh"
+}
+
+# Un fichier de workflow commité (valide : actionlint ne doit pas bloquer)
+workflow_commit() {
+    mkdir -p .github/workflows
+    printf 'name: ci\non: push\njobs:\n  b:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo\n' >.github/workflows/ci.yml
+    git add -A
+    git commit -q -m "ci: workflow"
+}
+
+@test "pre-push : jeton gh sans scope workflow et workflow pousse -> avertissement" {
+    fake_gh
+    workflow_commit
+    FAKE_GH_SCOPES="gist, read:org, repo" PATH="$GHBIN:$PATH" run git push -q origin feat/x
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"gh auth refresh -h github.com -s workflow"* ]] || false
+}
+
+@test "pre-push : jeton gh avec scope workflow -> aucun avertissement" {
+    fake_gh
+    workflow_commit
+    FAKE_GH_SCOPES="gist, read:org, repo, workflow" PATH="$GHBIN:$PATH" run git push -q origin feat/x
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"gh auth refresh"* ]] || false
+}
+
+@test "pre-push : gh non connecte -> aucun avertissement de scope" {
+    fake_gh
+    workflow_commit
+    FAKE_GH_OK=0 PATH="$GHBIN:$PATH" run git push -q origin feat/x
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"gh auth refresh"* ]] || false
+}
+
+@test "pre-push : push sans workflow -> gh n'est pas appele" {
+    fake_gh
+    printf 'x\n' >f.txt
+    git add -A
+    git commit -q -m "chore: fichier"
+    PATH="$GHBIN:$PATH" run git push -q origin feat/x
+    [ "$status" -eq 0 ]
+    [ ! -s "$GHBIN/log" ]
+}
+
 @test "python : pas de faux succes avec un .pyc perime (meme taille, meme seconde)" {
     require pytest
     load_engine

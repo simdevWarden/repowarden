@@ -95,7 +95,7 @@ Sans Node : `git clone https://github.com/simdevWarden/repowarden.git ~/repoward
 > [!NOTE]
 > **GitHub CLI (`gh`) : facultatif.**
 > Sans `gh` : tous les hooks (commits, branches, secrets, formatage, tests), `git cc`, `repowarden code-mort`, `repowarden statut`, et la CI (GitHub ou GitLab), qui n'utilise jamais le `gh` du poste.
-> Avec `gh` connecté (`gh auth login`), en plus : les tickets (`repowarden ticket`, `tickets`, branches de tes tickets créées en local) et la gestion du dépôt (`proteger`, `app init`, `npm-publication`, `pr-*`, `run-*`). Utile au mainteneur du dépôt GitHub ; chaque commande le signale s'il manque.
+> Avec `gh` connecté (`gh auth login -s workflow` : le scope `workflow` autorise la modification de `.github/workflows/`), en plus : les tickets (`repowarden ticket`, `tickets`, branches de tes tickets créées en local) et la gestion du dépôt (`proteger`, `app init`, `npm-publication`, `pr-*`, `run-*`). Utile au mainteneur du dépôt GitHub ; chaque commande le signale s'il manque.
 
 ### 2. Dans un projet d'équipe : les mêmes règles pour tous
 
