@@ -15,9 +15,11 @@ setup() {
     mkdir -p "$HOME"
     setup_repo
     initial_commit
-    # repowarden dans le PATH, comme après npm install -g
+    # repowarden dans le PATH, comme après npm install -g ; script relais et
+    # non lien symbolique : Git Bash (Windows) copie le fichier au lieu du lien
     mkdir -p "$BATS_TEST_TMPDIR/bin"
-    ln -s "$RW" "$BATS_TEST_TMPDIR/bin/repowarden"
+    printf '#!/usr/bin/env bash\nexec "%s" "$@"\n' "$RW" >"$BATS_TEST_TMPDIR/bin/repowarden"
+    chmod +x "$BATS_TEST_TMPDIR/bin/repowarden"
     export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
 }
 
@@ -27,9 +29,9 @@ setup() {
     [[ "$output" == *"Claude Code : garde-fou ajouté"* ]] || false
     [[ "$output" == *"opencode : garde-fou ajouté"* ]] || false
     [[ "$output" == *"À versionner : git add .claude/settings.json .opencode/plugins/repowarden-garde.js"* ]] || false
-    run jq -r '.hooks.PreToolUse[0].matcher, .hooks.PreToolUse[0].hooks[0].command' .claude/settings.json
-    [ "${lines[0]}" = "Edit|Write|MultiEdit|NotebookEdit|Bash" ]
-    [ "${lines[1]}" = "repowarden garde --format claude" ]
+    # jq -e : comparaison dans jq, sans les fins de ligne \r\n de jq sous Windows
+    jq -e '.hooks.PreToolUse[0].matcher == "Edit|Write|MultiEdit|NotebookEdit|Bash"
+        and .hooks.PreToolUse[0].hooks[0].command == "repowarden garde --format claude"' .claude/settings.json
     cmp -s .opencode/plugins/repowarden-garde.js "$MODELE"
 }
 
