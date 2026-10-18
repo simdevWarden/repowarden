@@ -81,9 +81,11 @@ python_deadcode() {
         deadcode_tool_missing Python "ruff / vulture"
     elif [ "$a_ruff" = 0 ]; then
         # vulture seul : les imports et variables inutilisés restent à analyser
-        deadcode_partial Python ruff "pip install ruff"
+        _tr dc.scope.imports
+        deadcode_partial Python ruff "$_T" "pip install ruff"
     elif [ "$a_vulture" = 0 ]; then
         # ruff seul : les fonctions et classes inutilisées restent à analyser
-        deadcode_partial Python vulture "pip install vulture"
+        _tr dc.scope.functions
+        deadcode_partial Python vulture "$_T" "pip install vulture"
     fi
 }

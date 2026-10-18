@@ -33,7 +33,7 @@ En CI, l'action installe PMD pour un projet Java (version et empreinte figées).
 
 ## Analyse partielle
 
-Quand un langage a plusieurs outils (Python : ruff et vulture ; JavaScript : `tsc` et knip) et qu'il n'en est installé qu'un seul, l'analyse est **partielle** : repowarden le signale avec l'installation manquante (« Python : vulture absent, analyse partielle du code mort (pip install vulture) »). Et surtout, sans résultat sur ce qui a été analysé, le message de fin n'est plus le feu vert « Aucun nouveau code mort », mais « Aucun nouveau code mort dans ce qui a été analysé : analyse partielle, voir ci-dessus ». Aucun outil du langage n'est là : le message « code mort non analysé » reste, et compte aussi comme une analyse partielle.
+Quand un langage a plusieurs outils (Python : ruff et vulture ; JavaScript : `tsc` et knip) et qu'il n'en est installé qu'un seul, l'analyse est **partielle** : repowarden le signale en nommant ce qui n'a pas été analysé (« Python : vulture absent : fonctions et classes inutilisées non analysées (pip install vulture) »). Et surtout, sans résultat sur ce qui a été analysé, le message de fin n'est plus le feu vert « Aucun nouveau code mort », mais « Aucun nouveau code mort dans ce qui a été analysé : analyse partielle, voir ci-dessus ». Aucun outil du langage n'est là : le message « code mort non analysé » reste, et compte aussi comme une analyse partielle.
 
 ## Utilisation
 

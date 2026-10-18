@@ -1494,7 +1494,7 @@ T
     python_dead_code
     run "$CHECK" deadcode
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Python : vulture absent, analyse partielle du code mort (pip install vulture)"* ]] || false
+    [[ "$output" == *"Python : vulture absent : fonctions et classes inutilisées non analysées (pip install vulture)."* ]] || false
     [[ "$output" == *"Aucun nouveau code mort dans ce qui a été analysé : analyse partielle, voir ci-dessus."* ]] || false
     [[ "$output" != *"Aucun nouveau code mort."* ]] || false
 }
@@ -1504,7 +1504,7 @@ T
     python_dead_code
     run "$CHECK" deadcode
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Python : ruff absent, analyse partielle du code mort (pip install ruff)"* ]] || false
+    [[ "$output" == *"Python : ruff absent : imports et variables inutilisés non analysés (pip install ruff)."* ]] || false
     [[ "$output" == *"Aucun nouveau code mort dans ce qui a été analysé : analyse partielle, voir ci-dessus."* ]] || false
     [[ "$output" != *"Aucun nouveau code mort."* ]] || false
 }
@@ -1537,7 +1537,7 @@ T
     git commit -q --no-verify -m "feat: app"
     run "$CHECK" deadcode
     [ "$status" -eq 0 ]
-    [[ "$output" == *"JavaScript / TypeScript : knip absent, analyse partielle du code mort (npm i -D knip)"* ]] || false
+    [[ "$output" == *"JavaScript / TypeScript : knip absent : fichiers, exports et dépendances non référencés non analysés (npm i -D knip)."* ]] || false
     [[ "$output" == *"Aucun nouveau code mort dans ce qui a été analysé : analyse partielle, voir ci-dessus."* ]] || false
     [[ "$output" != *"Aucun nouveau code mort."* ]] || false
 }

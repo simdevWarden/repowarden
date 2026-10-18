@@ -77,9 +77,11 @@ node_deadcode() {
         deadcode_tool_missing "JavaScript / TypeScript" "typescript / knip"
     elif [ "$a_tsc" = 0 ]; then
         # knip seul : les variables, paramètres et imports inutilisés restent à analyser
-        deadcode_partial "JavaScript / TypeScript" typescript "npm i -D typescript"
+        _tr dc.scope.locals
+        deadcode_partial "JavaScript / TypeScript" typescript "$_T" "npm i -D typescript"
     elif [ "$a_knip" = 0 ]; then
         # tsc seul : les fichiers, exports et dépendances non référencés restent à analyser
-        deadcode_partial "JavaScript / TypeScript" knip "npm i -D knip"
+        _tr dc.scope.files
+        deadcode_partial "JavaScript / TypeScript" knip "$_T" "npm i -D knip"
     fi
 }

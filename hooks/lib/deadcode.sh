@@ -155,11 +155,12 @@ deadcode_tool_missing() {
     deadcode_partial_note "$1"
 }
 
-# Analyse partielle : $1 langage, $2 outil absent, $3 installation à donner.
+# Analyse partielle : $1 langage, $2 outil absent, $3 ce qui n'est pas analysé
+# (déjà traduit, clé dc.scope.*), $4 installation à donner.
 # Un des outils du langage manque : ce qu'il couvre n'est pas analysé, et la
 # fin de l'analyse ne dira pas que tout va bien (voir deadcode_projects).
 deadcode_partial() {
-    attention_t dc.partial "$1" "$2" "$3"
+    attention_t dc.partial "$1" "$2" "$3" "$4"
     deadcode_partial_note "$1"
 }
 

@@ -377,7 +377,11 @@ _msg_fr() {
         dc.nothing) _M="Aucun fichier d'un langage analysable parmi les modifications : rien à vérifier." ;;
         dc.none) _M="Aucun nouveau code mort." ;;
         dc.none_partial) _M="Aucun nouveau code mort dans ce qui a été analysé : analyse partielle, voir ci-dessus." ;;
-        dc.partial) _M="%s : %s absent, analyse partielle du code mort (%s)." ;;
+        dc.partial) _M="%s : %s absent : %s (%s)." ;;
+        dc.scope.functions) _M="fonctions et classes inutilisées non analysées" ;;
+        dc.scope.imports) _M="imports et variables inutilisés non analysés" ;;
+        dc.scope.locals) _M="variables, paramètres et imports inutilisés non analysés" ;;
+        dc.scope.files) _M="fichiers, exports et dépendances non référencés non analysés" ;;
         dc.summary_candidates) _M="%s candidat(s) à vérifier : non bloquant (appel par réflexion, framework, API publique possibles)." ;;
         dc.summary_proven) _M="%s élément(s) de code mort prouvé : à supprimer, ou à ignorer (deadcodeIgnore)." ;;
         dc.summary_strict) _M="%s élément(s) de code mort (mode deadcode = strict)." ;;
