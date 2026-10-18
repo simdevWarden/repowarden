@@ -394,6 +394,12 @@ _msg_en() {
         dc.candidate) _M="%s: %s (candidate: check for dynamic usage)" ;;
         dc.nothing) _M="No file in an analysable language among the changes: nothing to check." ;;
         dc.none) _M="No new dead code." ;;
+        dc.none_partial) _M="No new dead code in what was analysed: partial analysis, see above." ;;
+        dc.partial) _M="%s: %s not installed: %s (%s)." ;;
+        dc.scope.functions) _M="unused functions and classes not analysed" ;;
+        dc.scope.imports) _M="unused imports and variables not analysed" ;;
+        dc.scope.locals) _M="unused variables, parameters and imports not analysed" ;;
+        dc.scope.files) _M="unreferenced files, exports and dependencies not analysed" ;;
         dc.summary_candidates) _M="%s candidate(s) to check: not blocking (reflection, framework or public API calls are possible)." ;;
         dc.summary_proven) _M="%s proven dead code item(s): remove them, or ignore them (deadcodeIgnore)." ;;
         dc.summary_strict) _M="%s dead code item(s) (deadcode = strict mode)." ;;
