@@ -84,3 +84,4 @@ Trois parcours, selon l'usage. Le plus rapide pour essayer : **Sur mon poste**.
 | git + bash | oui | macOS, Linux, Windows via [Git for Windows](https://gitforwindows.org) |
 | Outils des langages utilisés | selon les projets | un outil absent est ignoré sur le poste |
 | [gitleaks](https://github.com/gitleaks/gitleaks) | conseillé | `brew install gitleaks` · `apt install gitleaks` · `winget install gitleaks` |
+| [GitHub CLI (`gh`)](https://cli.github.com) | facultatif | tickets et gestion du dépôt GitHub : `gh auth login -s workflow` (le scope `workflow` autorise la modification de `.github/workflows/`) |

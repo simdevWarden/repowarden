@@ -45,3 +45,24 @@ github_sans_rulesets() {
     local reponse
     ! reponse="$(gh api "repos/$1/rulesets" 2>&1)" && [[ "$reponse" == *"403"* ]]
 }
+
+# gh présent (rien n'est affiché)
+gh_present() { command -v gh >/dev/null 2>&1; }
+
+# gh présent et connecté : gh auth status réussi
+gh_connected() { gh_present && gh auth status >/dev/null 2>&1; }
+
+# Contrôle partagé des commandes qui parlent à GitHub (bin/ticket, bin/tickets,
+# bin/app) : gh installé ET connecté, sinon le message du problème et un échec.
+# Sans gh : bot.no_gh ; sans connexion : gh.not_logged (la commande de
+# connexion, le scope workflow étant requis pour pousser .github/workflows/).
+gh_ready() {
+    if ! gh_present; then
+        err_t bot.no_gh
+        return 1
+    fi
+    if ! gh_connected; then
+        err_t gh.not_logged
+        return 1
+    fi
+}

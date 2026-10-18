@@ -45,7 +45,7 @@ if [ "$commande" != init ]; then
     exit
 fi
 
-command -v gh >/dev/null || { err_t bot.no_gh; exit 1; }
+gh_ready || exit 1
 command -v node >/dev/null || { err_t app.no_node; exit 1; }
 [ -n "$REPO" ] || REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 owner="${REPO%%/*}"

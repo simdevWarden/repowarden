@@ -153,6 +153,28 @@ if ! skipped lint; then
     [ "$LINT_FAILED" -eq 0 ] || exit 1
 fi
 
+# Jeton gh sans le scope « workflow » : GitHub refuserait après le commit un
+# push qui touche .github/workflows/ (OAuth App). Signalé avant, sans bloquer
+# (un push par SSH passe). Sans gh, ou gh non connecté : rien.
+if has gh; then
+    if GH_SCOPES="$(gh auth status 2>&1)"; then
+        case "$GH_SCOPES" in
+            *workflow*) ;;
+            *)
+                while read -r _ local_sha _ remote_sha; do
+                    # suppression de branche : rien à pousser
+                    if [ -z "$local_sha" ] || [[ "$local_sha" =~ ^0+$ ]]; then continue; fi
+                    case "$(changed_files "$local_sha" "$remote_sha")" in
+                        *".github/workflows/"*)
+                            attention_t hook.pre_push.workflow_scope
+                            break ;;
+                    esac
+                done <<<"$REFS"
+                ;;
+        esac
+    fi
+fi
+
 skipped tests && { info "Tests désactivés (repowarden.skip)."; exit 0; }
 
 run_tests_for() { test_projects <"$1"; }

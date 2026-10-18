@@ -34,7 +34,7 @@ done
 if [ "$commande" = sync ]; then
     # shellcheck source=../hooks/lib/tickets.sh
     source "$ROOT/hooks/lib/tickets.sh"
-    command -v gh >/dev/null || { err_t bot.no_gh; exit 1; }
+    gh_ready || exit 1
     [ -n "$GIT_TOPLEVEL" ] || { err_t install.not_repo; exit 1; }
     cd "$GIT_TOPLEVEL"
     tickets_sync force
@@ -46,7 +46,7 @@ if [ "$commande" != init ]; then
     exit
 fi
 
-command -v gh >/dev/null || { err_t bot.no_gh; exit 1; }
+gh_ready || exit 1
 [ -n "$GIT_TOPLEVEL" ] || { err_t install.not_repo; exit 1; }
 cd "$GIT_TOPLEVEL"
 [ -n "$REPO" ] || REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"

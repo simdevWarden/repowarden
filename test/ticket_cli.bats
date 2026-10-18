@@ -30,7 +30,7 @@ case "$1 $2" in
             *) while [ $# -gt 0 ]; do [ "$1" = --name ] && git push -q --no-verify origin "main:refs/heads/$2"; shift; done ;;
         esac ;;
     "issue list") printf '%s\n' "${FAKE_ASSIGNED:-}" ;;
-    "auth status") exit 0 ;;
+    "auth status") exit "${FAKE_GH_AUTH_RC:-0}" ;;
 esac
 exit 0
 GH
@@ -240,4 +240,38 @@ gere() {
     [ -f .github/ISSUE_TEMPLATE/ticket.yml ]
     # workflow existant : laissé tel quel
     grep -q "uses: o/repowarden/.github/workflows/tickets.yml@v4" .github/workflows/tickets.yml
+}
+
+@test "ticket cli : gh installe mais non connecte -> message repowarden et code 1" {
+    FAKE_GH_AUTH_RC=1 PATH="$F/bin:$PATH" run "$TICKET" 12
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"gh non connecté"* ]] || false
+    [[ "$output" == *"gh auth login -s workflow"* ]] || false
+    [[ "$output" != *"command not found"* ]] || false
+    # rien n'est tenté : ni branche, ni appel au ticket
+    [ "$(git branch --show-current)" = main ]
+    ! grep -q "issue develop" "$F/log"
+}
+
+@test "tickets init : gh installe mais non connecte -> message repowarden et code 1" {
+    FAKE_GH_AUTH_RC=1 PATH="$F/bin:$PATH" run "$BATS_TEST_DIRNAME/../bin/tickets" init --repo o/r
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"gh non connecté"* ]] || false
+    [[ "$output" == *"gh auth login -s workflow"* ]] || false
+}
+
+@test "ticket cli : clone mono-branche -> ticket <n> bascule sur la branche distante" {
+    git push -q --no-verify origin main
+    git switch -q -c feat/12-panier
+    git push -q --no-verify origin feat/12-panier
+    git switch -q main
+    git clone -q --single-branch "$REMOTE" "$BATS_TEST_TMPDIR/clone"
+    # Le clone ne suit qu'une branche : la ref du ticket existe sans être suivie
+    git -C "$BATS_TEST_TMPDIR/clone" fetch -q origin "+refs/heads/feat/12-panier:refs/remotes/origin/feat/12-panier"
+    cd "$BATS_TEST_TMPDIR/clone"
+    PATH="$F/bin:$PATH" run "$TICKET" 12
+    [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+    [ "$(git branch --show-current)" = feat/12-panier ]
+    [ "$(git rev-parse --abbrev-ref feat/12-panier@{upstream})" = origin/feat/12-panier ]
+    [[ "$output" == *"Sur la branche feat/12-panier (ticket #12)"* ]] || false
 }

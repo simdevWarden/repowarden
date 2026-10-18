@@ -28,6 +28,11 @@ switch_to() {
     if git show-ref -q --verify "refs/heads/$1"; then
         git switch -q "$1"
     else
+        # Clone mono-branche : la ref du ticket existe sans être suivie, et
+        # « switch --track » la refuse (« … is not a branch ») tant que la
+        # refspec ne la couvre pas. On l'ajoute à la config avant de suivre.
+        git config --add remote.origin.fetch "+refs/heads/$1:refs/remotes/origin/$1"
+        git fetch -q origin
         git switch -q --track -c "$1" "origin/$1"
     fi
 }
@@ -37,7 +42,7 @@ prendre() { gh issue edit "$1" --add-assignee @me >/dev/null 2>&1 || true; }
 
 cmd_ticket() {
     local n="$1" json etat titre etiquettes base
-    command -v gh >/dev/null || { err_t bot.no_gh; exit 1; }
+    gh_ready || exit 1
     step_t tk.cli.fetch "$n"
     git fetch -q origin --prune
     ticket_remote_branch_r "$n"
@@ -83,7 +88,7 @@ cmd_nouveau() {
         shift
     done
     [ -n "$titre" ] || { err_t tk.cli.title_required; exit 1; }
-    command -v gh >/dev/null || { err_t bot.no_gh; exit 1; }
+    gh_ready || exit 1
     if tickets_managed; then
         etiquettes+=(--label "$S_AVALIDER")
         [ -z "$type" ] || etiquettes+=(--label "type: $type")

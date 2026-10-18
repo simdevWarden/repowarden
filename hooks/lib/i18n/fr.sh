@@ -126,6 +126,7 @@ _msg_fr() {
         hook.pre_push.5) _M="%s : aucun fichier modifié, rien à tester." ;;
         hook.pre_push.6) _M="Rien à tester (suppression de branche uniquement)." ;;
         hook.pre_push.7) _M="Pre-push OK" ;;
+        hook.pre_push.workflow_scope) _M="Jeton gh sans le scope « workflow » : GitHub refusera un push touchant .github/workflows/. L'autoriser (puis se reconnecter) : gh auth refresh -h github.com -s workflow" ;;
         hook.pre_push.lint.missing) _M="%s absent, %s non vérifié (installation : %s)." ;;
         hook.pre_push.lint.run) _M="%s : %s" ;;
         hook.branch_hint.1) _M="Nom de branche « %s » non conforme : commits et push seront refusés. Renommer :" ;;
@@ -416,6 +417,7 @@ _msg_fr() {
         ci.notify.failure) _M="❌ %s : échec du workflow de release : %s" ;;
         # GitHub CLI
         bot.no_gh) _M="GitHub CLI (gh) requis : https://cli.github.com" ;;
+        gh.not_logged) _M="gh non connecté : gh auth login -s workflow" ;;
         # Paquet npm
         npm.npx_global) _M="npx utilise un dossier temporaire : des hooks globaux pointeraient vers un dossier effacé. Installe d'abord le paquet : npm install -g repowarden, puis repowarden install --global." ;;
         npm.no_npm) _M="npm requis : https://nodejs.org" ;;

@@ -145,6 +145,7 @@ _msg_en() {
         hook.pre_push.5) _M="%s: no changed file, nothing to test." ;;
         hook.pre_push.6) _M="Nothing to test (branch deletion only)." ;;
         hook.pre_push.7) _M="Pre-push OK" ;;
+        hook.pre_push.workflow_scope) _M="gh token without the 'workflow' scope: GitHub will refuse a push touching .github/workflows/. Allow it (then sign in again): gh auth refresh -h github.com -s workflow" ;;
         hook.pre_push.lint.missing) _M="%s not installed, %s not checked (install: %s)." ;;
         hook.pre_push.lint.run) _M="%s: %s" ;;
         hook.branch_hint.1) _M="Branch name \"%s\" does not follow the convention: commits and pushes will be refused. Rename:" ;;
@@ -415,6 +416,7 @@ _msg_en() {
         ci.notify.failure) _M="❌ %s: release workflow failed: %s" ;;
         # GitHub CLI
         bot.no_gh) _M="GitHub CLI (gh) required: https://cli.github.com" ;;
+        gh.not_logged) _M="gh not logged in: gh auth login -s workflow" ;;
         # npm package
         npm.npx_global) _M="npx uses a temporary folder: global hooks would point to a deleted folder. Install the package first: npm install -g repowarden, then repowarden install --global." ;;
         npm.no_npm) _M="npm required: https://nodejs.org" ;;

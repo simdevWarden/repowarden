@@ -19,7 +19,7 @@ case "${1:-}" in
 esac
 
 [ $# -ge 2 ] || { aide >&2; exit 1; }
-command -v gh >/dev/null || { err_t bot.no_gh; exit 1; }
+gh_ready || exit 1
 
 n="${1}"
 texte="${2}"

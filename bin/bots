@@ -48,8 +48,8 @@ fi
 [ -n "$GIT_TOPLEVEL" ] || pas_maintenant bots.why_repo
 cd "$GIT_TOPLEVEL"
 [ "$FORGE" = github ] || pas_maintenant bots.why_github
-command -v gh >/dev/null || pas_maintenant bots.why_gh
-gh auth status >/dev/null 2>&1 || pas_maintenant bots.why_gh_login
+gh_present || pas_maintenant bots.why_gh
+gh_connected || pas_maintenant bots.why_gh_login
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
 [ -n "$REPO" ] || pas_maintenant bots.why_github
 [ "$(gh api "repos/$REPO" --jq .permissions.admin 2>/dev/null || true)" = true ] || pas_maintenant bots.why_admin
