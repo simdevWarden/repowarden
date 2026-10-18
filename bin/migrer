@@ -14,7 +14,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # shellcheck source=../hooks/lib/common.sh
 source "$ROOT/hooks/lib/common.sh"
 
-aide() { sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//'; }
+aide() { _tr help.migrer; printf '%b\n' "$_T" >&2; }
 
 PR="" HOOKS_LEFTHOOK=""
 while [ $# -gt 0 ]; do

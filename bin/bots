@@ -20,7 +20,7 @@ source "$ROOT/hooks/lib/common.sh"
 # shellcheck source=../hooks/lib/lang.sh
 source "$ROOT/hooks/lib/lang.sh"
 
-aide() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; }
+aide() { _tr help.bots; printf '%b\n' "$_T" >&2; }
 
 # Commandes enchaînées (remplaçables dans les tests)
 BIN="${REPOWARDEN_BIN:-$ROOT/bin}"

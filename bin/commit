@@ -1,19 +1,16 @@
 #!/usr/bin/env bash
-# Assistant de commit conventionnel : guide l'en-tête, le corps et le pied.
-#   git cc [options de git commit]     alias installé par install.sh
-#   bin/commit --dry-run               affiche le message sans commiter
-#   git cc --strict                    une réponse refusée arrête tout (scripts :
-#                                      sans cela, la ligne suivante serait lue
-#                                      comme une nouvelle réponse)
-#   git cc -m "description" [--type T] [--scope S] [--breaking NOTE]
-#          [--body TEXTE] [--refs "Ticket : #12"]
-#                                      sans question (scripts, agents) : mêmes
-#                                      contrôles, toute réponse refusée arrête
-#                                      tout ; type et scope déduits de la
-#                                      branche s'ils sont omis
-# Les réponses sont lues sur l'entrée standard (terminal avec édition de
-# ligne, ou fichier/tube pour les tests). Le commit passe ensuite par les
-# hooks habituels. Couleurs désactivables : NO_COLOR=1.
+# Usage : repowarden cc [options de git commit]   (alias : git cc, installé par install.sh)
+#         repowarden cc -m "description" [--type T] [--scope S] [--breaking NOTE] [--body TEXTE] [--refs "Ticket : #12"]
+#         repowarden cc --dry-run
+#
+# Assistant de commit conventionnel : guide l'en-tête, le corps et le pied,
+# puis commit via les hooks habituels. Sans question (-m : scripts, agents) :
+# mêmes contrôles, type et scope déduits de la branche s'ils sont omis.
+#   --strict    une réponse refusée arrête tout (rien n'est commité)
+#   --dry-run   affiche le message sans commiter
+# Les réponses sont lues sur l'entrée standard (terminal avec édition de ligne,
+# ou fichier/tube pour les tests). Le commit passe ensuite par les hooks
+# habituels. Couleurs désactivables : NO_COLOR=1.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"

@@ -42,8 +42,7 @@ if [ "$commande" = sync ]; then
     exit 0
 fi
 if [ "$commande" != init ]; then
-    sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'
-    [ "$commande" = "" ] || [ "$commande" = -h ] || [ "$commande" = --help ]
+    _tr help.tickets; printf '%b\n' "$_T"
     exit
 fi
 

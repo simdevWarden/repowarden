@@ -18,7 +18,7 @@ source "$ROOT/hooks/lib/common.sh"
 # shellcheck source=../hooks/lib/tickets.sh
 source "$ROOT/hooks/lib/tickets.sh"
 
-aide() { sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; }
+aide() { _tr help.ticket; printf '%b\n' "$_T" >&2; }
 
 [ -n "$GIT_TOPLEVEL" ] || { err_t install.not_repo; exit 1; }
 cd "$GIT_TOPLEVEL"
@@ -119,7 +119,9 @@ case "${1:-}" in
         if [ -n "$REPLY" ]; then
             info_t tk.cli.current "$branche" "$REPLY"
         else
-            ticket_hint "$branche"
+            err_t tk.cli.no_ticket_here
+            aide >&2
+            exit 1
         fi
         ;;
     *)

@@ -10,14 +10,8 @@ source "$ROOT/hooks/lib/common.sh"
 source "$ROOT/hooks/lib/i18n.sh"
 
 aide() {
-    cat <<EOF
-Usage: repowarden pr checks <n>
-
-Affiche l'état des checks de la PR #<n>.
-
-Exemple:
-  repowarden pr checks 123
-EOF
+    _tr help.pr
+    printf '%b\n' "$_T"
 }
 
 [ $# -eq 1 ] || { aide >&2; exit 1; }

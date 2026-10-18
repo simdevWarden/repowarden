@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Code mort introduit par ta branche, comme en CI : seules les lignes ajoutées ou
-# modifiées depuis la base comptent (commits, modifications en cours, nouveaux fichiers).
-#   bin/code-mort [base]     défaut : point de départ de la branche depuis origin/main
+# Usage : repowarden code-mort [base]
+#
+# Code mort introduit par ta branche, comme en CI : seules les lignes ajoutées
+# ou modifiées depuis la base comptent (commits, modifications en cours,
+# nouveaux fichiers). Défaut : point de départ de la branche depuis origin/main.
 # Voir docs/code-mort.md : ce qui est prouvé (bloquant) et ce qui est candidat.
 set -euo pipefail
 

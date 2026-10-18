@@ -194,7 +194,7 @@ answer() { printf '%s\n' "$@" | "$CC" 2>&1; }
 }
 
 @test "catalogues : chaque cle existe en francais et en anglais" {
-    cles() { grep -oE '^        [a-z_.0-9]+\)' "$1" | tr -d ' )' | sort; }
+    cles() { grep -oE '^        [a-z_.0-9-]+\)' "$1" | tr -d ' )' | sort; }
     diff <(cles "$HOOKS/lib/i18n/fr.sh") <(cles "$HOOKS/lib/i18n/en.sh")
 }
 
