@@ -35,6 +35,8 @@ majeure_r() {
     local v
     repowarden_version_r "$ROOT"
     v="$REPLY"
+    # 0.0.0-dev : version inconnue (clone sans tags), rien à déduire
+    if [ "$v" = 0.0.0-dev ]; then REPLY=""; return; fi
     REPLY="${v%%.*}"
     REPLY="${REPLY%%-*}"
     [[ "$v" != *.0.0-* ]] || REPLY=$((REPLY - 1))
@@ -45,6 +47,7 @@ else
     majeure_r
     MAJEURE="$REPLY"
 fi
+[ -n "$MAJEURE" ] || { err_t mig.unknown_version "$ROOT"; exit 1; }
 [[ "$MAJEURE" =~ ^[1-9][0-9]*$ ]] || { err_t mig.no_major "$MAJEURE"; exit 1; }
 BRANCHE="chore/migration-repowarden-v$MAJEURE"
 

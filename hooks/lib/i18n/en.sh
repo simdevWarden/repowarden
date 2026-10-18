@@ -331,6 +331,7 @@ _msg_en() {
         ci.proteger.tags_none) _M="not protected (--sans-tags)" ;;
         ci.proteger.unknown_team) _M="Unknown or inaccessible team: %s (format @organisation/team)" ;;
         ci.proteger.unknown_user) _M="Unknown user: %s" ;;
+        mig.unknown_version) _M="repowarden version unknown (clone without tags): git -C %s fetch --tags, or REPOWARDEN_MAJEURE=4 repowarden migrer." ;;
         mig.no_major) _M="repowarden major version not found (%s): REPOWARDEN_MAJEURE=4 repowarden migrer." ;;
         mig.dirty) _M="Uncommitted changes: commit or stash before repowarden migrer --pr." ;;
         mig.pr_open) _M="Migration PR already open (%s): nothing to do." ;;

@@ -120,11 +120,28 @@ YML
 @test "migrer : version majeure du tag flottant de la version installee, valeur invalide refusee" {
     unset REPOWARDEN_MAJEURE
     # le dépôt repowarden courant donne une version : vN publié existe
+    # (clone sans tags : version inconnue, cas vérifié par le test suivant)
+    source "$BATS_TEST_DIRNAME/../hooks/lib/ui.sh"
+    repowarden_version_r "$BATS_TEST_DIRNAME/.."
+    [ "$REPLY" != 0.0.0-dev ] || skip "clone de repowarden sans tags : git fetch --tags"
     run "$MIGRER"
     [ "$status" -eq 0 ]
     grep -qE 'uses: simdevWarden/repowarden@v[1-9][0-9]*$' .github/workflows/repowarden.yml
     REPOWARDEN_MAJEURE=x run "$MIGRER"
     [ "$status" -ne 0 ]
+}
+
+@test "migrer : version inconnue (clone sans tags) -> marche a suivre, rien de modifie" {
+    unset REPOWARDEN_MAJEURE
+    # Copie de repowarden sans .git : version 0.0.0-dev de package.json
+    copie="$BATS_TEST_TMPDIR/repowarden-sans-tags"
+    mkdir -p "$copie"
+    cp -R "$BATS_TEST_DIRNAME/../bin" "$BATS_TEST_DIRNAME/../hooks" "$BATS_TEST_DIRNAME/../package.json" "$copie/"
+    avant="$(git status --porcelain)"
+    run "$copie/bin/migrer"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Version de repowarden inconnue (clone sans tags) : git -C $copie fetch --tags"* ]] || false
+    [ "$(git status --porcelain)" = "$avant" ]
 }
 
 @test "migrer --pr : branche, commit conventionnel, push et PR ; rien si une PR est ouverte" {

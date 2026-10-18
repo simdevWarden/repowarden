@@ -370,7 +370,9 @@ check_version() {
     root="${HOOKS_DIR%/hooks}"
     repowarden_version_r "$root"
     installed="$REPLY"
-    [ -n "$installed" ] || return 0
+    # 0.0.0-dev : version inconnue (clone sans tags, git clone --depth) ;
+    # aucune comparaison possible, pas de fausse alerte à chaque commit
+    [ -n "$installed" ] && [ "$installed" != 0.0.0-dev ] || return 0
     local IFS=.
     # shellcheck disable=SC2206 # découpage voulu sur les points
     w=($wanted) i=($installed)
