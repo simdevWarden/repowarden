@@ -20,12 +20,17 @@ deadcode_projects() {
     local base="$1" changed added found partial dir p plugins niveau f l msg path proven=0 cand=0 mode ignore pat code var
     local ran="" file tmp partiel=0
     # Un dossier temporaire unique : les fichiers de l'analyse, dont le
-    # fichier témoin de l'analyse partielle (voir deadcode_partial)
+    # fichier témoin de l'analyse partielle (voir deadcode_partial). Créés
+    # vides tout de suite : sans plugin ni fichier non suivi, rien ne les
+    # ouvrirait en écriture, et leur lecture (« done < found ») échouerait.
     tmp="$(mktemp -d)"
     changed="$tmp/changed"
     added="$tmp/added"
     found="$tmp/found"
     partial="$tmp/partial"
+    : >"$changed"
+    : >"$added"
+    : >"$found"
     : >"$partial"
     DEADCODE_PARTIAL_FILE="$partial"
     export DEADCODE_PARTIAL_FILE
