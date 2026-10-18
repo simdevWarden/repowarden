@@ -79,11 +79,32 @@ setup() {
 @test "version : projet qui demande une version plus recente -> avertissement et commande de mise a jour" {
     initial_commit
     git switch -q -c feat/version
+    # Version installée connue, même dans un clone sans tags : copie publiée en 4.9.3
+    copie="$BATS_TEST_TMPDIR/repowarden-4.9.3"
+    mkdir -p "$copie"
+    cp -R "$HOOKS" "$copie/"
+    sed 's/"version": "[^"]*"/"version": "4.9.3"/' "$BATS_TEST_DIRNAME/../package.json" >"$copie/package.json"
+    git config core.hooksPath "$copie/hooks"
     git config repowarden.version 99.0.0
     echo a >a.txt && git add a.txt
     run git commit -m "feat: a"
     [ "$status" -eq 0 ] # avertissement seulement : la CI fait foi
     [[ "$output" == *"demande repowarden 99.0.0 ou plus récent"* ]] || false
+}
+
+@test "version : version inconnue (clone sans tags) -> aucune fausse alerte" {
+    initial_commit
+    git switch -q -c feat/version
+    # Hooks d'une copie de repowarden sans .git : version 0.0.0-dev
+    copie="$BATS_TEST_TMPDIR/repowarden-sans-tags"
+    mkdir -p "$copie"
+    cp -R "$HOOKS" "$BATS_TEST_DIRNAME/../package.json" "$copie/"
+    git config core.hooksPath "$copie/hooks"
+    git config repowarden.version 4
+    echo a >a.txt && git add a.txt
+    run git commit -m "feat: a"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"demande repowarden"* ]] || false
 }
 
 @test "version : version installee suffisante -> aucun message" {

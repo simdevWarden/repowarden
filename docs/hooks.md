@@ -57,7 +57,7 @@ Format `<type>(<scope>): <description>` ; `!` après le type pour un changement 
 | `docs` | documentation | correctif |
 | `style`, `refactor`, `test`, `build`, `ci`, `chore`, `revert` | formatage, restructuration, tests, build, CI, maintenance, annulation | aucune à eux seuls |
 
-**Agents IA** : les signatures d'agent (`Co-Authored-By: Claude …`, « 🤖 Generated with … ») sont **retirées** du message, et un commit dont l'auteur ou le committer est un agent (`noreply@anthropic.com`, Copilot, Cursor, Devin) est **refusé** : l'historique porte l'identité d'une personne. Les bots d'automatisation (`github-actions`, App repowarden, Dependabot) ne sont pas concernés. Pour autoriser les agents : `git config repowarden.allowAgentSignatures true` (ou dans `.repowarden.conf`).
+**Agents IA** : les signatures d'agent (`Co-Authored-By: Claude …`, « 🤖 Generated with … ») sont **retirées** du message, et un commit dont l'auteur ou le committer est un agent (`noreply@anthropic.com`, Copilot, Cursor, Devin) est **refusé** : l'historique porte l'identité d'une personne. Les bots d'automatisation (`github-actions`, App repowarden, Dependabot) ne sont pas concernés. Pour autoriser les agents : `git config repowarden.allowAgentSignatures true` (ou dans `.repowarden.conf`). Pour arrêter un agent **avant** qu'il ne modifie une branche protégée ou ne contourne les hooks : [garde-fou des agents](agents.md) (`repowarden agents init`).
 
 Un `!` (`feat!: …`) ou un pied de page `BREAKING CHANGE:` donne une **version majeure**. Voir [releases automatiques](industrialisation.md#2-versions-et-releases-automatiques).
 
