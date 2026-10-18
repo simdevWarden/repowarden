@@ -297,6 +297,7 @@ _msg_fr() {
         ci.proteger.no_delivery_env) _M="main exigera un déploiement « %s » réussi, mais aucun workflow ne crée ce déploiement : un déploiement que rien ne crée bloquerait main pour toujours. Appeler release-auto.yml avec delivery-environment (voir docs/releases.md, flux develop), ou deliveryApproval = review dans .repowarden.conf." ;;
         ci.proteger.stale_concurrency) _M="%s : une demande de livraison (manuelle ou planifiée) en attente bloquerait en silence les suivantes. Mettre cancel-in-progress: \${{ github.event_name != 'push' }} (une nouvelle demande remplace celle en attente) et un groupe par déclencheur : release-\${{ github.ref_name }}-\${{ github.event.schedule || github.event_name }}." ;;
         ci.proteger.urgent) _M="  étiquette « urgent » créée (son merge lance la demande de livraison)" ;;
+        ci.proteger.urgent_dry) _M="  étiquette « urgent » sera créée (son merge lance la demande de livraison)" ;;
         ci.proteger.verify_missing) _M="%s : ruleset absent en ligne" ;;
         ci.proteger.verify_diff) _M="%s : règles en ligne différentes\n    en ligne : %s\n    attendu  : %s" ;;
         ci.proteger.verify_fix) _M="Règles périmées : relancer repowarden proteger pour les mettre à jour." ;;
