@@ -181,8 +181,15 @@ verifier_git() {
 # Ligne de commande shell : chaque commande (&&, ||, ;, |, retour à la ligne),
 # « cd » suivi, variables d'environnement en tête ignorées
 verifier_shell() {
-    local commande="$1" segment mots m
+    local commande="$1" segment mots m nl=$'\n' lignes
     dir="$cwd"
+    # Une commande par ligne. Découpage hors de <( … ) : bash 3.2 (macOS) y
+    # lit mal ces motifs (« bad substitution ») et ne vérifierait plus rien
+    lignes="${commande//&&/$nl}"
+    lignes="${lignes//||/$nl}"
+    lignes="${lignes//;/$nl}"
+    lignes="${lignes//|/$nl}"
+    lignes="${lignes//&/$nl}"
     while IFS= read -r segment; do
         # shellcheck disable=SC2162 # les antislashs restent tels quels, comme dans la commande
         read -a mots <<<"$segment" || true
@@ -209,15 +216,7 @@ verifier_shell() {
                 verifier_git "${@//[\"\']/}"
                 ;;
         esac
-    done < <(
-        # $'\n' dans "${…//…/…}" n'est pas interprété par bash 3.2 : variable
-        nl=$'\n'
-        commande="${commande//&&/$nl}"
-        commande="${commande//||/$nl}"
-        commande="${commande//;/$nl}"
-        commande="${commande//|/$nl}"
-        printf '%s\n' "${commande//&/$nl}"
-    )
+    done <<<"$lignes"
 }
 
 case "$outil" in
