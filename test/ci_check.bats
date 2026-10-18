@@ -1462,6 +1462,86 @@ python_dead_code() {
     [[ "$output" == *"ruff / vulture absent"* ]] || false
 }
 
+# Faux ruff seul : rien à signaler (code sain), vulture échoue à --version
+# (absent, même s'il serait installé sur la machine)
+fake_ruff_only() {
+    mkdir -p "$BATS_TEST_TMPDIR/bin"
+    cat >"$BATS_TEST_TMPDIR/bin/ruff" <<'T'
+#!/usr/bin/env bash
+[ "$1" = --version ] && { echo "ruff 0.0"; exit 0; }
+exit 0
+T
+    printf '#!/bin/sh\nexit 127\n' >"$BATS_TEST_TMPDIR/bin/vulture"
+    chmod +x "$BATS_TEST_TMPDIR/bin/ruff" "$BATS_TEST_TMPDIR/bin/vulture"
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+}
+
+# Faux vulture seul (ruff absent) : rien à signaler (code sain)
+fake_vulture_only() {
+    mkdir -p "$BATS_TEST_TMPDIR/bin"
+    cat >"$BATS_TEST_TMPDIR/bin/vulture" <<'T'
+#!/usr/bin/env bash
+[ "$1" = --version ] && { echo "vulture 0.0"; exit 0; }
+exit 0
+T
+    printf '#!/bin/sh\nexit 127\n' >"$BATS_TEST_TMPDIR/bin/ruff"
+    chmod +x "$BATS_TEST_TMPDIR/bin/ruff" "$BATS_TEST_TMPDIR/bin/vulture"
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+}
+
+@test "code mort : ruff seul -> analyse partielle, pas de feu vert sans reserve" {
+    fake_ruff_only
+    python_dead_code
+    run "$CHECK" deadcode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Python : vulture absent, analyse partielle du code mort (pip install vulture)"* ]] || false
+    [[ "$output" == *"Aucun nouveau code mort dans ce qui a été analysé : analyse partielle, voir ci-dessus."* ]] || false
+    [[ "$output" != *"Aucun nouveau code mort."* ]] || false
+}
+
+@test "code mort : vulture seul -> analyse partielle sur ruff signalee" {
+    fake_vulture_only
+    python_dead_code
+    run "$CHECK" deadcode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Python : ruff absent, analyse partielle du code mort (pip install ruff)"* ]] || false
+    [[ "$output" == *"Aucun nouveau code mort dans ce qui a été analysé : analyse partielle, voir ci-dessus."* ]] || false
+    [[ "$output" != *"Aucun nouveau code mort."* ]] || false
+}
+
+@test "code mort : aucun outil -> analyse partielle, jamais un feu vert sans reserve" {
+    # ruff et vulture « absents » : ils échouent à --version (portable, Windows compris)
+    mkdir -p "$BATS_TEST_TMPDIR/bin"
+    for t in ruff vulture; do printf '#!/bin/sh\nexit 127\n' >"$BATS_TEST_TMPDIR/bin/$t"; chmod +x "$BATS_TEST_TMPDIR/bin/$t"; done
+    export PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+    python_dead_code
+    run "$CHECK" deadcode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"ruff / vulture absent"* ]] || false
+    [[ "$output" == *"Aucun nouveau code mort dans ce qui a été analysé : analyse partielle, voir ci-dessus."* ]] || false
+    [[ "$output" != *"Aucun nouveau code mort."* ]] || false
+}
+
+@test "code mort : typescript seul -> analyse partielle sur knip signalee" {
+    mkdir -p node_modules/.bin
+    printf '#!/bin/sh\nexit 0\n' >node_modules/.bin/tsc
+    chmod +x node_modules/.bin/tsc
+    echo "node_modules/" >.gitignore
+    echo "{}" >package.json
+    echo "{}" >tsconfig.json
+    git add -A
+    git commit -q --no-verify -m "chore: base"
+    export REPOWARDEN_BASE="$(git rev-parse HEAD)"
+    echo "export const a = 1;" >app.ts
+    git add -A
+    git commit -q --no-verify -m "feat: app"
+    run "$CHECK" deadcode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"JavaScript / TypeScript : knip absent, analyse partielle du code mort (npm i -D knip)"* ]] || false
+    [[ "$output" == *"Aucun nouveau code mort dans ce qui a été analysé : analyse partielle, voir ci-dessus."* ]] || false
+    [[ "$output" != *"Aucun nouveau code mort."* ]] || false
+}
+
 @test "code mort : sortie PMD (Java) interpretee" {
     mkdir -p "$BATS_TEST_TMPDIR/bin" src/a
     printf '#!/bin/sh\nprintf "src/a/A.java:3:\\tUnnecessaryImport:\\tUnused import x\\n"; exit 4\n' >"$BATS_TEST_TMPDIR/bin/pmd"

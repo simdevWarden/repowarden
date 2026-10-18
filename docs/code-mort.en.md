@@ -31,6 +31,10 @@ repowarden only reports dead code **introduced** by the PR (lines added or chang
 
 In CI, the action installs PMD for a Java project (pinned version and checksum). Other tools are the project's own. A missing tool is reported without failing, even in strict mode: detection remains an aid.
 
+## Partial analysis
+
+When a language has several tools (Python: ruff and vulture; JavaScript: `tsc` and knip) and only one is installed, the analysis is **partial**: repowarden says so, with the missing installation ("Python: vulture not installed, partial dead code analysis (pip install vulture)"). And above all, with no finding in what was analysed, the closing message is no longer the green light "No new dead code", but "No new dead code in what was analysed: partial analysis, see above". No tool of the language at all: the "dead code not analysed" message remains, and also counts as a partial analysis.
+
 ## Usage
 
 - **CI**: the `deadcode` check, included by default in the action (`checks:`).

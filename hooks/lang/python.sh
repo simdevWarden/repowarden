@@ -63,17 +63,27 @@ python_test() {
 # vulture (confiance 100 % : prouvé, en dessous : candidat — les frameworks
 # appellent des fonctions par leur nom)
 python_deadcode() {
-    local ran=""
+    local ran="" a_ruff=0 a_vulture=0
     if python_has ruff; then
         ran=1
+        a_ruff=1
         python_run ruff check --select F401,F811,F841 --output-format concise --quiet --exit-zero . 2>/dev/null |
             sed -nE 's/^(.+):([0-9]+):[0-9]+: F[0-9]+ (\[\*\] )?(.*)$/prouve\t\1\t\2\t\4/p'
     fi
     if python_has vulture; then
         ran=1
+        a_vulture=1
         python_run vulture . --min-confidence 60 --exclude ".venv,venv,node_modules,build,dist,site-packages" 2>/dev/null |
             sed -nE -e 's/^(.+):([0-9]+): (.*) \(100% confidence\)$/prouve\t\1\t\2\t\3/p' \
                 -e 's/^(.+):([0-9]+): (.*) \(([0-9]+)% confidence\)$/candidat\t\1\t\2\t\3 (\4 %)/p'
     fi
-    [ -n "$ran" ] || deadcode_tool_missing Python "ruff / vulture"
+    if [ -z "$ran" ]; then
+        deadcode_tool_missing Python "ruff / vulture"
+    elif [ "$a_ruff" = 0 ]; then
+        # vulture seul : les imports et variables inutilisés restent à analyser
+        deadcode_partial Python ruff "pip install ruff"
+    elif [ "$a_vulture" = 0 ]; then
+        # ruff seul : les fonctions et classes inutilisées restent à analyser
+        deadcode_partial Python vulture "pip install vulture"
+    fi
 }

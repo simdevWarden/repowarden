@@ -17,11 +17,18 @@
 # Code mort introduit depuis $1 (base) dans les fichiers lus sur stdin.
 # Retour : 1 si un élément bloque selon le réglage deadcode.
 deadcode_projects() {
-    local base="$1" changed added found dir p plugins niveau f l msg path proven=0 cand=0 mode ignore pat code var
-    local ran="" file
-    changed="$(mktemp)"
-    added="$(mktemp)"
-    found="$(mktemp)"
+    local base="$1" changed added found partial dir p plugins niveau f l msg path proven=0 cand=0 mode ignore pat code var
+    local ran="" file tmp partiel=0
+    # Un dossier temporaire unique : les fichiers de l'analyse, dont le
+    # fichier témoin de l'analyse partielle (voir deadcode_partial)
+    tmp="$(mktemp -d)"
+    changed="$tmp/changed"
+    added="$tmp/added"
+    found="$tmp/found"
+    partial="$tmp/partial"
+    : >"$partial"
+    DEADCODE_PARTIAL_FILE="$partial"
+    export DEADCODE_PARTIAL_FILE
     cat >"$changed"
 
     # Lignes ajoutées ou modifiées (fichier:ligne), du commit de base à
@@ -109,14 +116,18 @@ deadcode_projects() {
             attention_t dc.candidate "$path" "$msg"
         fi
     done <"$found"
-    rm -f "$changed" "$added" "$found"
+    # Une analyse partielle (outil absent) interdit tout feu vert sans réserve
+    [ ! -s "$partial" ] || partiel=1
+    rm -rf "$tmp"
 
     if [ -z "$ran" ]; then
         info_t dc.nothing
         return 0
     fi
     if [ "$proven" = 0 ] && [ "$cand" = 0 ]; then
-        ok_t dc.none
+        if [ "$partiel" = 1 ]; then attention_t dc.none_partial
+        else ok_t dc.none
+        fi
         return 0
     fi
     [ "$cand" = 0 ] || info_t dc.summary_candidates "$cand"
@@ -137,8 +148,28 @@ deadcode_projects() {
 }
 
 # Outil d'analyse absent : signalé, sans faire échouer le mode strict
-# (la détection de code mort reste une aide, pas un prérequis du projet)
-deadcode_tool_missing() { attention_t dc.tool_missing "$1" "$2"; }
+# (la détection de code mort reste une aide, pas un prérequis du projet).
+# Un outil totalement absent compte comme une analyse partielle.
+deadcode_tool_missing() {
+    attention_t dc.tool_missing "$1" "$2"
+    deadcode_partial_note "$1"
+}
+
+# Analyse partielle : $1 langage, $2 outil absent, $3 installation à donner.
+# Un des outils du langage manque : ce qu'il couvre n'est pas analysé, et la
+# fin de l'analyse ne dira pas que tout va bien (voir deadcode_projects).
+deadcode_partial() {
+    attention_t dc.partial "$1" "$2" "$3"
+    deadcode_partial_note "$1"
+}
+
+# Note l'analyse partielle : les plugins tournent dans un sous-shell de tube
+# ({ … } |), une variable ne reviendrait pas — le signal passe par un fichier
+# témoin sous le dossier temporaire de l'analyse
+deadcode_partial_note() {
+    [ -n "${DEADCODE_PARTIAL_FILE:-}" ] || return 0
+    printf '%s\n' "$1" >>"$DEADCODE_PARTIAL_FILE"
+}
 
 # Java (Maven, Gradle) : règles PMD dont le résultat est prouvé — import,
 # champ, méthode ou variable privés jamais utilisés dans leur portée
