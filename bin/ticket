@@ -23,6 +23,19 @@ aide() { _tr help.ticket; printf '%b\n' "$_T" >&2; }
 [ -n "$GIT_TOPLEVEL" ] || { err_t install.not_repo; exit 1; }
 cd "$GIT_TOPLEVEL"
 
+# Vrai si remote.origin.fetch couvre déjà la branche $1 : ligne exacte, ou
+# refspec générale d'un clone normal. Évite d'empiler la même ligne à chaque
+# appel (la config de l'utilisateur est laissée intacte quand elle suffit).
+refspec_covers() {
+    local ligne
+    while IFS= read -r ligne; do
+        case "$ligne" in
+            "+refs/heads/$1:refs/remotes/origin/$1" | "+refs/heads/*:refs/remotes/origin/*") return 0 ;;
+        esac
+    done < <(git config --get-all remote.origin.fetch)
+    return 1
+}
+
 # Se place sur la branche $1 (locale, ou suivie depuis origin)
 switch_to() {
     if git show-ref -q --verify "refs/heads/$1"; then
@@ -30,8 +43,10 @@ switch_to() {
     else
         # Clone mono-branche : la ref du ticket existe sans être suivie, et
         # « switch --track » la refuse (« … is not a branch ») tant que la
-        # refspec ne la couvre pas. On l'ajoute à la config avant de suivre.
-        git config --add remote.origin.fetch "+refs/heads/$1:refs/remotes/origin/$1"
+        # refspec ne la couvre pas. On la couvre une seule fois, puis on suit.
+        if ! refspec_covers "$1"; then
+            git config --add remote.origin.fetch "+refs/heads/$1:refs/remotes/origin/$1"
+        fi
         git fetch -q origin
         git switch -q --track -c "$1" "origin/$1"
     fi

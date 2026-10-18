@@ -155,22 +155,22 @@ fi
 
 # Jeton gh sans le scope « workflow » : GitHub refuserait après le commit un
 # push qui touche .github/workflows/ (OAuth App). Signalé avant, sans bloquer
-# (un push par SSH passe). Sans gh, ou gh non connecté : rien.
-if has gh; then
+# (un push par SSH passe). Le fichier poussé est regardé d'abord, sans gh :
+# « gh auth status » (appel réseau) n'a lieu que si un workflow est poussé.
+WORKFLOW_PUSHED=0
+while read -r _ local_sha _ remote_sha; do
+    # suppression de branche : rien à pousser
+    if [ -z "$local_sha" ] || [[ "$local_sha" =~ ^0+$ ]]; then continue; fi
+    case "$(changed_files "$local_sha" "$remote_sha")" in
+        *".github/workflows/"*) WORKFLOW_PUSHED=1; break ;;
+    esac
+done <<<"$REFS"
+
+if [ "$WORKFLOW_PUSHED" -eq 1 ] && has gh; then
     if GH_SCOPES="$(gh auth status 2>&1)"; then
         case "$GH_SCOPES" in
             *workflow*) ;;
-            *)
-                while read -r _ local_sha _ remote_sha; do
-                    # suppression de branche : rien à pousser
-                    if [ -z "$local_sha" ] || [[ "$local_sha" =~ ^0+$ ]]; then continue; fi
-                    case "$(changed_files "$local_sha" "$remote_sha")" in
-                        *".github/workflows/"*)
-                            attention_t hook.pre_push.workflow_scope
-                            break ;;
-                    esac
-                done <<<"$REFS"
-                ;;
+            *) attention_t hook.pre_push.workflow_scope ;;
         esac
     fi
 fi
