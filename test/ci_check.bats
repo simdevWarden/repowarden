@@ -15,6 +15,10 @@ setup() {
     BASE_SHA="$(git rev-parse HEAD)"
     git switch -q -c feat/x
     export REPOWARDEN_BASE="$BASE_SHA" REPOWARDEN_BRANCH=feat/x
+    # check.sh met REPOWARDEN_BIN (défaut ~/.local/bin) en tête du PATH : un
+    # ruff installé là par pipx passerait avant les faux outils des tests
+    mkdir -p "$BATS_TEST_TMPDIR/repowarden-bin"
+    export REPOWARDEN_BIN="$BATS_TEST_TMPDIR/repowarden-bin"
     # isole des variables CI de l'environnement d'exécution
     unset GITHUB_ACTIONS GITHUB_BASE_REF GITHUB_HEAD_REF GITHUB_REF_NAME CI_COMMIT_BRANCH \
         CI_MERGE_REQUEST_SOURCE_BRANCH_NAME CI_MERGE_REQUEST_DIFF_BASE_SHA \
