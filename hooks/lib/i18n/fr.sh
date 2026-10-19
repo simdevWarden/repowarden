@@ -111,6 +111,14 @@ _msg_fr() {
         hook.pre_commit.3) _M="  (désactiver pour ce dépôt : git config repowarden.skip protect-branch)" ;;
         hook.pre_commit.4) _M="Détection de secrets (gitleaks)" ;;
         hook.pre_commit.5) _M="Secret détecté : commit refusé." ;;
+        hook.secrets.where) _M="  %s:%s (%s)" ;;
+        hook.secrets.unreadable) _M="  (rapport de gitleaks illisible : relancer gitleaks git --pre-commit --staged --redact pour voir les fuites)" ;;
+        hook.secrets.todo) _M="Que faire :" ;;
+        hook.secrets.todo_1) _M="  1. Retirer la valeur du fichier (variable d'environnement, fichier ignoré), puis recommencer le commit." ;;
+        hook.secrets.todo_2) _M="  2. Fichier qui ne doit jamais être versionné : l'ajouter à .gitignore, puis git rm --cached <fichier>." ;;
+        hook.secrets.todo_3) _M="  3. Clé qui a pu fuir ailleurs (déjà poussée, partagée) : la révoquer chez son fournisseur." ;;
+        hook.secrets.todo_4) _M="  Faux positif : ajouter son empreinte à .gitleaksignore :" ;;
+        hook.secrets.failed) _M="gitleaks en échec (code %s) : commit refusé, détection de secrets non faite." ;;
         hook.pre_commit.6) _M="gitleaks absent, détection de secrets ignorée (installation : %s)." ;;
         hook.pre_commit.7) _M="Pre-commit OK" ;;
         hook.commit_msg.1) _M="Première ligne trop longue (%s > 72 caractères)." ;;

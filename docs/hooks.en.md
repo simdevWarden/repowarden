@@ -13,6 +13,24 @@
 
 One-off bypass: `git commit --no-verify`, `git push --no-verify` — the [CI](ci.md) re-runs the checks.
 
+## Secrets at pre-commit
+
+With [gitleaks](https://github.com/gitleaks/gitleaks) installed, the staged content is scanned before each commit. A secret found rejects the commit and tells **where** it is, **never showing its value**:
+
+```text
+✖ Secret detected: commit refused.
+  config/app.ini:3 (github-pat)
+
+What to do:
+  1. Remove the value from the file (environment variable, ignored file), then commit again.
+  2. File that must never be versioned: add it to .gitignore, then git rm --cached <file>.
+  3. Key that may have leaked elsewhere (already pushed, shared): revoke it at its provider.
+  False positive: add its fingerprint to .gitleaksignore:
+    config/app.ini:github-pat:3
+```
+
+A failing gitleaks (invalid configuration, incompatible version) also rejects the commit, with its error message: detection was not done, and it is never presented as a leak. Without gitleaks, detection is skipped with the install command; the [CI](ci.md) `secrets` check runs it again. Disable for a repository: `git config repowarden.skip secrets`.
+
 ## Lint at pre-push
 
 The `pre-push` hook runs linters on changed files **before** tests:

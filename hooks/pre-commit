@@ -6,6 +6,7 @@ set -euo pipefail
 source "$(dirname "$0")/lib/common.sh"
 source "$(dirname "$0")/lib/lang.sh"
 source "$(dirname "$0")/lib/safety.sh"
+source "$(dirname "$0")/lib/secrets.sh"
 exit_if_skipped
 check_version
 cd "$GIT_TOPLEVEL"
@@ -33,10 +34,26 @@ fi
 if ! skipped secrets; then
     if has gitleaks; then
         step_t hook.pre_commit.4
-        if ! gitleaks git --pre-commit --staged --redact --no-banner; then
-            err_t hook.pre_commit.5 >&2
+        # Journal de gitleaks tu (horodatage, couleurs à chaque commit) ; ses
+        # trouvailles lues dans un rapport JSON. Code 42 : fuite ; tout autre
+        # code non nul : gitleaks en échec (jamais présenté comme une fuite)
+        rapport="$(mktemp)"
+        journal="$(mktemp)"
+        code=0
+        gitleaks git --pre-commit --staged --redact --no-banner --log-level error \
+            --report-format json --report-path "$rapport" --exit-code 42 >/dev/null 2>"$journal" || code=$?
+        if [ "$code" -ne 0 ]; then
+            if [ "$code" -eq 42 ]; then
+                err_t hook.pre_commit.5 >&2
+                secrets_report "$rapport" >&2
+            else
+                err_t hook.secrets.failed "$code" >&2
+                cat "$journal" >&2
+            fi
+            rm -f "$rapport" "$journal"
             exit 1
         fi
+        rm -f "$rapport" "$journal"
     else
         # Installation adaptée au système (bash le connaît sans sous-processus)
         case "${OSTYPE:-}" in
