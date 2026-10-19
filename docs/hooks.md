@@ -13,6 +13,24 @@
 
 Contournement ponctuel : `git commit --no-verify`, `git push --no-verify` — la [CI](ci.md) refait les vérifications.
 
+## Secrets au pre-commit
+
+Avec [gitleaks](https://github.com/gitleaks/gitleaks) installé, le contenu stagé est analysé avant chaque commit. Un secret trouvé refuse le commit et dit **où** il est, **sans jamais afficher sa valeur** :
+
+```text
+✖ Secret détecté : commit refusé.
+  config/app.ini:3 (github-pat)
+
+Que faire :
+  1. Retirer la valeur du fichier (variable d'environnement, fichier ignoré), puis recommencer le commit.
+  2. Fichier qui ne doit jamais être versionné : l'ajouter à .gitignore, puis git rm --cached <fichier>.
+  3. Clé qui a pu fuir ailleurs (déjà poussée, partagée) : la révoquer chez son fournisseur.
+  Faux positif : ajouter son empreinte à .gitleaksignore :
+    config/app.ini:github-pat:3
+```
+
+gitleaks en panne (configuration invalide, version incompatible) refuse aussi le commit, avec son message d'erreur : la détection n'a pas été faite, ce n'est jamais présenté comme une fuite. Sans gitleaks, la détection est ignorée avec la commande d'installation ; la vérification `secrets` de la [CI](ci.md) la refait. Désactiver pour un dépôt : `git config repowarden.skip secrets`.
+
 ## Lint au pre-push
 
 Le hook `pre-push` lance des linters sur les fichiers modifiés **avant** les tests :
