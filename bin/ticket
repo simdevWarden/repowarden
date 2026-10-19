@@ -18,16 +18,36 @@ source "$ROOT/hooks/lib/common.sh"
 # shellcheck source=../hooks/lib/tickets.sh
 source "$ROOT/hooks/lib/tickets.sh"
 
-aide() { sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'; }
+aide() { _tr help.ticket; printf '%b\n' "$_T" >&2; }
 
 [ -n "$GIT_TOPLEVEL" ] || { err_t install.not_repo; exit 1; }
 cd "$GIT_TOPLEVEL"
+
+# Vrai si remote.origin.fetch couvre déjà la branche $1 : ligne exacte, ou
+# refspec générale d'un clone normal. Évite d'empiler la même ligne à chaque
+# appel (la config de l'utilisateur est laissée intacte quand elle suffit).
+refspec_covers() {
+    local ligne
+    while IFS= read -r ligne; do
+        case "$ligne" in
+            "+refs/heads/$1:refs/remotes/origin/$1" | "+refs/heads/*:refs/remotes/origin/*") return 0 ;;
+        esac
+    done < <(git config --get-all remote.origin.fetch)
+    return 1
+}
 
 # Se place sur la branche $1 (locale, ou suivie depuis origin)
 switch_to() {
     if git show-ref -q --verify "refs/heads/$1"; then
         git switch -q "$1"
     else
+        # Clone mono-branche : la ref du ticket existe sans être suivie, et
+        # « switch --track » la refuse (« … is not a branch ») tant que la
+        # refspec ne la couvre pas. On la couvre une seule fois, puis on suit.
+        if ! refspec_covers "$1"; then
+            git config --add remote.origin.fetch "+refs/heads/$1:refs/remotes/origin/$1"
+        fi
+        git fetch -q origin
         git switch -q --track -c "$1" "origin/$1"
     fi
 }
@@ -37,7 +57,7 @@ prendre() { gh issue edit "$1" --add-assignee @me >/dev/null 2>&1 || true; }
 
 cmd_ticket() {
     local n="$1" json etat titre etiquettes base
-    command -v gh >/dev/null || { err_t bot.no_gh; exit 1; }
+    gh_ready || exit 1
     step_t tk.cli.fetch "$n"
     git fetch -q origin --prune
     ticket_remote_branch_r "$n"
@@ -83,7 +103,7 @@ cmd_nouveau() {
         shift
     done
     [ -n "$titre" ] || { err_t tk.cli.title_required; exit 1; }
-    command -v gh >/dev/null || { err_t bot.no_gh; exit 1; }
+    gh_ready || exit 1
     if tickets_managed; then
         etiquettes+=(--label "$S_AVALIDER")
         [ -z "$type" ] || etiquettes+=(--label "type: $type")
@@ -119,7 +139,9 @@ case "${1:-}" in
         if [ -n "$REPLY" ]; then
             info_t tk.cli.current "$branche" "$REPLY"
         else
-            ticket_hint "$branche"
+            err_t tk.cli.no_ticket_here
+            aide >&2
+            exit 1
         fi
         ;;
     *)

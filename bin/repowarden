@@ -21,6 +21,8 @@
 #   repowarden npm-publication                     publication npm automatique
 #   repowarden app init                            GitHub App des workflows (une fois)
 #   repowarden bot [init|rapport]                  bot d'organisation (dépôt de pilotage)
+#   repowarden agents init [--claude] [--opencode] garde-fou des agents IA
+#   repowarden garde [--format claude|opencode]    vérifie une action d'agent
 #   repowarden --version
 set -euo pipefail
 
@@ -38,11 +40,55 @@ source "$ROOT/hooks/lib/ui.sh"
 # shellcheck source=../hooks/lib/i18n.sh
 source "$ROOT/hooks/lib/i18n.sh"
 
-aide() { sed -n '2,24p' "$ROOT/bin/repowarden" | sed 's/^# \{0,1\}//'; }
+# Clé d'aide d'une commande, alias compris ; vide si la commande est inconnue.
+help_key_r() {
+    case "$1" in
+        install) REPLY=help.install ;;
+        uninstall) REPLY=help.uninstall ;;
+        bots) REPLY=help.bots ;;
+        bot) REPLY=help.bot ;;
+        agents) REPLY=help.agents ;;
+        garde | guard) REPLY=help.garde ;;
+        cc | commit) REPLY=help.cc ;;
+        code-mort | deadcode) REPLY=help.code-mort ;;
+        ticket) REPLY=help.ticket ;;
+        tickets) REPLY=help.tickets ;;
+        pr) REPLY=help.pr ;;
+        run) REPLY=help.run ;;
+        app) REPLY=help.app ;;
+        migrer | migrate) REPLY=help.migrer ;;
+        proteger | protect) REPLY=help.proteger ;;
+        npm-publication | npm-publish) REPLY=help.npm-publication ;;
+        "" | statut | status) REPLY=help.statut ;;
+        *) REPLY="" ;;
+    esac
+}
+
+aide() { _tr help.main; printf '%b\n' "$_T" >&2; }
 
 commande="${1:-}"
+cmd="$commande"
 [ $# -eq 0 ] || shift
-case "$commande" in
+
+# Une seule interception : le premier argument de la sous-commande, testé
+# avant l'exécution (code 0, rien n'est fait). Seul ce premier argument
+# compte : cc -m "--help" reste un message. pr et run gardent leurs
+# sous-commandes (label, checks, rerun, list), dispatchées plus bas.
+case "${1:-}" in
+    -h | --help | help)
+        help_key_r "$cmd"
+        if [ -n "$REPLY" ]; then
+            _tr "$REPLY"
+            printf '%b\n' "$_T"
+            exit 0
+        fi
+        err_t install.unknown_arg "$cmd"
+        aide
+        exit 1
+        ;;
+esac
+
+case "$cmd" in
     install)
         # npx : paquet dans un cache temporaire, effaçable à tout moment ;
         # des hooks globaux y pointeraient vers un dossier disparu
@@ -59,6 +105,28 @@ case "$commande" in
     ticket) exec bash "$ROOT/bin/ticket" "$@" ;;
     ticket-comment) exec bash "$ROOT/bin/ticket-comment" "$@" ;;
     ticket-label) exec bash "$ROOT/bin/ticket-label" "$@" ;;
+    pr)
+        if [ $# -ge 1 ]; then
+            case "$1" in
+                label) exec bash "$ROOT/bin/pr-label" "${@:2}" ;;
+                checks) exec bash "$ROOT/bin/pr-checks" "${@:2}" ;;
+                *) err_t install.unknown_arg "$1"; _tr help.pr; printf '%b\n' "$_T" >&2; exit 1 ;;
+            esac
+        else
+            _tr help.pr; printf '%b\n' "$_T"; exit 0
+        fi
+        ;;
+    run)
+        if [ $# -ge 1 ]; then
+            case "$1" in
+                rerun) exec bash "$ROOT/bin/run-rerun" "${@:2}" ;;
+                list) exec bash "$ROOT/bin/run-list" "${@:2}" ;;
+                *) err_t install.unknown_arg "$1"; _tr help.run; printf '%b\n' "$_T" >&2; exit 1 ;;
+            esac
+        else
+            _tr help.run; printf '%b\n' "$_T"; exit 0
+        fi
+        ;;
     pr-label) exec bash "$ROOT/bin/pr-label" "$@" ;;
     run-rerun) exec bash "$ROOT/bin/run-rerun" "$@" ;;
     run-list) exec bash "$ROOT/bin/run-list" "$@" ;;
@@ -69,15 +137,20 @@ case "$commande" in
     app) exec bash "$ROOT/bin/app" "$@" ;;
     bots) exec bash "$ROOT/bin/bots" "$@" ;;
     bot) exec bash "$ROOT/bin/bot" "$@" ;;
+    agents) exec bash "$ROOT/bin/agents" "$@" ;;
+    garde | guard) exec bash "$ROOT/bin/garde" "$@" ;;
     -v | --version | version)
         repowarden_version_r "$ROOT"
         echo "$REPLY"
         ;;
     "" | statut | status) exec bash "$ROOT/bin/statut" "$@" ;;
-    -h | --help | help) aide ;;
+    -h | --help | help)
+        _tr help.main
+        printf '%b\n' "$_T"
+        ;;
     *)
-        err_t install.unknown_arg "$commande"
-        aide >&2
+        err_t install.unknown_arg "$cmd"
+        aide
         exit 1
         ;;
 esac

@@ -1,0 +1,237 @@
+#!/usr/bin/env bash
+# Garde-fou des agents IA : reçoit sur l'entrée standard une action d'agent
+# (JSON) et dit si elle est permise dans ce dépôt, avant qu'elle ne s'exécute.
+#   repowarden garde [--format claude|opencode]
+#     claude    hook PreToolUse de Claude Code : tool_name, tool_input, cwd
+#     opencode  plugin opencode (tool.execute.before) : tool, args, cwd (défaut)
+# Code 0 : permis. Code 2 : refusé, raison et commande à lancer sur la sortie
+# d'erreur (Claude Code bloque l'appel et transmet le message à l'agent ; le
+# plugin opencode lève une erreur). Tout autre code (jq absent, JSON illisible)
+# n'empêche rien : une panne du garde-fou ne bloque jamais un agent.
+# Seulement dans un dépôt repowarden ; ailleurs tout est permis. Mêmes réglages
+# que les hooks (protectedBranches, integrationBranch, suivi des tickets).
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# shellcheck source=../hooks/lib/common.sh
+source "$ROOT/hooks/lib/common.sh"
+# shellcheck source=../hooks/lib/tickets.sh
+source "$ROOT/hooks/lib/tickets.sh"
+
+aide() { _tr help.garde; printf '%b\n' "$_T"; }
+
+format=opencode
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h | --help) aide; exit 0 ;;
+        --format) shift; format="${1:-}" ;;
+        --format=*) format="${1#--format=}" ;;
+        *) err_t install.unknown_arg "$1"; aide >&2; exit 1 ;;
+    esac
+    shift
+done
+case "$format" in claude | opencode) ;; *) err_t garde.format "$format"; exit 1 ;; esac
+
+has jq || { attention_t garde.no_jq; exit 1; }
+entree="$(cat)"
+if [ "$format" = claude ]; then o=tool_name a=tool_input; else o=tool a=args; fi
+outil="$(jq -r ".$o // \"\"" <<<"$entree" 2>/dev/null)" || { attention_t garde.json; exit 1; }
+cwd="$(jq -r '.cwd // ""' <<<"$entree")"
+args="$(jq -c ".$a // {}" <<<"$entree")"
+[ -n "$cwd" ] && [ -d "$cwd" ] || cwd="$PWD"
+
+# Refus : raison et commande à lancer, puis code 2
+refuser() {
+    _tr "$@"
+    printf '✖ repowarden : %b\n' "$_T" >&2
+    exit 2
+}
+
+# REPLY = dossier existant le plus proche du chemin $1 (absolu, ou relatif à $cwd)
+dossier_r() {
+    local p="$1"
+    case "$p" in /*) ;; *) p="$cwd/$p" ;; esac
+    while [ ! -d "$p" ] && [ "$p" != / ] && [ -n "$p" ]; do p="$(dirname "$p")"; done
+    REPLY="$p"
+}
+
+# Vrai si le dossier courant est dans un dépôt repowarden : .repowarden.conf,
+# réglage repowarden.*, ou hooks repowarden actifs. Charge sa configuration.
+depot_repowarden() {
+    local hp
+    git rev-parse --show-toplevel >/dev/null 2>&1 || return 1
+    cfg_load
+    i18n_init
+    # shellcheck disable=SC2034 # cache de tickets_managed (tickets.sh), propre à ce dépôt
+    TICKETS_MANAGED=""
+    [ -n "$CFG_FILE$CFG_GIT" ] && return 0
+    hp="$(git config --get core.hooksPath 2>/dev/null || true)"
+    [ -n "$hp" ] && [ -f "$hp/lib/tickets.sh" ] && [ -f "$hp/lib/common.sh" ]
+}
+
+# Branche protégée : protectedBranches (défaut main master) ou branche d'intégration
+protegee() {
+    cfg_r protectedBranches "main master"
+    [[ " $REPLY " == *" $1 "* ]] && return 0
+    cfg_r integrationBranch ""
+    [ -n "$REPLY" ] && [ "$REPLY" = "$1" ]
+}
+
+# Modification du fichier $1 : seulement sur une branche de travail (de ticket,
+# si le dépôt suit ses tickets)
+verifier_fichier() {
+    dossier_r "$1"
+    local d="$REPLY"
+    (
+        cd "$d" 2>/dev/null || exit 0
+        depot_repowarden || exit 0
+        # Fichiers internes de git (.git/…) : hors du travail de l'agent
+        case "$(pwd -P)/" in "$(cd "$(git rev-parse --git-dir)" && pwd -P)"/*) exit 0 ;; esac
+        branche="$(git symbolic-ref -q --short HEAD 2>/dev/null || true)"
+        [ -n "$branche" ] || refuser garde.detache "$GIT_TOPLEVEL"
+        if protegee "$branche"; then
+            tickets_managed && refuser garde.protegee "$branche"
+            refuser garde.protegee_libre "$branche"
+        fi
+        if tickets_managed; then
+            branch_ticket_r "$branche"
+            [ -n "$REPLY" ] || refuser garde.hors_ticket "$branche"
+        fi
+        exit 0
+    ) || exit $?
+}
+
+# Commande git (mots $@, sans « git ») lancée depuis le dossier $dir
+verifier_git() {
+    local mot sous="" args_git=() repertoire="$dir"
+    # Options globales : -C <dossier> (cumulées), -c <clé=valeur>, autres
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -C) shift; case "${1:-}" in /*) repertoire="$1" ;; *) repertoire="$repertoire/${1:-}" ;; esac ;;
+            -c) shift ;;
+            -*) ;;
+            *) sous="$1"; shift; break ;;
+        esac
+        shift
+    done
+    [ -n "$sous" ] || return 0
+    args_git=("$@")
+    dossier_r "$repertoire"
+    repertoire="$REPLY"
+    (
+        cd "$repertoire" 2>/dev/null || exit 0
+        depot_repowarden || exit 0
+        ligne="git $sous${args_git[*]+ ${args_git[*]}}"
+        for mot in ${args_git[@]+"${args_git[@]}"}; do
+            [ "$mot" != --no-verify ] || refuser garde.no_verify "$ligne"
+        done
+        case "$sous" in
+            commit)
+                amend="" noedit=""
+                for mot in ${args_git[@]+"${args_git[@]}"}; do
+                    case "$mot" in
+                        --amend) amend=1 ;;
+                        --no-edit) noedit=1 ;;
+                        # Options courtes groupées : -n est --no-verify (-nm, -an…)
+                        -[!-]*) [[ "$mot" != *n* ]] || refuser garde.no_verify "$ligne" ;;
+                    esac
+                done
+                [ -n "$amend" ] && [ -n "$noedit" ] && exit 0
+                refuser garde.commit "$ligne"
+                ;;
+            add)
+                for mot in ${args_git[@]+"${args_git[@]}"}; do
+                    case "$mot" in
+                        . | ./ | --all | :/) refuser garde.add_tout "$ligne" ;;
+                        -[!-]*) [[ "$mot" != *A* ]] || refuser garde.add_tout "$ligne" ;;
+                    esac
+                done
+                ;;
+            checkout | switch | branch | worktree)
+                tickets_managed || exit 0
+                cree=""
+                case "$sous" in
+                    checkout) for mot in ${args_git[@]+"${args_git[@]}"}; do case "$mot" in -b | -B | --orphan) cree=1 ;; esac; done ;;
+                    switch) for mot in ${args_git[@]+"${args_git[@]}"}; do case "$mot" in -c | -C | --create | --force-create | --orphan | --create=* | --force-create=*) cree=1 ;; esac; done ;;
+                    worktree)
+                        [ "${args_git[0]:-}" = add ] || exit 0
+                        for mot in ${args_git[@]+"${args_git[@]}"}; do case "$mot" in -b | -B) cree=1 ;; esac; done
+                        ;;
+                    branch)
+                        nom=""
+                        for mot in ${args_git[@]+"${args_git[@]}"}; do
+                            case "$mot" in
+                                -d | -D | --delete | -m | -M | --move | -c | -C | --copy | -l | --list | -a | --all | -r | --remotes | \
+                                    -v | -vv | --verbose | --show-current | --contains | --no-contains | --merged | --no-merged | \
+                                    -u | --set-upstream-to | --set-upstream-to=* | --unset-upstream | --edit-description | --points-at) exit 0 ;;
+                                -*) ;;
+                                *) nom="$mot" ;;
+                            esac
+                        done
+                        [ -z "$nom" ] || cree=1
+                        ;;
+                esac
+                [ -z "$cree" ] || refuser garde.branche "$ligne"
+                ;;
+        esac
+        exit 0
+    ) || exit $?
+}
+
+# Ligne de commande shell : chaque commande (&&, ||, ;, |, retour à la ligne),
+# « cd » suivi, variables d'environnement en tête ignorées
+verifier_shell() {
+    local commande="$1" segment mots m nl=$'\n' lignes
+    dir="$cwd"
+    # Une commande par ligne. Découpage hors de <( … ) : bash 3.2 (macOS) y
+    # lit mal ces motifs (« bad substitution ») et ne vérifierait plus rien
+    lignes="${commande//&&/$nl}"
+    lignes="${lignes//||/$nl}"
+    lignes="${lignes//;/$nl}"
+    lignes="${lignes//|/$nl}"
+    lignes="${lignes//&/$nl}"
+    while IFS= read -r segment; do
+        # shellcheck disable=SC2162 # les antislashs restent tels quels, comme dans la commande
+        read -a mots <<<"$segment" || true
+        set -- ${mots[@]+"${mots[@]}"}
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                [A-Za-z_]*=* | '(' | '{' | '!' | command | exec | env | sudo | time | nohup) shift ;;
+                *) break ;;
+            esac
+        done
+        [ $# -gt 0 ] || continue
+        m="${1//[\"\']/}"
+        case "$m" in
+            cd)
+                case "${2:-}" in
+                    "" | \~) dir="$HOME" ;;
+                    /*) dir="${2//[\"\']/}" ;;
+                    \~/*) dir="$HOME/${2#\~/}" ;;
+                    *) dir="$dir/${2//[\"\']/}" ;;
+                esac
+                ;;
+            git | */git)
+                shift
+                verifier_git "${@//[\"\']/}"
+                ;;
+        esac
+    done <<<"$lignes"
+}
+
+case "$outil" in
+    Edit | Write | MultiEdit | NotebookEdit | edit | write | multiedit)
+        chemin="$(jq -r '.file_path // .filePath // .notebook_path // empty' <<<"$args" 2>/dev/null)"
+        [ -z "$chemin" ] || verifier_fichier "$chemin"
+        ;;
+    apply_patch)
+        while IFS= read -r chemin; do
+            [ -z "$chemin" ] || verifier_fichier "$chemin"
+        done < <(jq -r '.patchText // empty' <<<"$args" 2>/dev/null |
+            sed -nE -e 's/^\*\*\* (Add|Update|Delete) File: //p' -e 's/^\*\*\* Move to: //p')
+        ;;
+    Bash | bash)
+        verifier_shell "$(jq -r '.command // empty' <<<"$args" 2>/dev/null)"
+        ;;
+esac
+exit 0

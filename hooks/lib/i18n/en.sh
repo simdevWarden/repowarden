@@ -63,6 +63,7 @@ _msg_en() {
         tk.cli.issue_created_branch) _M="Ticket #%s created." ;;
         tk.cli.title_required) _M="Ticket title required: repowarden ticket nouveau \"<title>\"" ;;
         tk.cli.current) _M="Branch %s: ticket #%s." ;;
+        tk.cli.no_ticket_here) _M="No ticket for this branch." ;;
         cc.ticket_offer) _M="No ticket for this branch. Create one now (title: the description)? [y/N]: " ;;
         cc.ticket_created) _M="Ticket #%s created and referenced in the message." ;;
         cc.preview) _M="Message" ;;
@@ -106,6 +107,25 @@ _msg_en() {
         install.keys_migrated) _M="repogarde.* settings (%s) renamed to repowarden.*" ;;
         help.alias.feat) _M="(branch: feature/ accepted)" ;;
         help.alias.fix) _M="(branch: bugfix/, hotfix/ accepted)" ;;
+        # Help texts for commands (--help): single source shown by bin/repowarden
+        help.main) _M="Usage: repowarden <command> [options] · detailed help: repowarden <command> --help\n\n  repowarden                                     post status and next step\n  repowarden statut                              (same)\n  repowarden install [--global] [--lang fr|en]   activate hooks (install.sh)\n  repowarden uninstall [--global] [--purge]      remove them (before npm uninstall -g)\n  repowarden bots                                GitHub repo bots (CI, releases, tickets…)\n  repowarden cc                                  commit assistant\n  repowarden code-mort                           new dead code in branch\n  repowarden ticket                              ticket of the current branch\n  repowarden ticket <n>                          branch of ticket (created, linked if needed)\n  repowarden ticket nouveau \"<title>\"            new ticket\n  repowarden ticket comment <n> \"<text>\"         add a comment\n  repowarden ticket label <n> <label> [--remove] manage ticket labels\n  repowarden pr label <n> <label> [--remove]     manage PR labels\n  repowarden pr checks <n>                       show PR checks\n  repowarden run rerun <id|--failed|--workflow>  rerun a workflow\n  repowarden run list [--workflow <name>]        list recent runs\n  repowarden tickets init                        set up ticket tracking (GitHub)\n  repowarden tickets sync                        my assigned tickets → local branches\n  repowarden proteger [options]                  protect GitHub branches\n  repowarden migrer [--pr] [--hooks]             migrate from repogarde to repowarden\n  repowarden npm-publication                     automate npm publication\n  repowarden app init                            GitHub App for workflows (once)\n  repowarden bot [init|rapport]                  org bot (pilot repo)\n  repowarden agents init [--claude] [--opencode] AI agent guard (Claude Code, opencode)\n  repowarden garde                               checks an agent action (called by its hook)\n  repowarden --version                           installed version" ;;
+        help.statut) _M="Usage: repowarden statut   (or repowarden, no args)\n\nRead-only status of repowarden on this machine and in the current repo,\nplus the next command to run (like \"gh auth status\" or \"brew doctor\")." ;;
+        help.install) _M="Usage: repowarden install [--global] [--lang fr|en] [--bots | --sans-bots]\n\nActivate repowarden hooks (install.sh).\n  --global       all repos (and commit assistant: git cc)\n  --lang fr|en   message language (asked once if unset)\n  --bots         then propose repo bots (repowarden bots)\n  --sans-bots    never propose bots" ;;
+        help.uninstall) _M="Usage: repowarden uninstall [--global] [--purge] [--scan FOLDER]\n\nRemove repowarden hooks (only if owned). Do before npm uninstall -g.\n  --global        also remove global installation\n  --purge         remove caches and list repos still pointing to repowarden\n  --scan FOLDER   check repos in FOLDER still using repowarden (with --purge)" ;;
+        help.bots) _M="Usage: repowarden bots\n\nSet up GitHub repo bots (CI, releases, cleanup, tickets, App, protection,\nnpm): one global question, per-bot confirmation, preview, final confirmation.\nNothing done without consent. Can be rerun. Also via install --bots.\nNeeds a terminal, gh logged in and admin rights on the repo." ;;
+        help.bot) _M="Usage: repowarden bot [--repo o/r]… [--dry-run] [--rapport FILE]\n       repowarden bot rapport FILE\n       repowarden bot init\n\nOrg bot: nightly (and on demand) updates adopted projects (protection,\nmigration), publishes a report to the \"Rapport du bot repowarden\" issue.\n--dry-run shows without changes. init writes .github/workflows/bot.yml.\nUses installation token of the bot App (repowarden app init --bot)." ;;
+        help.cc) _M="Usage: repowarden cc [git commit options]   (alias: git cc)\n       repowarden cc -m \"description\" [--type T] [--scope S] [--breaking NOTE] [--body TEXT] [--refs \"Ticket: #12\"]\n       repowarden cc --dry-run\n\nConventional commit assistant: guides header, body and footer, runs hooks.\nBatch mode (-m etc.): same checks, type/scope inferred from branch if omitted.\n  --strict    any refused answer stops (nothing committed)\n  --dry-run   show message without committing" ;;
+        help.code-mort) _M="Usage: repowarden code-mort [base]\n\nDead code introduced by your branch (like CI): only added/changed lines\nsince base (commits, staged/uncommitted, new files). Default: merge-base\nwith origin/main. See docs/code-mort.md (proven vs candidates)." ;;
+        help.ticket) _M="Usage: repowarden ticket <n>                          branch for ticket (created, linked if needed)\n       repowarden ticket                              ticket of current branch\n       repowarden ticket nouveau \"<title>\" [--type fix] [--description \"…\"]\n       repowarden ticket comment <n> \"<text>\"         add comment\n       repowarden ticket label <n> <label> [--remove] manage labels\n\nTicket first: taking <n> assigns to you and switches to its branch\n(created from develop if needed). \"nouveau\" creates a ticket (\"à valider\"\nif tracking is managed). Needs gh connected (https://cli.github.com)." ;;
+        help.tickets) _M="Usage: repowarden tickets init [--repo owner/name] [--sans-validation-auto]\n       repowarden tickets sync\n\nSets up ticket tracking: labels, issue template, workflow; classifies\nexisting tickets; records PR branches. sync checks out local branches for\ntickets assigned to you (auto with ticketSync=auto, manual by default)." ;;
+        help.pr) _M="Usage: repowarden pr label <n> <label> [--remove]\n       repowarden pr checks <n>\n\nlabel adds or removes a label from PR #<n>; checks shows its checks\n(name, conclusion, status, link).\nExamples:\n  repowarden pr label 123 \"ready-for-review\"\n  repowarden pr label 123 \"needs-changes\" --remove\n  repowarden pr checks 123" ;;
+        help.run) _M="Usage: repowarden run rerun <run-id|--failed|--workflow <name>>\n       repowarden run list [--workflow <name>] [--limit N]\n\nrerun restarts a GitHub Actions workflow. list shows recent runs\n(default limit 20).\nExamples:\n  repowarden run rerun --failed\n  repowarden run list --workflow \"CI\" --limit 10" ;;
+        help.proteger) _M="Usage: repowarden proteger [--repo owner/name] [--checks \"repowarden,tests (ubuntu-latest)\"]\n       [--relecteurs N] [--codeowners] [--environnement NAME] [--approbateurs \"login …\"]\n       [--sans-tags] [--dry-run] [--verifier]\n\nProtects GitHub repo per .repowarden.conf: required PR, required checks,\nno force push/deletion, ruleset, squash merges, v* tags reserved to\nworkflows, optional human approvals. --verifier checks online rules\nwithout changes. Needs gh and admin rights." ;;
+        help.migrer) _M="Usage: repowarden migrer [--pr] [--hooks]\n\nMigrates from repogarde to repowarden (docs/migration-v4.md): configs,\nworkflows, renames, lists manual steps left. Safe to rerun.\n  --pr     on chore/migration-repowarden-vN: commit, push and PR\n  --hooks  also move leftover lefthook hooks to .git/hooks-lefthook/" ;;
+        help.npm-publication) _M="Usage: repowarden npm-publication [--repo owner/name] [--workflow release.yml]\n       [--environnement NAME] [--dry-run]\n\nSets up automatic npm publishing per release via OIDC (trusted publishing,\nprovenance). Needs npm logged in, package exists; if interrupted resumes.\nWorkflow: release.yml publishes via npm-publish.yml." ;;
+        help.garde) _M="Usage: repowarden garde [--format claude|opencode]   (reads the action on standard input)\n\nAI agent guard, called by the agent's hook before each action (repowarden\nagents init wires it): exit code 0 allowed, 2 refused with the command to\nrun. In a repowarden repository: no change on a detached HEAD, on a\nprotected branch, or outside a ticket branch when the repository tracks its\ntickets; branches created by repowarden ticket <n>, commits by repowarden\ncc; no --no-verify, no git add . / -A / --all. Requires jq." ;;
+        help.agents) _M="Usage: repowarden agents init [--claude] [--opencode] [--projet | --global]\n\nWires the guard (repowarden garde) into AI agents: Claude Code PreToolUse\nhook (.claude/settings.json), opencode plugin\n(.opencode/plugins/repowarden-garde.js). Without --claude or --opencode:\nboth. --projet (default): repository files, to commit; --global: user\nconfiguration. Re-runnable: existing files are completed, never\noverwritten." ;;
+        help.app) _M="Usage: repowarden app init [--repo owner/name] [--nom NAME] [--administration]\n       repowarden app init --bot\n\nCreates/sets up a GitHub App for repowarden workflows (Actions token doesn't\ntrigger other workflows; App token does). Browser-based manifest, minimal\npermissions, credentials stored securely, installed on repo. --bot for org\nbot (pilot repo). Needs gh and node. Rerunnable." ;;
         # Hooks and language plugins
         hook.pre_commit.1) _M="Commit refused: branch name does not follow the convention." ;;
         hook.pre_commit.2) _M="Direct commit on '%s' forbidden. Create a branch: git switch -c feat/my-feature" ;;
@@ -127,6 +147,7 @@ _msg_en() {
         hook.pre_push.5) _M="%s: no changed file, nothing to test." ;;
         hook.pre_push.6) _M="Nothing to test (branch deletion only)." ;;
         hook.pre_push.7) _M="Pre-push OK" ;;
+        hook.pre_push.workflow_scope) _M="gh token without the 'workflow' scope: GitHub will refuse a push touching .github/workflows/. Allow it (then sign in again): gh auth refresh -h github.com -s workflow" ;;
         hook.pre_push.lint.missing) _M="%s not installed, %s not checked (install: %s)." ;;
         hook.pre_push.lint.run) _M="%s: %s" ;;
         hook.branch_hint.1) _M="Branch name \"%s\" does not follow the convention: commits and pushes will be refused. Rename:" ;;
@@ -310,6 +331,7 @@ _msg_en() {
         ci.proteger.tags_none) _M="not protected (--sans-tags)" ;;
         ci.proteger.unknown_team) _M="Unknown or inaccessible team: %s (format @organisation/team)" ;;
         ci.proteger.unknown_user) _M="Unknown user: %s" ;;
+        mig.unknown_version) _M="repowarden version unknown (clone without tags): git -C %s fetch --tags, or REPOWARDEN_MAJEURE=4 repowarden migrer." ;;
         mig.no_major) _M="repowarden major version not found (%s): REPOWARDEN_MAJEURE=4 repowarden migrer." ;;
         mig.dirty) _M="Uncommitted changes: commit or stash before repowarden migrer --pr." ;;
         mig.pr_open) _M="Migration PR already open (%s): nothing to do." ;;
@@ -376,6 +398,12 @@ _msg_en() {
         dc.candidate) _M="%s: %s (candidate: check for dynamic usage)" ;;
         dc.nothing) _M="No file in an analysable language among the changes: nothing to check." ;;
         dc.none) _M="No new dead code." ;;
+        dc.none_partial) _M="No new dead code in what was analysed: partial analysis, see above." ;;
+        dc.partial) _M="%s: %s not installed: %s (%s)." ;;
+        dc.scope.functions) _M="unused functions and classes not analysed" ;;
+        dc.scope.imports) _M="unused imports and variables not analysed" ;;
+        dc.scope.locals) _M="unused variables, parameters and imports not analysed" ;;
+        dc.scope.files) _M="unreferenced files, exports and dependencies not analysed" ;;
         dc.summary_candidates) _M="%s candidate(s) to check: not blocking (reflection, framework or public API calls are possible)." ;;
         dc.summary_proven) _M="%s proven dead code item(s): remove them, or ignore them (deadcodeIgnore)." ;;
         dc.summary_strict) _M="%s dead code item(s) (deadcode = strict mode)." ;;
@@ -397,6 +425,7 @@ _msg_en() {
         ci.notify.failure) _M="❌ %s: release workflow failed: %s" ;;
         # GitHub CLI
         bot.no_gh) _M="GitHub CLI (gh) required: https://cli.github.com" ;;
+        gh.not_logged) _M="gh not logged in: gh auth login -s workflow" ;;
         # npm package
         npm.npx_global) _M="npx uses a temporary folder: global hooks would point to a deleted folder. Install the package first: npm install -g repowarden, then repowarden install --global." ;;
         npm.no_npm) _M="npm required: https://nodejs.org" ;;
@@ -641,6 +670,25 @@ _msg_en() {
         run.listing.workflow) _M="Listing runs for workflow \"%s\"..." ;;
         # PR checks
         pr.checks.checking) _M="Checking checks for PR #%s..." ;;
+        # AI agent guard (repowarden garde, repowarden agents)
+        garde.format) _M="Unknown format \"%s\": claude or opencode." ;;
+        garde.no_jq) _M="repowarden garde: jq missing, action not checked (install jq: https://jqlang.org)." ;;
+        garde.json) _M="repowarden garde: unreadable JSON input, action not checked." ;;
+        garde.detache) _M="change refused: detached HEAD in %s.\n  → Switch to a ticket's branch: repowarden ticket <n>" ;;
+        garde.protegee) _M="change refused: \"%s\" is a protected branch.\n  → Work on a ticket's branch: repowarden ticket <n>" ;;
+        garde.protegee_libre) _M="change refused: \"%s\" is a protected branch.\n  → Create a work branch: git switch -c <type>/<topic>" ;;
+        garde.hors_ticket) _M="change refused: branch \"%s\" is not a ticket's branch (<type>/<n>-<topic>).\n  → Take the ticket: repowarden ticket <n>" ;;
+        garde.branche) _M="command refused: \"%s\" creates a branch; here, branches come from tickets.\n  → repowarden ticket <n>" ;;
+        garde.commit) _M="command refused: \"%s\"; commits go through the assistant (only --amend --no-edit is allowed).\n  → repowarden cc -m \"<description>\" --refs \"Ticket : #<n>\"" ;;
+        garde.no_verify) _M="command refused: \"%s\" bypasses the repowarden hooks.\n  → Run it again without --no-verify and fix what the hooks report." ;;
+        garde.add_tout) _M="command refused: \"%s\" adds the whole repository.\n  → Add files one by one: git add <files>" ;;
+        agents.added) _M="%s: guard added (%s)." ;;
+        agents.present) _M="%s: guard already in place (%s)." ;;
+        agents.kept) _M="%s: %s exists and differs from the template; kept as is (template: %s)." ;;
+        agents.bad_json) _M="%s: %s is not valid JSON; nothing was changed." ;;
+        agents.no_jq) _M="jq is required to update %s (https://jqlang.org)." ;;
+        agents.versionner) _M="To commit: git add %s" ;;
+        agents.no_repowarden) _M="The guard calls \"repowarden garde\": repowarden must be on the PATH (npm install -g repowarden)." ;;
         *) _M="" ;;
     esac
 }

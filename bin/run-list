@@ -10,19 +10,8 @@ source "$ROOT/hooks/lib/common.sh"
 source "$ROOT/hooks/lib/i18n.sh"
 
 aide() {
-    cat <<EOF
-Usage: repowarden run list [--workflow <nom>] [--limit N]
-
-Liste les runs de workflows récents.
-
-Options:
-  --workflow <nom>   Filtre par nom de workflow
-  --limit N          Nombre max de runs (défaut: 20)
-
-Exemples:
-  repowarden run list
-  repowarden run list --workflow "CI" --limit 10
-EOF
+    _tr help.run
+    printf '%b\n' "$_T"
 }
 
 if [[ "$1" == "--help" || "$1" == "-h" ]]; then

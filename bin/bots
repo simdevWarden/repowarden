@@ -20,7 +20,7 @@ source "$ROOT/hooks/lib/common.sh"
 # shellcheck source=../hooks/lib/lang.sh
 source "$ROOT/hooks/lib/lang.sh"
 
-aide() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; }
+aide() { _tr help.bots; printf '%b\n' "$_T" >&2; }
 
 # Commandes enchaînées (remplaçables dans les tests)
 BIN="${REPOWARDEN_BIN:-$ROOT/bin}"
@@ -48,8 +48,8 @@ fi
 [ -n "$GIT_TOPLEVEL" ] || pas_maintenant bots.why_repo
 cd "$GIT_TOPLEVEL"
 [ "$FORGE" = github ] || pas_maintenant bots.why_github
-command -v gh >/dev/null || pas_maintenant bots.why_gh
-gh auth status >/dev/null 2>&1 || pas_maintenant bots.why_gh_login
+gh_present || pas_maintenant bots.why_gh
+gh_connected || pas_maintenant bots.why_gh_login
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || true)"
 [ -n "$REPO" ] || pas_maintenant bots.why_github
 [ "$(gh api "repos/$REPO" --jq .permissions.admin 2>/dev/null || true)" = true ] || pas_maintenant bots.why_admin

@@ -22,6 +22,7 @@
 - **Formatage** : seul le contenu stagé, avec l'outil du projet ; le travail en cours est préservé.
 - **Tests** : au push et en CI, seulement les projets touchés, sur le commit poussé.
 - **Code mort** : seul le nouveau code mort est signalé, prouvé (bloquant) ou candidat (à vérifier) ; `repowarden code-mort` en local.
+- **Agents IA** : Claude Code et opencode arrêtés avant de modifier une branche protégée, de travailler hors ticket ou de contourner les hooks, avec la commande à lancer ; `repowarden agents init`.
 - **Tickets** : chaque PR est reliée à un ticket validé (créé automatiquement s'il manque), suivi de « à valider » à « done » à la release ; `repowarden tickets init`.
 - **Versions et releases** : les commits étant conventionnels, la version suivante (semver) et le changelog se déduisent de l'historique ; un workflow réutilisable en fait des releases automatiques (PR de release validée par la CI puis mergée, tag, release), sans jeton ; dans le flux `develop` → `main`, un clic d'approbation par livraison.
 
@@ -95,7 +96,7 @@ Sans Node : `git clone https://github.com/simdevWarden/repowarden.git ~/repoward
 > [!NOTE]
 > **GitHub CLI (`gh`) : facultatif.**
 > Sans `gh` : tous les hooks (commits, branches, secrets, formatage, tests), `git cc`, `repowarden code-mort`, `repowarden statut`, et la CI (GitHub ou GitLab), qui n'utilise jamais le `gh` du poste.
-> Avec `gh` connecté (`gh auth login`), en plus : les tickets (`repowarden ticket`, `tickets`, branches de tes tickets créées en local) et la gestion du dépôt (`proteger`, `app init`, `npm-publication`, `pr-*`, `run-*`). Utile au mainteneur du dépôt GitHub ; chaque commande le signale s'il manque.
+> Avec `gh` connecté (`gh auth login -s workflow` : le scope `workflow` autorise la modification de `.github/workflows/`), en plus : les tickets (`repowarden ticket`, `tickets`, branches de tes tickets créées en local) et la gestion du dépôt (`proteger`, `app init`, `npm-publication`, `pr-*`, `run-*`). Utile au mainteneur du dépôt GitHub ; chaque commande le signale s'il manque.
 
 ### 2. Dans un projet d'équipe : les mêmes règles pour tous
 
@@ -164,6 +165,6 @@ Les PR visent `develop` ; `main` ne reçoit que les livraisons, qui déclenchent
 
 ## Liens
 
-[Démarrage rapide](https://simdevwarden.github.io/repowarden/demarrage/) · [Hooks et règles](https://simdevwarden.github.io/repowarden/hooks/) · [Technologies](https://simdevwarden.github.io/repowarden/technologies/) · [Configuration](https://simdevwarden.github.io/repowarden/configuration/) · [CI](https://simdevwarden.github.io/repowarden/ci/) · [Versions et releases](https://simdevwarden.github.io/repowarden/releases/) · [Validation humaine](https://simdevwarden.github.io/repowarden/validation/) · [Code mort](https://simdevwarden.github.io/repowarden/code-mort/) · [En organisation](https://simdevwarden.github.io/repowarden/industrialisation/) · [Sources internes (Nexus, Artifactory)](https://simdevwarden.github.io/repowarden/industrialisation/#8-sources-internes-reseau-ferme-nexus-artifactory) · [Désinstallation](https://simdevwarden.github.io/repowarden/desinstallation/) · [Sécurité](SECURITY.md) · [Contribuer](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
+[Démarrage rapide](https://simdevwarden.github.io/repowarden/demarrage/) · [Hooks et règles](https://simdevwarden.github.io/repowarden/hooks/) · [Technologies](https://simdevwarden.github.io/repowarden/technologies/) · [Configuration](https://simdevwarden.github.io/repowarden/configuration/) · [CI](https://simdevwarden.github.io/repowarden/ci/) · [Versions et releases](https://simdevwarden.github.io/repowarden/releases/) · [Validation humaine](https://simdevwarden.github.io/repowarden/validation/) · [Code mort](https://simdevwarden.github.io/repowarden/code-mort/) · [Agents IA](https://simdevwarden.github.io/repowarden/agents/) · [En organisation](https://simdevwarden.github.io/repowarden/industrialisation/) · [Sources internes (Nexus, Artifactory)](https://simdevwarden.github.io/repowarden/industrialisation/#8-sources-internes-reseau-ferme-nexus-artifactory) · [Désinstallation](https://simdevwarden.github.io/repowarden/desinstallation/) · [Sécurité](SECURITY.md) · [Contribuer](CONTRIBUTING.md) · [Changelog](CHANGELOG.md)
 
 Licence [GPL-3.0-only](LICENSE) : GNU General Public License version 3.

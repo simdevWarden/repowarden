@@ -16,7 +16,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # shellcheck source=../hooks/lib/common.sh
 source "$ROOT/hooks/lib/common.sh"
 
-aide() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; }
+aide() { _tr help.bot; printf '%b\n' "$_T" >&2; }
 
 # Scripts appelés (remplaçables dans les tests) et origine des clones
 BIN="${REPOWARDEN_BIN:-$ROOT/bin}"

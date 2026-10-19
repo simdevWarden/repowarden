@@ -31,6 +31,10 @@ repowarden ne signale que le code mort **introduit** par la PR (lignes ajoutées
 
 En CI, l'action installe PMD pour un projet Java (version et empreinte figées). Les autres outils sont ceux du projet. Un outil absent est signalé, sans faire échouer même le mode strict : la détection reste une aide.
 
+## Analyse partielle
+
+Quand un langage a plusieurs outils (Python : ruff et vulture ; JavaScript : `tsc` et knip) et qu'il n'en est installé qu'un seul, l'analyse est **partielle** : repowarden le signale en nommant ce qui n'a pas été analysé (« Python : vulture absent : fonctions et classes inutilisées non analysées (pip install vulture) »). Et surtout, sans résultat sur ce qui a été analysé, le message de fin n'est plus le feu vert « Aucun nouveau code mort », mais « Aucun nouveau code mort dans ce qui a été analysé : analyse partielle, voir ci-dessus ». Aucun outil du langage n'est là : le message « code mort non analysé » reste, et compte aussi comme une analyse partielle.
+
 ## Utilisation
 
 - **CI** : vérification `deadcode`, incluse par défaut dans l'action (`checks:`).

@@ -10,21 +10,8 @@ source "$ROOT/hooks/lib/common.sh"
 source "$ROOT/hooks/lib/i18n.sh"
 
 aide() {
-    cat <<EOF
-Usage: repowarden run rerun <run-id|--failed|--workflow <nom>>
-
-Relance un workflow GitHub Actions.
-
-Options:
-  <run-id>           ID du run à relancer
-  --failed           Relance le dernier run échoué du repo
-  --workflow <nom>   Relance le dernier run du workflow spécifié
-
-Exemples:
-  repowarden run rerun 123456789
-  repowarden run rerun --failed
-  repowarden run rerun --workflow "CI"
-EOF
+    _tr help.run
+    printf '%b\n' "$_T"
 }
 
 [ $# -ge 1 ] || { aide >&2; exit 1; }

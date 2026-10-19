@@ -23,7 +23,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # shellcheck source=../hooks/lib/common.sh
 source "$ROOT/hooks/lib/common.sh"
 
-aide() { sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; }
+aide() { _tr help.app; printf '%b\n' "$_T" >&2; }
 
 commande="${1:-}"
 [ $# -eq 0 ] || shift
@@ -45,7 +45,7 @@ if [ "$commande" != init ]; then
     exit
 fi
 
-command -v gh >/dev/null || { err_t bot.no_gh; exit 1; }
+gh_ready || exit 1
 command -v node >/dev/null || { err_t app.no_node; exit 1; }
 [ -n "$REPO" ] || REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner)"
 owner="${REPO%%/*}"

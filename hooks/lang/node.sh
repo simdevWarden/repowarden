@@ -44,15 +44,17 @@ node_test() {
 # inaccessible : prouvé) ; knip s'il est installé dans le projet (fichiers,
 # exports, dépendances non référencés : candidats)
 node_deadcode() {
-    local ran=""
+    local ran="" a_tsc=0 a_knip=0
     if [ -f tsconfig.json ] && [ -x node_modules/.bin/tsc ]; then
         ran=1
+        a_tsc=1
         node_modules/.bin/tsc --noEmit -p . --noUnusedLocals --noUnusedParameters \
             --allowUnreachableCode false --pretty false 2>/dev/null |
             sed -nE 's/^(.+)\(([0-9]+),[0-9]+\): error (TS6133|TS6138|TS6192|TS6196|TS6198|TS7027): (.*)$/prouve\t\1\t\2\t\4/p'
     fi
     if [ -x node_modules/.bin/knip ] && has node; then
         ran=1
+        a_knip=1
         _tr dc.knip_file
         local m_file="$_T"
         _tr dc.knip_export
@@ -71,5 +73,15 @@ node_deadcode() {
                         for (const d of i[k] || []) out(i.file, 0, process.env.M_DEP + " " + d.name);
                 }'
     fi
-    [ -n "$ran" ] || deadcode_tool_missing "JavaScript / TypeScript" "typescript / knip"
+    if [ -z "$ran" ]; then
+        deadcode_tool_missing "JavaScript / TypeScript" "typescript / knip"
+    elif [ "$a_tsc" = 0 ]; then
+        # knip seul : les variables, paramètres et imports inutilisés restent à analyser
+        _tr dc.scope.locals
+        deadcode_partial "JavaScript / TypeScript" typescript "$_T" "npm i -D typescript"
+    elif [ "$a_knip" = 0 ]; then
+        # tsc seul : les fichiers, exports et dépendances non référencés restent à analyser
+        _tr dc.scope.files
+        deadcode_partial "JavaScript / TypeScript" knip "$_T" "npm i -D knip"
+    fi
 }
