@@ -65,9 +65,11 @@ hooks_actifs() {
     local hp
     hp="$(git config --get core.hooksPath 2>/dev/null || true)"
     [ -n "$hp" ] || return 1
+    # Absolu : /…, ou C:/… et C:\… (git pour Windows : Git Bash convertit
+    # le chemin passé à git config)
     case "$hp" in
         \~/*) hp="$HOME/${hp#\~/}" ;;
-        /*) ;;
+        /* | [A-Za-z]:[/\\]*) ;;
         *) hp="$(git rev-parse --show-toplevel)/$hp" ;;
     esac
     [ -f "$hp/commit-msg" ] && [ -f "$hp/lib/common.sh" ] && [ -f "$hp/lib/tickets.sh" ]

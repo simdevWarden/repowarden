@@ -152,7 +152,8 @@ has repowarden || attention_t agents.no_repowarden
 # dire maintenant (dossier de hooks repowarden : commit-msg et lib/common.sh)
 if [ "$portee" = projet ]; then
     hp="$(git config --get core.hooksPath 2>/dev/null || true)"
-    case "$hp" in "" | /*) ;; *) hp="$base/$hp" ;; esac
+    # Absolu : /…, ou C:/… et C:\… (git pour Windows)
+    case "$hp" in "" | /* | [A-Za-z]:[/\\]* | \~/*) ;; *) hp="$base/$hp" ;; esac
     lieu="$base" commande="repowarden install"
 else
     hp="$(git config --global --get core.hooksPath 2>/dev/null || true)"
