@@ -21,7 +21,7 @@ Seulement dans un dépôt repowarden (`.repowarden.conf`, réglage `repowarden.*
 | `--no-verify` (et `git commit -n`) | toujours | relancer sans, corriger ce que les hooks signalent |
 | `git add .`, `-A`, `--all` | toujours | `git add <fichiers>` |
 
-Chaque commande d'une ligne shell est vérifiée (`&&`, `;`, `|`…), dans le bon dépôt (`cd`, `git -C`). Un refus vaut pour **toute la ligne** : rien n'en est lancé, pas même les autres commandes (`git add a.txt && git commit …` n'ajoute rien), et le message le dit. Un refus donne la raison et la commande :
+L'aide et l'aperçu (`--help`, `-h`, `--dry-run` de `repowarden cc`, `git cc`, `git commit`) sont toujours permis : rien n'est commité. Chaque commande d'une ligne shell est vérifiée (`&&`, `;`, `|`…), dans le bon dépôt (`cd`, `git -C`). Un refus vaut pour **toute la ligne** : rien n'en est lancé, pas même les autres commandes (`git add a.txt && git commit …` n'ajoute rien), et le message le dit. Un refus donne la raison et la commande :
 
 ```text
 ✖ repowarden : modification refusée : « main » est une branche protégée.
