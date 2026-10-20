@@ -16,10 +16,12 @@ Only in a repowarden repository (`.repowarden.conf`, a `repowarden.*` setting or
 | Change a file | detached HEAD; protected branch (`protectedBranches`, `integrationBranch`); if the repository tracks its [tickets](tickets.md): branch that is not a ticket's branch (`type/<n>-topic`) | `repowarden ticket <n>` (without ticket tracking: `git switch -c <type>/<topic>`) |
 | Create a branch (`git checkout -b`, `git switch -c`, `git branch <name>`, `git worktree add -b`) | the repository tracks its tickets | `repowarden ticket <n>`: branches come from tickets |
 | `git commit` | always, except `--amend --no-edit` | `repowarden cc -m "…" --refs "Ticket : #<n>"` (or `git cc`) |
+| `repowarden cc`, `git cc` | protected branch: the commit would be refused there, and without a terminal `cc` does not create a branch for the agent | `git switch -c <type>/<topic>` (changes follow); if the repository tracks its tickets: `repowarden ticket <n>` |
+| any commit (`git commit --amend --no-edit` included) | repowarden hooks inactive in the repository (no `core.hooksPath` to the repowarden hooks): messages, secrets and formatting would not be checked | `repowarden install` (or `--global`) |
 | `--no-verify` (and `git commit -n`) | always | run it again without, fix what the hooks report |
 | `git add .`, `-A`, `--all` | always | `git add <files>` |
 
-Each command of a shell line is checked (`&&`, `;`, `|`…), in the right repository (`cd`, `git -C`). A refusal gives the reason and the command:
+Each command of a shell line is checked (`&&`, `;`, `|`…), in the right repository (`cd`, `git -C`). A refusal applies to **the whole line**: none of it runs, not even the other commands (`git add a.txt && git commit …` adds nothing), and the message says so. A refusal gives the reason and the command:
 
 ```text
 ✖ repowarden : change refused: "main" is a protected branch.
@@ -30,10 +32,18 @@ Each command of a shell line is checked (`&&`, `;`, `|`…), in the right reposi
 
 | Tool | Wiring | Project (`--projet`, default) | User (`--global`) |
 |---|---|---|---|
-| [Claude Code](https://code.claude.com/docs/en/hooks) | `PreToolUse` hook (`Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `Bash` tools): `repowarden garde --format claude` | `.claude/settings.json` | `~/.claude/settings.json` |
-| [opencode](https://opencode.ai/docs/plugins/) | plugin, `tool.execute.before` hook (`edit`, `write`, `apply_patch`, `bash` tools) | `.opencode/plugins/repowarden-garde.js` | `~/.config/opencode/plugins/repowarden-garde.js` |
+| [Claude Code](https://code.claude.com/docs/en/hooks) | `PreToolUse` hook (`Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `Bash` tools): `repowarden garde --format claude` | `.claude/settings.json` | `$CLAUDE_CONFIG_DIR/settings.json` ([if set](https://code.claude.com/docs/en/settings)), else `~/.claude/settings.json` |
+| [opencode](https://opencode.ai/docs/plugins/) | plugin, `tool.execute.before` hook (`edit`, `write`, `apply_patch`, `bash` tools) | `.opencode/plugins/repowarden-garde.js` | `$OPENCODE_CONFIG_DIR/plugins/` ([if set](https://opencode.ai/docs/config/)), else `${XDG_CONFIG_HOME:-~/.config}/opencode/plugins/` |
 
-`repowarden agents init --claude` or `--opencode` for a single tool. Re-runnable: an existing `settings.json` is completed (nothing if the hook is already there), a modified plugin is kept as is and reported. Nothing is ever overwritten.
+`repowarden agents init --claude` or `--opencode` for a single tool. Re-runnable: an existing `settings.json` is completed (nothing if the hook is already there), a modified plugin is kept as is and reported. Nothing is ever overwritten. repowarden hooks inactive (repository, or `--global` without `repowarden install --global`): reported, with the command, since the guard will then refuse commits.
+
+### Removing the guard
+
+```bash
+repowarden agents retirer             # repository; --global: user configuration (alias: remove)
+```
+
+Same options as `init` (`--claude`, `--opencode`, `--projet`, `--global`). Only what `init` wrote goes: in `settings.json`, the `repowarden garde` commands (other hooks and settings stay; the file is deleted if nothing is left); the opencode plugin if identical to the template (modified, it is kept and reported). Run again, nothing to remove, no error.
 
 ## Checker: `repowarden garde`
 

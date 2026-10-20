@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Branche le garde-fou repowarden (repowarden garde) dans les agents IA :
-#   repowarden agents init [--claude] [--opencode] [--projet | --global]
+#   repowarden agents init    [--claude] [--opencode] [--projet | --global]
+#   repowarden agents retirer [--claude] [--opencode] [--projet | --global]
 #     Claude Code  hook PreToolUse dans .claude/settings.json
 #     opencode     plugin .opencode/plugins/repowarden-garde.js
 # Sans --claude ni --opencode : les deux. --projet (défaut) : fichiers du dépôt,
-# à versionner ; --global : configuration de l'utilisateur. Relançable :
-# fichiers existants complétés, jamais écrasés.
+# à versionner ; --global : configuration de l'utilisateur, là où chaque outil
+# la lit (CLAUDE_CONFIG_DIR ; OPENCODE_CONFIG_DIR, sinon XDG_CONFIG_HOME).
+# Relançable : fichiers existants complétés, jamais écrasés ; retirer n'enlève
+# que ce qu'init a écrit.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -18,8 +21,10 @@ MODELE_OPENCODE="$ROOT/hooks/agents/repowarden-garde.js"
 COMMANDE_CLAUDE="repowarden garde --format claude"
 MATCHER_CLAUDE="Edit|Write|MultiEdit|NotebookEdit|Bash"
 
+action=""
 case "${1:-}" in
-    init) shift ;;
+    init | retirer) action="$1"; shift ;;
+    remove) action=retirer; shift ;;
     "" | -h | --help) aide; exit 0 ;;
     *) err_t install.unknown_arg "$1"; aide >&2; exit 1 ;;
 esac
@@ -44,8 +49,11 @@ if [ "$portee" = projet ]; then
     fichier_claude="$base/.claude/settings.json"
     fichier_opencode="$base/.opencode/plugins/repowarden-garde.js"
 else
-    fichier_claude="$HOME/.claude/settings.json"
-    fichier_opencode="$HOME/.config/opencode/plugins/repowarden-garde.js"
+    # Réglages utilisateur de Claude Code : $CLAUDE_CONFIG_DIR s'il est défini
+    # (code.claude.com/docs/en/settings) ; plugins globaux d'opencode :
+    # $OPENCODE_CONFIG_DIR, sinon $XDG_CONFIG_HOME/opencode (opencode.ai/docs/config)
+    fichier_claude="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
+    fichier_opencode="${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/plugins/repowarden-garde.js"
 fi
 
 ecrits=()
@@ -92,11 +100,68 @@ init_opencode() {
     ok_t agents.added opencode "$f"
 }
 
+# Hook PreToolUse : seules les commandes « repowarden garde » retirées ; une
+# entrée vidée disparaît, et le fichier s'il ne reste plus rien
+retirer_claude() {
+    local f="$fichier_claude" tmp
+    if [ ! -f "$f" ] || ! grep -q "repowarden garde" "$f"; then
+        ok_t agents.absent "Claude Code" "$f"
+        return 0
+    fi
+    has jq || { err_t agents.no_jq "$f"; return 1; }
+    jq -e . "$f" >/dev/null 2>&1 || { err_t agents.bad_json "Claude Code" "$f"; return 1; }
+    tmp="$(mktemp)"
+    jq '(.hooks.PreToolUse // []) as $p
+        | .hooks.PreToolUse = [$p[] | .hooks = [(.hooks // [])[] | select((.command // "") | test("repowarden garde") | not)]
+            | select(.hooks | length > 0)]
+        | if (.hooks.PreToolUse | length) == 0 then del(.hooks.PreToolUse) else . end
+        | if (.hooks | length) == 0 then del(.hooks) else . end' "$f" >"$tmp"
+    if [ "$(jq -c . "$tmp")" = "{}" ]; then
+        rm -f "$f"
+    else
+        cat "$tmp" >"$f"
+    fi
+    rm -f "$tmp"
+    ok_t agents.removed "Claude Code" "$f"
+}
+
+# Plugin opencode : supprimé s'il est celui du modèle ; modifié, gardé et signalé
+retirer_opencode() {
+    local f="$fichier_opencode"
+    if [ ! -f "$f" ]; then
+        ok_t agents.absent opencode "$f"
+    elif cmp -s "$f" "$MODELE_OPENCODE"; then
+        rm -f "$f"
+        ok_t agents.removed opencode "$f"
+    else
+        attention_t agents.kept_remove opencode "$f"
+    fi
+}
+
 statut=0
+if [ "$action" = retirer ]; then
+    [ -z "$claude" ] || retirer_claude || statut=1
+    [ -z "$opencode" ] || retirer_opencode || statut=1
+    exit "$statut"
+fi
 [ -z "$claude" ] || init_claude || statut=1
 [ -z "$opencode" ] || init_opencode || statut=1
 
 has repowarden || attention_t agents.no_repowarden
+# Hooks repowarden inactifs : le garde-fou refusera les commits, autant le
+# dire maintenant (dossier de hooks repowarden : commit-msg et lib/common.sh)
+if [ "$portee" = projet ]; then
+    hp="$(git config --get core.hooksPath 2>/dev/null || true)"
+    case "$hp" in "" | /*) ;; *) hp="$base/$hp" ;; esac
+    lieu="$base" commande="repowarden install"
+else
+    hp="$(git config --global --get core.hooksPath 2>/dev/null || true)"
+    lieu="(--global)" commande="repowarden install --global"
+fi
+case "$hp" in \~/*) hp="$HOME/${hp#\~/}" ;; esac
+if [ -z "$hp" ] || [ ! -f "$hp/commit-msg" ] || [ ! -f "$hp/lib/common.sh" ]; then
+    attention_t agents.sans_hooks "$lieu" "$commande"
+fi
 if [ "$portee" = projet ] && [ ${#ecrits[@]} -gt 0 ]; then
     info_t agents.versionner "${ecrits[*]#"$base/"}"
 fi
