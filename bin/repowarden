@@ -22,6 +22,7 @@
 #   repowarden app init                            GitHub App des workflows (une fois)
 #   repowarden bot [init|rapport]                  bot d'organisation (dépôt de pilotage)
 #   repowarden agents init [--claude] [--opencode] garde-fou des agents IA
+#   repowarden agents retirer                      le retire
 #   repowarden garde [--format claude|opencode]    vérifie une action d'agent
 #   repowarden --version
 set -euo pipefail

@@ -120,10 +120,58 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     [[ "$output" == *"repowarden cc -m"* ]] || false
     run shell 'git commit --amend'
     [ "$status" -eq 2 ]
-    for c in 'git commit --amend --no-edit' 'repowarden cc -m "x" --type feat' 'git cc -m x' 'git status'; do
+    for c in 'git commit --amend --no-edit' 'git status'; do
         run shell "$c"
         [ "$status" -eq 0 ] || { echo "$c refusé"; return 1; }
     done
+    git switch -q -c feat/essai
+    for c in 'repowarden cc -m "x" --type feat' 'git cc -m x'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refusé"; return 1; }
+    done
+}
+
+@test "garde : repowarden cc sur une branche protegee refuse, avec la branche a creer" {
+    for c in 'repowarden cc -m "x" --type feat' 'git cc -m x' "'repowarden' commit -m x"; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"« main » est une branche protégée, le commit y serait refusé"* ]] || false
+        [[ "$output" == *"git switch -c <type>/<sujet>"* ]] || false
+    done
+    # Depot qui suit ses tickets : la branche nait du ticket
+    git config repowarden.tickets true
+    run shell 'repowarden cc -m x'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"repowarden ticket <n>"* ]] || false
+}
+
+@test "garde : hooks repowarden inactifs -> commits refuses, avec repowarden install" {
+    printf '[repowarden]\n\tversion = 4\n' >.repowarden.conf
+    git config --unset core.hooksPath
+    git switch -q -c feat/essai
+    for c in 'repowarden cc -m x' 'git commit --amend --no-edit' 'git commit -m x'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"hooks repowarden ne sont pas actifs"*"repowarden install"* ]] || false
+    done
+    # Les modifications restent permises : seul le commit, non verifie, est refuse
+    run edit
+    [ "$status" -eq 0 ]
+    # Chemin relatif (depuis la racine du depot), comme git le lit : actifs
+    ln -s "$HOOKS" "$REPO/.hooks-rw" 2>/dev/null || cp -R "$HOOKS" "$REPO/.hooks-rw"
+    git config core.hooksPath .hooks-rw
+    run shell 'repowarden cc -m x'
+    [ "$status" -eq 0 ]
+}
+
+@test "garde : ligne de plusieurs commandes refusee en bloc, et l'agent le sait" {
+    git switch -q -c feat/essai
+    run shell 'git add README.md && git commit -m "feat: x"'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"Rien de cette ligne n'a été lancé"* ]] || false
+    run shell 'git commit -m "feat: x"'
+    [ "$status" -eq 2 ]
+    [[ "$output" != *"Rien de cette ligne"* ]] || false
 }
 
 @test "garde : --no-verify refuse (commit -n compris)" {
@@ -194,4 +242,8 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     REPOWARDEN_LANG=en run edit
     [ "$status" -eq 2 ]
     [[ "$output" == *'"main" is a protected branch'* ]] || false
+    REPOWARDEN_LANG=en run shell 'git add README.md && repowarden cc -m x'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"git switch -c <type>/<topic>"* ]] || false
+    [[ "$output" == *"Nothing on this line was run"* ]] || false
 }

@@ -222,9 +222,15 @@ if [ -z "$first_commit" ] && [ -z "$DRY_RUN" ] && ! skipped protect-branch &&
     suggestion="$type/${scope:-$REPLY}"
     t cc.protected_hint "$branch"
     printf '\n  %s%s%s\n' "$B" "$REPLY" "$N" >&2
+    # Sans question (-m : scripts, agents) : jamais de branche créée à la place
+    # de l'appelant ; la commande à lancer, plutôt qu'un abandon muet
+    if [ -n "$BATCH" ]; then
+        t cc.protected_batch "$suggestion"
+        printf '%s\n' "$REPLY" >&2
+        exit 1
+    fi
     while :; do
         t cc.new_branch_prompt "$suggestion"
-        ANSWER=n # sans question : jamais de branche créée à la place de l'utilisateur
         ask "$REPLY"
         name="${REPLY:-$suggestion}"
         # Réponse incomplète ou approximative : complétée (« feat » → feat/<scope>,
