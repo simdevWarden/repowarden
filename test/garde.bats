@@ -145,6 +145,23 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     [[ "$output" == *"repowarden ticket <n>"* ]] || false
 }
 
+@test "garde : aide et apercu de cc et git commit permis partout (rien n'est commite)" {
+    for c in 'repowarden cc --help' 'repowarden cc -h' 'repowarden cc --dry-run -m x' 'git cc --help' 'git commit -h' 'git commit --dry-run'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refusé : $output"; return 1; }
+    done
+    # Hooks inactifs : l'aide reste lisible, le commit non
+    printf '[repowarden]\n\tversion = 4\n' >.repowarden.conf
+    git config --unset core.hooksPath
+    run shell 'repowarden cc --help'
+    [ "$status" -eq 0 ]
+    run shell 'repowarden cc -m x'
+    [ "$status" -eq 2 ]
+    # --no-verify reste refuse, meme avec une aide
+    run shell 'git commit --dry-run --no-verify'
+    [ "$status" -eq 2 ]
+}
+
 @test "garde : hooks repowarden inactifs -> commits refuses, avec repowarden install" {
     printf '[repowarden]\n\tversion = 4\n' >.repowarden.conf
     git config --unset core.hooksPath

@@ -100,6 +100,16 @@ verifier_commit() {
     fi
 }
 
+# Vrai si les mots $@ demandent une lecture seule (aide, aperçu) : rien n'est
+# commité, rien à refuser
+lecture_seule() {
+    local mot
+    for mot in "$@"; do
+        case "$mot" in -h | --help | --dry-run) return 0 ;; esac
+    done
+    return 1
+}
+
 # repowarden cc / commit (ou git cc), lancé depuis le dossier $dir
 verifier_cc() {
     dossier_r "$dir"
@@ -169,6 +179,7 @@ verifier_git() {
         done
         case "$sous" in
             commit)
+                lecture_seule ${args_git[@]+"${args_git[@]}"} && exit 0
                 amend="" noedit=""
                 for mot in ${args_git[@]+"${args_git[@]}"}; do
                     case "$mot" in
@@ -183,7 +194,7 @@ verifier_git() {
                 refuser garde.commit "$ligne"
                 ;;
             cc)
-                verifier_commit "$ligne"
+                lecture_seule ${args_git[@]+"${args_git[@]}"} || verifier_commit "$ligne"
                 ;;
             add)
                 for mot in ${args_git[@]+"${args_git[@]}"}; do
@@ -227,7 +238,7 @@ verifier_git() {
 # Ligne de commande shell : chaque commande (&&, ||, ;, |, retour à la ligne),
 # « cd » suivi, variables d'environnement en tête ignorées
 verifier_shell() {
-    local commande="$1" segment mots m nl=$'\n' lignes
+    local commande="$1" segment mots m cmd_cc nl=$'\n' lignes
     dir="$cwd"
     # Une commande par ligne. Découpage hors de <( … ) : bash 3.2 (macOS) y
     # lit mal ces motifs (« bad substitution ») et ne vérifierait plus rien
@@ -264,7 +275,13 @@ verifier_shell() {
                 verifier_git "${@//[\"\']/}"
                 ;;
             repowarden | */repowarden)
-                case "${2//[\"\']/}" in cc | commit) verifier_cc "repowarden ${2//[\"\']/}" ;; esac
+                case "${2//[\"\']/}" in
+                    cc | commit)
+                        cmd_cc="repowarden ${2//[\"\']/}"
+                        shift 2
+                        lecture_seule "${@//[\"\']/}" || verifier_cc "$cmd_cc"
+                        ;;
+                esac
                 ;;
         esac
     done <<<"$lignes"
