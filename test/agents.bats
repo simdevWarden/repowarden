@@ -13,6 +13,9 @@ setup() {
     : >"$GIT_CONFIG_GLOBAL"
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME"
+    # Configuration des agents hors du HOME de test (devzone : CLAUDE_CONFIG_DIR
+    # pointe le vrai ~/.claude) : jamais suivie par les tests
+    unset CLAUDE_CONFIG_DIR OPENCODE_CONFIG_DIR XDG_CONFIG_HOME
     setup_repo
     initial_commit
     # repowarden dans le PATH, comme après npm install -g ; script relais et
@@ -118,4 +121,63 @@ JS
     git switch -q -c feat/essai
     run node "$BATS_TEST_TMPDIR/appel.mjs" "$BATS_TEST_TMPDIR/garde.mjs"
     [ "$output" = permis ]
+}
+
+@test "agents init --global : CLAUDE_CONFIG_DIR, OPENCODE_CONFIG_DIR, XDG_CONFIG_HOME suivis" {
+    CLAUDE_CONFIG_DIR="$BATS_TEST_TMPDIR/claude" OPENCODE_CONFIG_DIR="$BATS_TEST_TMPDIR/oc" run "$RW" agents init --global
+    [ "$status" -eq 0 ]
+    [ -f "$BATS_TEST_TMPDIR/claude/settings.json" ]
+    [ -f "$BATS_TEST_TMPDIR/oc/plugins/repowarden-garde.js" ]
+    [ ! -e "$HOME/.claude" ] && [ ! -e "$HOME/.config/opencode" ]
+    XDG_CONFIG_HOME="$BATS_TEST_TMPDIR/xdg" run "$RW" agents init --global --opencode
+    [ "$status" -eq 0 ]
+    [ -f "$BATS_TEST_TMPDIR/xdg/opencode/plugins/repowarden-garde.js" ]
+}
+
+@test "agents init : hooks repowarden inactifs signales, avec la commande" {
+    run "$RW" agents init
+    [[ "$output" != *"Hooks repowarden inactifs"* ]] || false
+    rm -rf .claude .opencode
+    git config --unset core.hooksPath
+    run "$RW" agents init
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Hooks repowarden inactifs"*"repowarden install"* ]] || false
+    run "$RW" agents init --global
+    [[ "$output" == *"repowarden install --global"* ]] || false
+}
+
+@test "agents retirer : enleve seulement ce qu'init a ecrit" {
+    "$RW" agents init >/dev/null
+    run "$RW" agents retirer
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Claude Code : garde-fou retiré"* ]] || false
+    [[ "$output" == *"opencode : garde-fou retiré"* ]] || false
+    [ ! -e .claude/settings.json ] && [ ! -e .opencode/plugins/repowarden-garde.js ]
+    # Relance : rien a retirer, sans erreur
+    run "$RW" agents retirer
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"pas de garde-fou à retirer"* ]] || false
+}
+
+@test "agents retirer : reglages et hooks voisins gardes, plugin modifie garde" {
+    mkdir -p .claude
+    printf '{"model":"x","hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"mon-hook"}]}],"Stop":[{"hooks":[{"type":"command","command":"fin"}]}]}}\n' >.claude/settings.json
+    "$RW" agents init >/dev/null
+    printf '\n// modifie\n' >>.opencode/plugins/repowarden-garde.js
+    run "$RW" agents retirer
+    [ "$status" -eq 0 ]
+    [ "$(jq -c '.hooks.PreToolUse' .claude/settings.json)" = '[{"matcher":"Bash","hooks":[{"type":"command","command":"mon-hook"}]}]' ]
+    [ "$(jq -r '.model + " " + .hooks.Stop[0].hooks[0].command' .claude/settings.json)" = "x fin" ]
+    ! grep -q "repowarden garde" .claude/settings.json
+    [ -f .opencode/plugins/repowarden-garde.js ]
+    [[ "$output" == *"diffère du modèle ; gardé"* ]] || false
+}
+
+@test "agents retirer --global : configuration de l'utilisateur, CLAUDE_CONFIG_DIR suivi" {
+    export CLAUDE_CONFIG_DIR="$BATS_TEST_TMPDIR/claude"
+    "$RW" agents init --global >/dev/null
+    run "$RW" agents retirer --global --claude
+    [ "$status" -eq 0 ]
+    [ ! -e "$CLAUDE_CONFIG_DIR/settings.json" ]
+    [ -f "$HOME/.config/opencode/plugins/repowarden-garde.js" ]
 }

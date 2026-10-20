@@ -240,12 +240,14 @@ answer() { printf '%s\n' "$@" | "$CC" 2>&1; }
     [ "$(git rev-parse HEAD)" = "$before" ]
 }
 
-@test "assistant : sans question sur main -> aucune branche creee, abandon" {
+@test "assistant : sans question sur main -> aucune branche creee, commande a lancer" {
     git switch -q main
-    run "$CC" -m "ajoute le panier"
+    run "$CC" -m "ajoute le panier" --type feat --scope panier
     [ "$status" -ne 0 ]
     [ "$(git branch --show-current)" = main ]
     [ "$(subject)" = "chore: init" ]
+    [[ "$output" == *"rien n'a été commité"* ]] || false
+    [[ "$output" == *"git switch -c feat/panier"*"relance repowarden cc"* ]] || false
 }
 
 @test "assistant : branche hors convention -> ni type ni scope proposes" {

@@ -16,10 +16,12 @@ Seulement dans un dépôt repowarden (`.repowarden.conf`, réglage `repowarden.*
 | Modifier un fichier | HEAD détaché ; branche protégée (`protectedBranches`, `integrationBranch`) ; si le dépôt suit ses [tickets](tickets.md) : branche qui n'est pas celle d'un ticket (`type/<n>-sujet`) | `repowarden ticket <n>` (sans suivi des tickets : `git switch -c <type>/<sujet>`) |
 | Créer une branche (`git checkout -b`, `git switch -c`, `git branch <nom>`, `git worktree add -b`) | le dépôt suit ses tickets | `repowarden ticket <n>` : la branche naît du ticket |
 | `git commit` | toujours, sauf `--amend --no-edit` | `repowarden cc -m "…" --refs "Ticket : #<n>"` (ou `git cc`) |
+| `repowarden cc`, `git cc` | branche protégée : le commit y serait refusé, et sans terminal `cc` ne crée pas de branche à la place de l'agent | `git switch -c <type>/<sujet>` (les modifications suivent) ; si le dépôt suit ses tickets : `repowarden ticket <n>` |
+| tout commit (`git commit --amend --no-edit` compris) | hooks repowarden inactifs dans le dépôt (aucun `core.hooksPath` vers les hooks repowarden) : messages, secrets et formatage ne seraient pas vérifiés | `repowarden install` (ou `--global`) |
 | `--no-verify` (et `git commit -n`) | toujours | relancer sans, corriger ce que les hooks signalent |
 | `git add .`, `-A`, `--all` | toujours | `git add <fichiers>` |
 
-Chaque commande d'une ligne shell est vérifiée (`&&`, `;`, `|`…), dans le bon dépôt (`cd`, `git -C`). Un refus donne la raison et la commande :
+Chaque commande d'une ligne shell est vérifiée (`&&`, `;`, `|`…), dans le bon dépôt (`cd`, `git -C`). Un refus vaut pour **toute la ligne** : rien n'en est lancé, pas même les autres commandes (`git add a.txt && git commit …` n'ajoute rien), et le message le dit. Un refus donne la raison et la commande :
 
 ```text
 ✖ repowarden : modification refusée : « main » est une branche protégée.
@@ -30,10 +32,18 @@ Chaque commande d'une ligne shell est vérifiée (`&&`, `;`, `|`…), dans le bo
 
 | Outil | Branchement | Projet (`--projet`, défaut) | Utilisateur (`--global`) |
 |---|---|---|---|
-| [Claude Code](https://code.claude.com/docs/en/hooks) | hook `PreToolUse` (outils `Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `Bash`) : `repowarden garde --format claude` | `.claude/settings.json` | `~/.claude/settings.json` |
-| [opencode](https://opencode.ai/docs/plugins/) | plugin, crochet `tool.execute.before` (outils `edit`, `write`, `apply_patch`, `bash`) | `.opencode/plugins/repowarden-garde.js` | `~/.config/opencode/plugins/repowarden-garde.js` |
+| [Claude Code](https://code.claude.com/docs/en/hooks) | hook `PreToolUse` (outils `Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `Bash`) : `repowarden garde --format claude` | `.claude/settings.json` | `$CLAUDE_CONFIG_DIR/settings.json` ([défini](https://code.claude.com/docs/en/settings)), sinon `~/.claude/settings.json` |
+| [opencode](https://opencode.ai/docs/plugins/) | plugin, crochet `tool.execute.before` (outils `edit`, `write`, `apply_patch`, `bash`) | `.opencode/plugins/repowarden-garde.js` | `$OPENCODE_CONFIG_DIR/plugins/` ([défini](https://opencode.ai/docs/config/)), sinon `${XDG_CONFIG_HOME:-~/.config}/opencode/plugins/` |
 
-`repowarden agents init --claude` ou `--opencode` pour un seul outil. Relançable : un `settings.json` existant est complété (rien si le hook y est déjà), un plugin modifié est gardé tel quel et signalé. Rien n'est jamais écrasé.
+`repowarden agents init --claude` ou `--opencode` pour un seul outil. Relançable : un `settings.json` existant est complété (rien si le hook y est déjà), un plugin modifié est gardé tel quel et signalé. Rien n'est jamais écrasé. Hooks repowarden inactifs (dépôt, ou `--global` sans `repowarden install --global`) : signalé, avec la commande, puisque le garde-fou refusera alors les commits.
+
+### Retirer le garde-fou
+
+```bash
+repowarden agents retirer             # dépôt ; --global : configuration de l'utilisateur
+```
+
+Mêmes options qu'`init` (`--claude`, `--opencode`, `--projet`, `--global`). Seul ce qu'`init` a écrit part : dans `settings.json`, les commandes `repowarden garde` (les autres hooks et réglages restent ; le fichier est supprimé s'il ne contient plus rien) ; le plugin opencode s'il est identique au modèle (modifié, il est gardé et signalé). Relancé, rien à retirer, sans erreur.
 
 ## Vérificateur : `repowarden garde`
 

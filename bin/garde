@@ -40,10 +40,13 @@ cwd="$(jq -r '.cwd // ""' <<<"$entree")"
 args="$(jq -c ".$a // {}" <<<"$entree")"
 [ -n "$cwd" ] && [ -d "$cwd" ] || cwd="$PWD"
 
-# Refus : raison et commande à lancer, puis code 2
+# Refus : raison et commande à lancer, puis code 2. Ligne shell de plusieurs
+# commandes (LIGNE_MULTIPLE) : refusée en bloc, ce que l'agent doit savoir
+LIGNE_MULTIPLE=""
 refuser() {
     _tr "$@"
     printf '✖ repowarden : %b\n' "$_T" >&2
+    [ -z "$LIGNE_MULTIPLE" ] || { _tr garde.ligne_entiere; printf '%b\n' "$_T" >&2; }
     exit 2
 }
 
@@ -55,18 +58,57 @@ dossier_r() {
     REPLY="$p"
 }
 
+# Vrai si les hooks repowarden sont actifs dans le dépôt courant : le
+# core.hooksPath en vigueur (local, sinon global) est un dossier de hooks
+# repowarden. Chemin relatif : depuis la racine du dépôt, comme git
+hooks_actifs() {
+    local hp
+    hp="$(git config --get core.hooksPath 2>/dev/null || true)"
+    [ -n "$hp" ] || return 1
+    # Absolu : /…, ou C:/… et C:\… (git pour Windows : Git Bash convertit
+    # le chemin passé à git config)
+    case "$hp" in
+        \~/*) hp="$HOME/${hp#\~/}" ;;
+        /* | [A-Za-z]:[/\\]*) ;;
+        *) hp="$(git rev-parse --show-toplevel)/$hp" ;;
+    esac
+    [ -f "$hp/commit-msg" ] && [ -f "$hp/lib/common.sh" ] && [ -f "$hp/lib/tickets.sh" ]
+}
+
 # Vrai si le dossier courant est dans un dépôt repowarden : .repowarden.conf,
 # réglage repowarden.*, ou hooks repowarden actifs. Charge sa configuration.
 depot_repowarden() {
-    local hp
     git rev-parse --show-toplevel >/dev/null 2>&1 || return 1
     cfg_load
     i18n_init
     # shellcheck disable=SC2034 # cache de tickets_managed (tickets.sh), propre à ce dépôt
     TICKETS_MANAGED=""
     [ -n "$CFG_FILE$CFG_GIT" ] && return 0
-    hp="$(git config --get core.hooksPath 2>/dev/null || true)"
-    [ -n "$hp" ] && [ -f "$hp/lib/tickets.sh" ] && [ -f "$hp/lib/common.sh" ]
+    hooks_actifs
+}
+
+# Commit (repowarden cc, git commit) : hooks actifs, et pas sur une branche
+# protégée (le commit y serait refusé ; sans terminal, cc ne crée pas de
+# branche à la place de l'agent)
+verifier_commit() {
+    local b
+    hooks_actifs || refuser garde.sans_hooks "$1"
+    b="$(git symbolic-ref -q --short HEAD 2>/dev/null || true)"
+    if [ -n "$b" ] && protegee "$b"; then
+        tickets_managed && refuser garde.commit_protegee "$1" "$b"
+        refuser garde.commit_protegee_libre "$1" "$b"
+    fi
+}
+
+# repowarden cc / commit (ou git cc), lancé depuis le dossier $dir
+verifier_cc() {
+    dossier_r "$dir"
+    (
+        cd "$REPLY" 2>/dev/null || exit 0
+        depot_repowarden || exit 0
+        verifier_commit "$1"
+        exit 0
+    ) || exit $?
 }
 
 # Branche protégée : protectedBranches (défaut main master) ou branche d'intégration
@@ -136,8 +178,12 @@ verifier_git() {
                         -[!-]*) [[ "$mot" != *n* ]] || refuser garde.no_verify "$ligne" ;;
                     esac
                 done
+                hooks_actifs || refuser garde.sans_hooks "$ligne"
                 [ -n "$amend" ] && [ -n "$noedit" ] && exit 0
                 refuser garde.commit "$ligne"
+                ;;
+            cc)
+                verifier_commit "$ligne"
                 ;;
             add)
                 for mot in ${args_git[@]+"${args_git[@]}"}; do
@@ -190,6 +236,8 @@ verifier_shell() {
     lignes="${lignes//;/$nl}"
     lignes="${lignes//|/$nl}"
     lignes="${lignes//&/$nl}"
+    # Plusieurs commandes : un refus vaut pour toute la ligne (dit à l'agent)
+    [ "$(grep -c '[^[:space:]]' <<<"$lignes")" -le 1 ] || LIGNE_MULTIPLE=1
     while IFS= read -r segment; do
         # shellcheck disable=SC2162 # les antislashs restent tels quels, comme dans la commande
         read -a mots <<<"$segment" || true
@@ -214,6 +262,9 @@ verifier_shell() {
             git | */git)
                 shift
                 verifier_git "${@//[\"\']/}"
+                ;;
+            repowarden | */repowarden)
+                case "${2//[\"\']/}" in cc | commit) verifier_cc "repowarden ${2//[\"\']/}" ;; esac
                 ;;
         esac
     done <<<"$lignes"
