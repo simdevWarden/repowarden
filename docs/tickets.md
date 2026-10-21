@@ -11,7 +11,7 @@ Chaque changement part d'un **ticket** (issue GitHub) : **la branche découle du
 | `statut: en cours` | quelqu'un s'assigne le ticket (ou `repowarden ticket N`), ou pousse un premier commit sur sa branche | à l'assignation : **branche `<type>/<n°>-<titre>` créée** depuis `develop` et **liée au ticket** (panneau *Development*), un ticket validé pour plus tard n'a donc pas de branche qui vieillit ; au premier push : **PR en brouillon** ouverte vers `develop`, titrée par l'**en-tête du premier commit** de la branche, `(#n)` final retiré (il devient le commit de squash ; s'il n'est pas conforme : titre du ticket, portée tirée de son préfixe, sigles gardés, aucun mot coupé), à la **description reprise du ticket** (critères en cases à cocher, liste des commits, `Ticket : #n`), assignée ; **actualisée à chaque push** tant qu'elle est en brouillon |
 | `statut: en relecture` | PR « Ready for review » | la CI tourne ; une revue « Request changes » ramène le ticket en cours |
 | `statut: préprod` | PR mergée dans `develop` | branche supprimée ; commentaire à chaque préversion `vX.Y.Z-next.N` |
-| `statut: done` | release sur `main` | ticket **fermé**, avec la version |
+| `statut: done` | release sur `main`, ou livraison sans nouvelle version (ni `fix` ni `feat`) | ticket **fermé**, avec la version (ou « sans nouvelle version » et le commit livré) |
 
 Un ticket **livré** (`préprod`, `done`) ne recule jamais : un événement de PR traité en retard (PR éditée après son merge), une branche réapparue ou une réassignation ne le ramènent pas en cours ou en relecture ; le suivi le signale par une notice.
 
@@ -63,16 +63,17 @@ Sur un dépôt qui a déjà des tickets, `tickets init` les reprend (relançable
 - **branches des PR** ouvertes et mergées : inscrites sur les tickets qu'elles citent, pour savoir quel ticket a géré quelle branche, même supprimée ;
 - aucune branche créée en masse : elle naît quand le ticket est pris (`repowarden ticket N`).
 
-Dans `.github/workflows/release.yml`, les tickets passent en préprod à chaque préversion et en done à chaque release (job écrit par `repowarden bots` avec le suivi des tickets, avec l'App si elle est configurée ; à ajouter à la main dans un `release.yml` existant) :
+Dans `.github/workflows/release.yml`, les tickets passent en préprod à chaque préversion et en done à chaque release, ou à une livraison sur `main` sans nouvelle version (job écrit par `repowarden bots` avec le suivi des tickets, avec l'App si elle est configurée ; à ajouter à la main dans un `release.yml` existant) :
 
 ```yaml
   tickets:
     needs: release
-    if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true'
+    if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true' || needs.release.outputs.delivered_without_version != ''
     uses: simdevWarden/repowarden/.github/workflows/tickets.yml@v4
     permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
     with:
       tag: ${{ needs.release.outputs.tag_name || needs.release.outputs.prerelease_tag }}
+      delivered-sha: ${{ needs.release.outputs.delivered_without_version }}
 ```
 
 Un `tickets.yml` existant n'est jamais écrasé : pour la branche créée à la validation et la PR en brouillon, y ajouter les événements `pull_request_review`, `issues` (`assigned`, `closed`), `push`, et la permission `contents: write` (voir le modèle écrit par `repowarden tickets init`).
