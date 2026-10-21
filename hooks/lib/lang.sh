@@ -300,8 +300,11 @@ projects_for_files() {
 }
 
 # Lance les tests de chaque projet touché. Lecture des fichiers modifiés sur stdin.
+# $1 = resume (pre-push) : sortie de chaque lanceur gardée de côté ; succès →
+# sa dernière ligne seule (« 2 passed in 0.5s »), échec → sortie complète. Sans
+# argument (CI) : sortie complète, le journal sert au diagnostic.
 test_projects() {
-    local cmd dir p plugins key ran=0
+    local mode="${1:-}" cmd dir p plugins key ran=0 out="" line last rc
     cmd="$(cfg test)"
     if [ -n "$cmd" ]; then
         # Fichiers modifiés transmis sur l'entrée standard : la commande peut
@@ -326,13 +329,31 @@ test_projects() {
             ran=1
             if [ "$dir" = . ]; then key="$p"; else key="$p ($dir)"; fi
             info_t hook.lang.5 "$key"
-            if ! (cd "$dir" && "${p}_test") </dev/null; then
+            if [ "$mode" != resume ]; then
+                if ! (cd "$dir" && "${p}_test") </dev/null; then
+                    err_t hook.lang.6 "$key" >&2
+                    return 1
+                fi
+                continue
+            fi
+            [ -n "$out" ] || out="$(mktemp)"
+            rc=0
+            (cd "$dir" && "${p}_test") </dev/null >"$out" 2>&1 || rc=$?
+            if [ "$rc" -ne 0 ]; then
+                cat "$out"
+                rm -f "$out"
                 err_t hook.lang.6 "$key" >&2
                 return 1
             fi
+            last=""
+            while IFS= read -r line || [ -n "$line" ]; do
+                [ -n "${line//[[:space:]]/}" ] && last="$line"
+            done <"$out"
+            [ -z "$last" ] || printf '  %s\n' "$last"
         done
     done < <(projects_for_files)
 
+    [ -z "$out" ] || rm -f "$out"
     [ "$ran" = 1 ] || info_t hook.lang.7
     return 0
 }

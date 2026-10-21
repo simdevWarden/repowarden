@@ -222,6 +222,29 @@ load_engine() {
     [[ "$output" == *"make-test-lance"* ]] || false
 }
 
+@test "pre-push : tests reussis -> resume seul, sans la sortie detaillee" {
+    require make
+    printf 'test:\n\t@echo avertissement-bruyant && echo "2 passed, 163 warnings"\n' >Makefile
+    git add Makefile
+    git commit -q -m "build: makefile"
+    run git push -q origin feat/x
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"2 passed, 163 warnings"* ]] || false
+    [[ "$output" != *"avertissement-bruyant"* ]] || false
+}
+
+@test "pre-push : tests en echec -> sortie complete" {
+    require make
+    printf 'test:\n\t@echo detail-1 && echo detail-2 >&2 && exit 1\n' >Makefile
+    git add Makefile
+    git commit -q -m "build: makefile"
+    run git push -q origin feat/x
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"detail-1"* ]] || false
+    [[ "$output" == *"detail-2"* ]] || false
+    [[ "$output" == *"Échec des tests tasks"* ]] || false
+}
+
 @test "pre-push : Makefile ignore quand un langage est reconnu" {
     require go
     go_project ok
