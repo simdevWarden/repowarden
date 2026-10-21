@@ -42,7 +42,7 @@ slsa-verifier verify-artifact "repowarden-$TAG.tar.gz" \
 ## What repowarden does for security
 
 - Secret detection (gitleaks) in the hooks and in CI; gitleaks installed in CI at a **pinned version with a verified SHA-256 checksum**.
-- GitHub Actions pinned by SHA, CI Python tools pinned by hash (`--require-hashes`), updated by Dependabot; workflows have no permissions by default.
+- GitHub Actions pinned by SHA, CI Python tools pinned by hash (`--require-hashes`), updated by Dependabot (pip lock files regenerated with the command from their header by the `verrous-pip` workflow, which needs the **Dependabot** secret `REPOWARDEN_APP_KEY`); workflows have no permissions by default.
 - CodeQL analysis of the workflows, OpenSSF Scorecard assessment.
 - No secrets used by the workflows other than `GITHUB_TOKEN` (read-only by default) and the optional release token.
 - The hooks only run tools installed on the developer machine or declared by the project; nothing is downloaded at commit time.

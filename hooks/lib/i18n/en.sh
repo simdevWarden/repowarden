@@ -293,6 +293,11 @@ _msg_en() {
         ci.fix_pr.2) _M="PR #%s retargeted: %s → %s (%s flow)" ;;
         ci.fix_pr.3) _M="Title follows the convention: %s" ;;
         ci.fix_pr.4) _M="Title \"%s\" replaced with \"%s\"" ;;
+        ci.verrous_pip.compile) _M="Lock file %s: re-running the command from its header" ;;
+        ci.verrous_pip.refused) _M="Lock file %s skipped: the output of its header command is not this file" ;;
+        ci.verrous_pip.compliant) _M="pip lock files match their header: no commit" ;;
+        ci.verrous_pip.committed) _M="Lock files regenerated and committed: %s" ;;
+        ci.verrous_pip.pushed) _M="Commit pushed to %s" ;;
         ci.version.1) _M="version announced by the delivery PR" ;;
         ci.version.2) _M="No feat, fix, perf or breaking change since %s: no version." ;;
         ci.version.3) _M="first version" ;;

@@ -294,6 +294,11 @@ _msg_fr() {
         ci.fix_pr.2) _M="PR #%s reciblée : %s → %s (flux %s)" ;;
         ci.fix_pr.3) _M="Titre conforme : %s" ;;
         ci.fix_pr.4) _M="Titre « %s » remplacé par « %s »" ;;
+        ci.verrous_pip.compile) _M="Verrou %s : commande de son en-tête relancée" ;;
+        ci.verrous_pip.refused) _M="Verrou %s ignoré : la sortie de la commande de son en-tête n'est pas ce fichier" ;;
+        ci.verrous_pip.compliant) _M="Verrous pip conformes à leur en-tête : aucun commit" ;;
+        ci.verrous_pip.committed) _M="Verrous régénérés et commités : %s" ;;
+        ci.verrous_pip.pushed) _M="Commit poussé sur %s" ;;
         ci.version.1) _M="version annoncée par la PR de livraison" ;;
         ci.version.2) _M="Aucun feat, fix, perf ni changement incompatible depuis %s : pas de version." ;;
         ci.version.3) _M="première version" ;;
