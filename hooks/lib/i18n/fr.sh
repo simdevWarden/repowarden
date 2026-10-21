@@ -62,6 +62,7 @@ _msg_fr() {
         tk.cli.issue_created) _M="Ticket #%s créé, à valider. Sa branche sera créée à la validation ; ensuite : repowarden ticket %s" ;;
         tk.cli.issue_created_branch) _M="Ticket #%s créé." ;;
         tk.cli.title_required) _M="Titre du ticket obligatoire : repowarden ticket nouveau \"<titre>\"" ;;
+        tk.cli.bad_type) _M="Type de ticket inconnu : %s (types : %s)" ;;
         tk.cli.current) _M="Branche %s : ticket #%s." ;;
         tk.cli.no_ticket_here) _M="Aucun ticket pour cette branche." ;;
         cc.ticket_offer) _M="Aucun ticket pour cette branche. En créer un maintenant (titre : la description) ? [o/N] : " ;;

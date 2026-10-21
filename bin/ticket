@@ -103,6 +103,11 @@ cmd_nouveau() {
         shift
     done
     [ -n "$titre" ] || { err_t tk.cli.title_required; exit 1; }
+    # Étiquette « type: … » inexistante : gh refuserait de créer le ticket
+    if [ -n "$type" ] && tickets_managed && [[ " $TYPES_TICKET " != *" $type "* ]]; then
+        err_t tk.cli.bad_type "$type" "${TYPES_TICKET// /, }"
+        exit 1
+    fi
     gh_ready || exit 1
     if tickets_managed; then
         etiquettes+=(--label "$S_AVALIDER")

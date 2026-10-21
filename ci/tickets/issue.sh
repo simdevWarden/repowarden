@@ -7,9 +7,14 @@
 # Ticket $1 validé : backlog s'il attendait la validation, sa branche, et
 # vérification relancée sur les PR ouvertes qui l'attendaient
 accepter() {
-    local n="$1" pr head sha body base brouillon
-    if grep -qxF "$S_AVALIDER" <<<"$(etiquettes "$n")"; then
+    local n="$1" pr head sha body base brouillon labels
+    labels="$(etiquettes "$n")"
+    if grep -qxF "$S_AVALIDER" <<<"$labels"; then
         statut "$n" "$S_BACKLOG"
+    fi
+    # Décision prise : « à décider » n'a plus lieu d'être
+    if grep -qxF "$A_DECIDER" <<<"$labels"; then
+        gh issue edit "$n" --remove-label "$A_DECIDER" >/dev/null
     fi
     # La branche naît quand le ticket est pris (assigné) : un ticket validé
     # pour plus tard n'a pas de branche qui vieillit en attendant
@@ -36,7 +41,8 @@ accepter() {
 # GitHub ne garde qu'un run en attente par groupe de concurrence, le run
 # « opened » peut être annulé par ceux des étiquettes posées à la création.
 # Non si déjà validé, ou (hors ouverture) rangé au-delà de « à valider »
-# (« validé » retiré à la main : décision respectée). Test seul : appelé dans un « if », où set -e
+# (« validé » retiré à la main : décision respectée), ou proposé à décider
+# (étiquette « à décider » : le mainteneur pose « validé »). Test seul : appelé dans un « if », où set -e
 # ne s'applique pas.
 a_valider_d_office() {
     local labels l
@@ -45,6 +51,7 @@ a_valider_d_office() {
     [ "${ISSUE_STATE:-open}" = open ] || return 1
     labels="$(etiquettes "$ISSUE")"
     ! grep -qxF "$VALIDE" <<<"$labels" || return 1
+    ! grep -qxF "$A_DECIDER" <<<"$labels" || return 1
     [ "$ACTION" != opened ] || return 0
     while IFS= read -r l; do
         [[ "$l" == "statut: "* && "$l" != "$S_AVALIDER" ]] && return 1

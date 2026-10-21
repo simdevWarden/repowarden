@@ -62,6 +62,7 @@ _msg_en() {
         tk.cli.issue_created) _M="Ticket #%s created, awaiting validation. Its branch will be created on validation; then: repowarden ticket %s" ;;
         tk.cli.issue_created_branch) _M="Ticket #%s created." ;;
         tk.cli.title_required) _M="Ticket title required: repowarden ticket nouveau \"<title>\"" ;;
+        tk.cli.bad_type) _M="Unknown ticket type: %s (types: %s)" ;;
         tk.cli.current) _M="Branch %s: ticket #%s." ;;
         tk.cli.no_ticket_here) _M="No ticket for this branch." ;;
         cc.ticket_offer) _M="No ticket for this branch. Create one now (title: the description)? [y/N]: " ;;

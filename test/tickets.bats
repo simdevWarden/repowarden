@@ -182,6 +182,30 @@ ticket() { printf '%s\n' "$@" >"$F/issues/$N.labels"; }
     done
 }
 
+@test "tickets : ticket de mainteneur a decider -> reste a valider, sans branche ; valide ensuite -> backlog" {
+    N=80 ticket "à décider" "type: feat"
+    echo moi >"$F/issues/80.assignees"
+    ISSUE=80 ACTION=opened ISSUE_ASSOCIATION=OWNER run "$TICKETS" issue
+    [ "$status" -eq 0 ]
+    [[ "$(labels 80 | grep statut)" = "statut: à valider" ]] || false
+    # ni validation d'office ni branche, y compris aux rattrapages
+    for cas in "ACTION=labeled LABEL=type:feat" "ACTION=assigned"; do
+        env $cas ISSUE=80 ISSUE_ASSOCIATION=OWNER "$TICKETS" issue
+    done
+    run grep -cxF "validé" "$F/issues/80.labels"
+    [[ "$output" = 0 ]] || false
+    run grep -q "branche-creee" "$F/events"
+    [[ "$status" -ne 0 ]] || false
+    # le mainteneur décide : backlog, branche (assigné), « à décider » retirée
+    echo "validé" >>"$F/issues/80.labels"
+    ISSUE=80 ACTION=labeled LABEL="validé" ISSUE_ASSOCIATION=OWNER run "$TICKETS" issue
+    [ "$status" -eq 0 ]
+    [[ "$(labels 80 | grep statut)" = "statut: backlog" ]] || false
+    run grep -cxF "à décider" "$F/issues/80.labels"
+    [[ "$output" = 0 ]] || false
+    grep -q "branche-creee feat/80-" "$F/events"
+}
+
 @test "tickets : run opened annule -> labeled ou assigned rattrape la validation d'office" {
     # Ticket créé avec ses étiquettes : le run « opened » attendait et a été
     # annulé par GitHub (un seul run en attente par groupe de concurrence)
@@ -434,6 +458,12 @@ EOF
     N=24 ticket "type: feat"
     FAKE_ISSUES=$'24\tOWNER' FAKE_PRS_ALL="" AUTO_VALIDATE=never run "$TICKETS" adopter
     [ "$(labels 24 | grep statut)" = "statut: à valider" ]
+    # ticket d'un mainteneur « à décider » : a valider, pas valide d'office
+    N=25 ticket "à décider"
+    FAKE_ISSUES=$'25\tOWNER' FAKE_PRS_ALL="" run "$TICKETS" adopter
+    [[ "$(labels 25 | grep statut)" = "statut: à valider" ]] || false
+    run grep -cxF "validé" "$F/issues/25.labels"
+    [[ "$output" = 0 ]] || false
 }
 
 @test "tickets : PR sans objet depuis main ou develop -> fermee avec la marche a suivre ; retour utile garde" {

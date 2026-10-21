@@ -6,7 +6,7 @@
 
 # Mise en route sur un dépôt existant (tickets init, relançable) : tickets
 # ouverts sans statut rangés (validé ou ouvert par un mainteneur → backlog,
-# sinon à valider) ; branches des PR ouvertes et mergées inscrites sur les
+# sinon, ou « à décider », à valider) ; branches des PR ouvertes et mergées inscrites sur les
 # tickets qu'elles citent. Aucune branche créée en masse : elle naît quand le
 # ticket est pris (repowarden ticket N).
 cmd_adopter() {
@@ -17,7 +17,8 @@ cmd_adopter() {
         ! grep -q '^statut: ' <<<"$labels" || continue
         if grep -qxF "$VALIDE" <<<"$labels"; then
             statut "$n" "$S_BACKLOG"
-        elif [ "${AUTO_VALIDATE:-maintainers}" = maintainers ] && est_mainteneur "$assoc"; then
+        elif [ "${AUTO_VALIDATE:-maintainers}" = maintainers ] && est_mainteneur "$assoc" \
+            && ! grep -qxF "$A_DECIDER" <<<"$labels"; then
             gh issue edit "$n" --add-label "$VALIDE" >/dev/null
             statut "$n" "$S_BACKLOG"
         else
