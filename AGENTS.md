@@ -32,6 +32,9 @@ repowarden cc -m "…" --type … --scope … --body "…" --refs "Ticket : #<n>
 - Messages en **français**, en-tête ≤ 72 caractères, **sans signature ni
   co-auteur d'agent**. Utiliser `repowarden cc` (paquet installé), pas un alias
   local ni `git commit -m`.
+- **Toute nouvelle fonction** a, juste au-dessus, une à deux lignes qui disent
+  ce qu'elle fait et **pourquoi**, sans paraphraser le code (pas de gros bloc).
+  Le pre-commit et la CI signalent une fonction ajoutée sans commentaire.
 - Avant chaque push, les mêmes vérifications que la CI :
 
 ```bash

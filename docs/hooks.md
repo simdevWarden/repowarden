@@ -5,7 +5,7 @@
 | Hook | Rôle |
 |---|---|
 | `post-checkout` | Avertit dès qu'on arrive sur une branche mal nommée (non bloquant) |
-| `pre-commit` | Refuse les branches mal nommées, bloque les commits directs sur les branches protégées (`main`/`master` par défaut), détecte les secrets, formate **uniquement le contenu stagé** (le travail non stagé est préservé) |
+| `pre-commit` | Refuse les branches mal nommées, bloque les commits directs sur les branches protégées (`main`/`master` par défaut), détecte les secrets, formate **uniquement le contenu stagé** (le travail non stagé est préservé), signale les [fonctions ajoutées sans commentaire](#fonctions-sans-commentaire) |
 | `prepare-commit-msg` | Préfixe le message d'après la branche : sur `feat/bean`, `git commit -m "ajoute X"` → `feat(bean): ajoute X` |
 | `commit-msg` | Impose [Conventional Commits](https://www.conventionalcommits.org), 72 caractères maximum |
 | `pre-push` | Refuse les branches mal nommées et le push direct sur les branches protégées (`protectedBranches`, création initiale permise), et les **messages des commits poussés** (même règle que la CI, `git rebase -i` proposé pour corriger) ; **lint** (shellcheck pour les scripts shell, actionlint pour les workflows GitHub) puis build et tests **du commit poussé**, seulement pour les projets touchés (succès : une ligne de résumé par projet ; échec : sortie complète) |
@@ -42,6 +42,17 @@ gitleaks ne lit un fichier qu'une fois indexé. Avant, un fichier non suivi au *
 ```
 
 Noms signalés par défaut (sans casse) : `.env`, `.env.*`, `*token*`, `*secret*`, `*.pem`, `*.key`, `id_rsa*` ; `.env.example` jamais. Autres motifs : `sensitiveFiles = .env *.p12` dans `.repowarden.conf` (remplace la liste). Désactiver : `git config repowarden.skip sensitive-files` (`skip secrets` le coupe aussi).
+
+## Fonctions sans commentaire
+
+Consigne pour les agents (et pour tous) : **toute nouvelle fonction** a, juste au-dessus, une à deux lignes qui disent ce qu'elle fait et **pourquoi**, sans paraphraser le code. Le pre-commit et la CI (vérification `comments`) le contrôlent : une fonction **ajoutée** sans commentaire (ni docstring en Python) est signalée avec `fichier:ligne`. Les fonctions existantes ne le sont jamais, même retouchées. Shell (`.sh`, `.bash`, scripts à shebang `sh`/`bash`), Python, JavaScript et TypeScript (`function`, `const f = (…) =>`) ; méthodes de classe non analysées.
+
+```text
+⚠ src/panier.ts:12 : fonction total sans commentaire juste au-dessus
+ℹ 1 fonction(s) ajoutée(s) sans commentaire : une à deux lignes juste au-dessus, qui disent ce qu'elle fait et pourquoi (avertissement, non bloquant).
+```
+
+Avertissement seulement, jamais bloquant. Un décorateur ou une directive d'outil (`# shellcheck disable=…`, `// eslint-disable…`) entre le commentaire et la fonction est sauté ; seul, il ne compte pas comme commentaire. Désactiver : `git config repowarden.skip comments`.
 
 ## Lint au pre-push
 

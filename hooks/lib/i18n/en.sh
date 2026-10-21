@@ -426,6 +426,12 @@ _msg_en() {
         dc.knip_file) _M="file never imported" ;;
         dc.knip_export) _M="export never imported:" ;;
         dc.knip_dep) _M="dependency never imported:" ;;
+        # Functions added without a comment
+        cm.section) _M="Functions without a comment (new code only)" ;;
+        cm.no_base) _M="No base: comment check skipped." ;;
+        cm.missing) _M="%s: function %s has no comment right above it" ;;
+        cm.summary) _M="%s function(s) added without a comment: one or two lines right above, saying what it does and why (warning, not blocking)." ;;
+        cm.none) _M="Every added function has a comment." ;;
         ci.section.commits) _M="Commit messages (Conventional Commits)" ;;
         ci.section.branch) _M="Branch name" ;;
         ci.section.secrets) _M="Secrets (gitleaks)" ;;

@@ -427,6 +427,12 @@ _msg_fr() {
         dc.knip_file) _M="fichier jamais importé" ;;
         dc.knip_export) _M="export jamais importé :" ;;
         dc.knip_dep) _M="dépendance jamais importée :" ;;
+        # Fonctions ajoutées sans commentaire
+        cm.section) _M="Fonctions sans commentaire (nouveau code uniquement)" ;;
+        cm.no_base) _M="Pas de base : contrôle des commentaires ignoré." ;;
+        cm.missing) _M="%s : fonction %s sans commentaire juste au-dessus" ;;
+        cm.summary) _M="%s fonction(s) ajoutée(s) sans commentaire : une à deux lignes juste au-dessus, qui disent ce qu'elle fait et pourquoi (avertissement, non bloquant)." ;;
+        cm.none) _M="Chaque fonction ajoutée est commentée." ;;
         ci.section.commits) _M="Messages de commit (Conventional Commits)" ;;
         ci.section.branch) _M="Nom de branche" ;;
         ci.section.secrets) _M="Secrets (gitleaks)" ;;

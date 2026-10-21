@@ -54,6 +54,9 @@ done
 # Détection de code mort (fonctions <plugin>_deadcode des plugins ci-dessus)
 # shellcheck source=deadcode.sh
 source "$(dirname "${BASH_SOURCE[0]}")/deadcode.sh"
+# Fonctions ajoutées sans commentaire (pre-commit et CI)
+# shellcheck source=commentaires.sh
+source "$(dirname "${BASH_SOURCE[0]}")/commentaires.sh"
 unset _plugin
 
 # --- Détection ---------------------------------------------------------------

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Hook pre-commit : bloque les commits directs sur main, détecte les secrets,
-# puis formate les fichiers stagés selon le(s) langage(s) détecté(s).
+# formate les fichiers stagés selon le(s) langage(s) détecté(s), puis signale
+# les fonctions ajoutées sans commentaire.
 set -euo pipefail
 
 source "$(dirname "$0")/lib/common.sh"
@@ -72,6 +73,12 @@ if ! skipped format; then
     hide_unstaged
     format_staged
     restore_unstaged
+fi
+
+# 4. Fonctions ajoutées sans commentaire juste au-dessus (avertissement seulement,
+# après le formatage : les lignes signalées sont celles du commit)
+if ! skipped comments && git rev-parse -q --verify HEAD >/dev/null; then
+    comments_check HEAD ""
 fi
 
 ok_t hook.pre_commit.7
