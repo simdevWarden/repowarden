@@ -651,6 +651,8 @@ _msg_en() {
         tk.branch_kept) _M="Branch \`%s\` kept: %s commit(s) missing from the integration branch, open PR(s): %s. Delete it by hand if the work lives elsewhere." ;;
         tk.draft_opened) _M="Draft PR #%s opened for ticket #%s" ;;
         tk.draft_updated) _M="PR #%s (ticket #%s): title and description taken from the ticket" ;;
+        tk.pr_additions) _M="Ticket additions" ;;
+        tk.pr_design) _M="Design (summary)" ;;
         tk.created_body) _M="Ticket created automatically for PR #%s, which cited none. To be validated by a maintainer (\"validé\" label)." ;;
         tk.created) _M="Ticket #%s created for PR #%s and linked in its description: to be validated by a maintainer." ;;
         tk.init_labels) _M="Labels (statuses and validation)" ;;

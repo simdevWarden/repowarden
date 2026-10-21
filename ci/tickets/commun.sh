@@ -5,12 +5,16 @@
 # Chargé par ci/tickets.sh (après hooks/lib/common.sh et hooks/lib/tickets.sh).
 # shellcheck disable=SC2154 # statuts, réglages et compteurs définis dans les autres modules
 
+# Ligne de description lue comme référence de ticket (« Ticket : #12 », mot-clé
+# de fermeture) : partagée avec la PR brouillon, qui cite ces lignes reprises
+REF_TICKET_RE='^[[:space:]]*(Tickets?|Refs?|Closes|Fixes|Resolves)[[:space:]]*:?[[:space:]]*(.*)$'
+
 # REPLY = numéros de tickets (uniques) cités par la description $1 (« Ticket : #12 »,
 # « Tickets : #3, #4 », ou un mot-clé de fermeture) et la branche $2 (type/12-sujet)
 pr_tickets_r() {
     local body="$1" branch="$2" found="" n line
     while IFS= read -r line; do
-        if [[ "$line" =~ ^[[:space:]]*(Tickets?|Refs?|Closes|Fixes|Resolves)[[:space:]]*:?[[:space:]]*(.*)$ ]]; then
+        if [[ "$line" =~ $REF_TICKET_RE ]]; then
             for n in $(grep -oE '#[0-9]+' <<<"${BASH_REMATCH[2]}" | tr -d '#'); do
                 [[ " $found " == *" $n "* ]] || found="$found $n"
             done
