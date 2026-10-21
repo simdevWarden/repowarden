@@ -551,6 +551,7 @@ _msg_en() {
         bot.ignored) _M="ignored (bot = off)" ;;
         bot.mode_invalid) _M="bot = %s: auto, pr or off expected" ;;
         bot.clone_failed) _M="clone failed: %s" ;;
+        bot.email_fallback) _M="Bot user %s not found: commits signed %s, linked to no account (set REPOWARDEN_BOT_EMAIL to fix the address)." ;;
         bot.prot_ok) _M="up to date" ;;
         bot.prot_stale) _M="⚠ outdated: repowarden proteger" ;;
         bot.prot_applied) _M="✔ applied" ;;

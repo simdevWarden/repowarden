@@ -552,6 +552,7 @@ _msg_fr() {
         bot.ignored) _M="ignoré (bot = off)" ;;
         bot.mode_invalid) _M="bot = %s : auto, pr ou off attendu" ;;
         bot.clone_failed) _M="clone impossible : %s" ;;
+        bot.email_fallback) _M="Utilisateur bot %s introuvable : commits signés %s, rattachés à aucun compte (REPOWARDEN_BOT_EMAIL pour fixer l'adresse)." ;;
         bot.prot_ok) _M="à jour" ;;
         bot.prot_stale) _M="⚠ périmée : repowarden proteger" ;;
         bot.prot_applied) _M="✔ appliquée" ;;
