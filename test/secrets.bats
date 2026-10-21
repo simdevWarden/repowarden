@@ -101,15 +101,98 @@ setup() {
     [ -z "$(ls -A "$TMPDIR")" ]
 }
 
-@test "secrets : gitleaks absent -> avertissement avec l'installation, commit accepte" {
-    # PATH sans aucun dossier qui contient gitleaks
-    local d chemin=""
+# SANS_GITLEAKS = PATH sans aucun dossier qui contient gitleaks
+sans_gitleaks() {
+    local d
+    SANS_GITLEAKS=""
     while IFS= read -r d; do
-        [ -x "$d/gitleaks" ] || chemin="$chemin${chemin:+:}$d"
+        [ -x "$d/gitleaks" ] || SANS_GITLEAKS="$SANS_GITLEAKS${SANS_GITLEAKS:+:}$d"
     done <<<"$(tr ':' '\n' <<<"$PATH")"
-    PATH="$chemin" run git commit -q -m "feat: a"
+}
+
+@test "secrets : gitleaks absent -> avertissement avec l'installation, commit accepte" {
+    sans_gitleaks
+    PATH="$SANS_GITLEAKS" run git commit -q -m "feat: a"
     [ "$status" -eq 0 ]
     [[ "$output" == *"gitleaks absent"* ]] || false
+    [[ "$output" == *"la CI (vérification secrets) fera le contrôle"*"Installation : "* ]] || false
+}
+
+# --- Fichier sensible ni suivi ni ignoré : signalé, jamais lu ni bloquant ----
+
+@test "fichiers sensibles : .env non ignore -> avertissement et ligne .gitignore, commit accepte" {
+    fake_gitleaks
+    echo "API_KEY=valeur-tres-secrete" >.env
+    mkdir -p outils
+    echo "valeur-tres-secrete" >outils/set-npm-TOKEN.sh
+    run git commit -q -m "feat: a"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Fichier sensible ni suivi ni ignoré"*"Lignes à ajouter à .gitignore"* ]] || false
+    [[ "$output" == *"    .env"* ]] || false
+    [[ "$output" == *"    outils/set-npm-TOKEN.sh"* ]] || false
+    [[ "$output" != *"valeur-tres-secrete"* ]] || false
+    [ "$(git log -1 --format=%s)" = "feat: a" ]
+    # rien n'a été indexé à la place de l'utilisateur
+    [ -z "$(git ls-files .env outils)" ]
+}
+
+@test "fichiers sensibles : ignore, .env.example ou suivi -> rien" {
+    fake_gitleaks
+    echo "x" >.env
+    echo "x" >.env.example
+    echo "x" >cle.pem
+    printf '.env\n' >.gitignore
+    echo "cle.pem" >>.git/info/exclude
+    git add .gitignore
+    git commit -q -m "chore: ignore"
+    echo "x" >id_rsa_test
+    git add id_rsa_test
+    run git commit -q -m "feat: b"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"Fichier sensible"* ]] || false
+}
+
+@test "fichiers sensibles : motifs regles par sensitiveFiles, skip sensitive-files" {
+    fake_gitleaks
+    echo "x" >.env
+    echo "x" >prod.secrets.yml
+    printf '[repowarden]\n\tsensitiveFiles = *.yml\n' >.repowarden.conf
+    git add .repowarden.conf
+    run git commit -q -m "feat: a"
+    [[ "$output" == *"    prod.secrets.yml"* ]] || false
+    [[ "$output" != *"    .env"* ]] || false
+    git config repowarden.skip sensitive-files
+    echo "y" >>a.txt
+    git add a.txt
+    run git commit -q -m "feat: b"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"Fichier sensible"* ]] || false
+}
+
+@test "fichiers sensibles : messages en anglais" {
+    fake_gitleaks
+    echo "x" >.env
+    REPOWARDEN_LANG=en run git commit -q -m "feat: a"
+    [[ "$output" == *"Sensitive file neither tracked nor ignored"*"    .env"* ]] || false
+}
+
+@test "statut : fichier sensible signale, gitleaks absent -> installation en etape suivante" {
+    local statut="$BATS_TEST_DIRNAME/../bin/statut"
+    export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global.gitconfig"
+    git config --global alias.cc "!bash \"$(cd "$BATS_TEST_DIRNAME/.." && pwd -P)/bin/commit\""
+    echo "API_KEY=valeur-tres-secrete" >.env
+    sans_gitleaks
+    PATH="$SANS_GITLEAKS" run "$statut"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Fichier sensible ni suivi ni ignoré"*"    .env"* ]] || false
+    [[ "$output" != *"valeur-tres-secrete"* ]] || false
+    [[ "$output" == *"Étape suivante : "*"gitleaks"* ]] || false
+    # gitleaks présent, .env ignoré : plus rien à signaler
+    fake_gitleaks
+    echo ".env" >.gitignore
+    run "$statut"
+    [[ "$output" != *"Fichier sensible"* ]] || false
+    [[ "$output" == *"Tout est prêt"* ]] || false
 }
 
 @test "secrets : messages en anglais" {
