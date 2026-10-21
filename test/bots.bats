@@ -248,10 +248,11 @@ lancer() { run bash -c "\"$BOTS\" <\"$F/reponses\""; }
     f=.github/workflows/release.yml
     grep -q '^  tickets:$' "$f"
     grep -q '^    needs: release$' "$f"
-    grep -qF "if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true'" "$f"
+    grep -qF "if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true' || needs.release.outputs.delivered_without_version != ''" "$f"
     grep -q '^    uses: simdevWarden/repowarden/.github/workflows/tickets.yml@v4$' "$f"
     grep -q 'permissions: { contents: write, issues: write, pull-requests: write, statuses: write }' "$f"
     grep -qF 'tag: ${{ needs.release.outputs.tag_name || needs.release.outputs.prerelease_tag }}' "$f"
+    grep -qF 'delivered-sha: ${{ needs.release.outputs.delivered_without_version }}' "$f"
     ! grep -q 'app-client-id' "$f"
     if command -v actionlint >/dev/null; then actionlint "$f"; fi
     rm -rf .github .repowarden.conf

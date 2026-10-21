@@ -326,7 +326,7 @@ Running the `release` workflow manually (Run workflow) publishes the latest rele
 !!! warning "Workflows that deploy"
     A workflow that deploys when it is not triggered by a PR (site, environment) would be run on the release branch: list the CI workflows explicitly with `workflows:`.
 
-Outputs: `release_created`, `tag_name`, `version`, `major`, `sha` (tag mode: also `prerelease_*` and `delivery_pr`, the delivery PR number), to chain the project's own publishing:
+Outputs: `release_created`, `tag_name`, `version`, `major`, `sha` (tag mode: also `prerelease_*`, `delivery_pr`, the delivery PR number, and `delivered_without_version`, the commit delivered to `main` without a new version when the delivery has no `fix` nor `feat`, so that delivered tickets are still closed), to chain the project's own publishing:
 
 ```yaml
   publier:

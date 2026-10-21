@@ -431,18 +431,19 @@ YAML
 YAML
         fi
     fi
-    # Tickets livrés : statut done et fermeture à la release, préprod à la
-    # préversion ; seulement avec le suivi des tickets (sinon le job échoue)
+    # Tickets livrés : statut done et fermeture à la release (ou à une
+    # livraison sans nouvelle version), préprod à la préversion ; seulement avec le suivi des tickets (sinon le job échoue)
     if choisi tickets || [ -e .github/workflows/tickets.yml ]; then
         cat <<'YAML'
 
   tickets:
     needs: release
-    if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true'
+    if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true' || needs.release.outputs.delivered_without_version != ''
     uses: simdevWarden/repowarden/.github/workflows/tickets.yml@v4
     permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
     with:
       tag: ${{ needs.release.outputs.tag_name || needs.release.outputs.prerelease_tag }}
+      delivered-sha: ${{ needs.release.outputs.delivered_without_version }}
 YAML
         if [ -n "$AVEC_APP" ]; then
             cat <<'YAML'

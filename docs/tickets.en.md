@@ -11,7 +11,7 @@ Every change starts from a **ticket** (GitHub issue): **the branch derives from 
 | `statut: en cours` | someone assigns themselves the ticket (or `repowarden ticket N`), or pushes a first commit to its branch | on assignment: **branch `<type>/<n>-<title>` created** from `develop` and **linked to the ticket** (*Development* panel), so a ticket validated for later has no branch going stale; on the first push: **draft PR** opened to `develop`, titled with the **header of the branch's first commit**, trailing `(#n)` removed (it becomes the squash commit; if it is not conventional: the ticket title, scope from its prefix, acronyms kept, no word cut), `Ticket : #n`, assigned |
 | `statut: en relecture` | PR "Ready for review" | CI runs; a "Request changes" review moves the ticket back to in progress |
 | `statut: préprod` | PR merged into `develop` | branch deleted; comment on each pre-release `vX.Y.Z-next.N` |
-| `statut: done` | release on `main` | ticket **closed**, with the version |
+| `statut: done` | release on `main`, or delivery without a new version (no `fix` nor `feat`) | ticket **closed**, with the version (or "without a new version" and the delivered commit) |
 
 A **delivered** ticket (`préprod`, `done`) never goes back: a PR event handled late (PR edited after its merge), a branch that reappears or a reassignment does not bring it back to in progress or in review; the tracking reports it with a notice.
 
@@ -62,16 +62,17 @@ On a repository that already has tickets, `tickets init` takes them over (re-run
 - **branches of open and merged PRs**: registered on the tickets they reference, to know which ticket handled which branch, even deleted;
 - no mass branch creation: the branch is born when the ticket is taken (`repowarden ticket N`).
 
-In `.github/workflows/release.yml`, tickets move to pre-production on each pre-release and to done on each release (job written by `repowarden bots` with ticket tracking, with the App when it is set up; add it by hand to an existing `release.yml`):
+In `.github/workflows/release.yml`, tickets move to pre-production on each pre-release and to done on each release, or on a delivery to `main` without a new version (job written by `repowarden bots` with ticket tracking, with the App when it is set up; add it by hand to an existing `release.yml`):
 
 ```yaml
   tickets:
     needs: release
-    if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true'
+    if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true' || needs.release.outputs.delivered_without_version != ''
     uses: simdevWarden/repowarden/.github/workflows/tickets.yml@v4
     permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
     with:
       tag: ${{ needs.release.outputs.tag_name || needs.release.outputs.prerelease_tag }}
+      delivered-sha: ${{ needs.release.outputs.delivered_without_version }}
 ```
 
 An existing `tickets.yml` is never overwritten: for the branch created on validation and the draft PR, add the `pull_request_review`, `issues` (`assigned`, `closed`) and `push` events to it, and the `contents: write` permission (see the template written by `repowarden tickets init`).
