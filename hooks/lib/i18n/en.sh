@@ -486,6 +486,10 @@ _msg_en() {
         st.repo_version_ok) _M="Version required by the project (%s): met" ;;
         st.repo_forge) _M="Platform: %s" ;;
         st.repo_rules) _M="GitHub rules up to date? repowarden proteger --verifier (read-only)" ;;
+        st.wf_owner) _M="%s:%s: repowarden called from another repository than the official one (%s); expected: %s" ;;
+        st.wf_branch) _M="%s:%s: repowarden called on a branch (@%s), broken as soon as it is deleted; expected: %s" ;;
+        st.wf_old) _M="%s:%s: repowarden called in an outdated major version (@%s); expected: %s" ;;
+        st.wf_fix) _M="fix the uses: lines reported above" ;;
         st.tools) _M="Tools present: %s · missing: %s (depending on the projects' languages)" ;;
         st.next) _M="Next step:" ;;
         st.ready) _M="All set: git cc to commit, repowarden code-mort on a branch." ;;

@@ -487,6 +487,10 @@ _msg_fr() {
         st.repo_version_ok) _M="Version demandée par le projet (%s) : respectée" ;;
         st.repo_forge) _M="Plateforme : %s" ;;
         st.repo_rules) _M="Règles GitHub à jour ? repowarden proteger --verifier (lecture seule)" ;;
+        st.wf_owner) _M="%s:%s : repowarden appelé depuis un autre dépôt que le dépôt officiel (%s) ; attendu : %s" ;;
+        st.wf_branch) _M="%s:%s : repowarden appelé sur une branche (@%s), cassé dès qu'elle disparaît ; attendu : %s" ;;
+        st.wf_old) _M="%s:%s : repowarden appelé dans une majeure dépassée (@%s) ; attendu : %s" ;;
+        st.wf_fix) _M="corriger les lignes uses: signalées ci-dessus" ;;
         st.tools) _M="Outils présents : %s · absents : %s (selon les langages des projets)" ;;
         st.next) _M="Étape suivante :" ;;
         st.ready) _M="Tout est prêt : git cc pour commiter, repowarden code-mort sur une branche." ;;

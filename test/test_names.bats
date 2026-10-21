@@ -79,6 +79,12 @@ PY
     ancien="simbienvenue""houlboumi" # découpé : ce test ne se trouve pas lui-même
     run git grep -n -i -e "$ancien/repowarden" -e "$ancien\.github\.io" -- . ':!CHANGELOG.md'
     [ -z "$output" ] || { echo "Liens vers l'ancien propriétaire :"; echo "$output"; return 1; }
+    # Ancien dépôt, tous propriétaires (…/repogarde/.github/…, …/repogarde@v3, site) : GitHub
+    # ne redirige pas les workflows réutilisables. Seuls l'historique, la doc
+    # de migration et les projets à migrer de ses tests le citent
+    ancien="repo""garde"
+    run git grep -n -i -E -e "[A-Za-z0-9_.-]+/$ancien(@|/\.github/)" -e "github\.io/$ancien" -- . ':!CHANGELOG.md' ':!docs/migration-v4*.md' ':!test/migrer.bats'
+    [ -z "$output" ] || { echo "Chemins vers l'ancien dépôt :"; echo "$output"; return 1; }
 }
 
 @test "tests : conditions [[ ]] protegees par || false (set -e ignore leur echec sous bash 3.2)" {
