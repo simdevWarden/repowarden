@@ -29,24 +29,10 @@ done
 [ -n "$GIT_TOPLEVEL" ] || { err_t install.not_repo; exit 1; }
 cd "$GIT_TOPLEVEL"
 
-# Version majeure dont le tag flottant (vN) est publié : celle de repowarden ;
-# préversion d'une nouvelle majeure (X.0.0-next) : X-1, vX n'existant pas encore
-majeure_r() {
-    local v
-    repowarden_version_r "$ROOT"
-    v="$REPLY"
-    # 0.0.0-dev : version inconnue (clone sans tags), rien à déduire
-    if [ "$v" = 0.0.0-dev ]; then REPLY=""; return; fi
-    REPLY="${v%%.*}"
-    REPLY="${REPLY%%-*}"
-    [[ "$v" != *.0.0-* ]] || REPLY=$((REPLY - 1))
-}
-if [ -n "${REPOWARDEN_MAJEURE:-}" ]; then
-    MAJEURE="$REPOWARDEN_MAJEURE"
-else
-    majeure_r
-    MAJEURE="$REPLY"
-fi
+# Version majeure dont le tag flottant (vN) est publié
+repowarden_version_r "$ROOT"
+repowarden_majeure_r "$REPLY"
+MAJEURE="$REPLY"
 [ -n "$MAJEURE" ] || { err_t mig.unknown_version "$ROOT"; exit 1; }
 [[ "$MAJEURE" =~ ^[1-9][0-9]*$ ]] || { err_t mig.no_major "$MAJEURE"; exit 1; }
 BRANCHE="chore/migration-repowarden-v$MAJEURE"
