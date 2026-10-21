@@ -90,15 +90,128 @@ criteres_coches_r() {
     REPLY="${sortie%$'\n'}"
 }
 
-# REPLY = description de la PR brouillon du ticket $1 (branche $2) : le ticket
-# (critères en cases à cocher), puis la liste des commits, puis « Ticket : #N »
+# Fin de chaque commentaire lu d'un bloc (séparateur ASCII) : un texte écrit à
+# la main ne le contient pas, les commentaires se découpent sans ambiguïté
+SEP_COMMENTAIRE=$'\x1e'
+
+# REPLY = commentaires de mainteneur du ticket $1, chacun suivi d'une ligne
+# SEP_COMMENTAIRE : comme la conception, seul un mainteneur alimente la PR
+commentaires_mainteneur_r() {
+    REPLY="$(gh issue view "$1" --json comments -q '.comments[]
+        | select(.authorAssociation == "OWNER" or .authorAssociation == "MEMBER" or .authorAssociation == "COLLABORATOR")
+        | .body + "\n\u001e"' 2>/dev/null || true)"
+}
+
+# $1 = ligne d'un commentaire → REPLY : titre décalé d'un niveau (rangé sous la
+# section du bot), ligne citée si pr_tickets_r la lirait : seul le pied compte
+ligne_reprise_r() {
+    REPLY="$1"
+    [[ ! "$REPLY" =~ ^#{1,5}[[:space:]] ]] || REPLY="#$REPLY"
+    [[ ! "$REPLY" =~ $REF_TICKET_RE ]] || REPLY="> $REPLY"
+}
+
+# $1 = texte → REPLY : sans ses lignes vides finales
+sans_fin_vide_r() {
+    REPLY="$1"
+    while [[ "$REPLY" == *$'\n' ]]; do REPLY="${REPLY%$'\n'}"; done
+}
+
+# Première ligne d'un commentaire d'ajout : titre ou gras « Ajout… », « Constat lié… »
+AJOUT_RE='^(#{1,6}[[:space:]]+|\*\*)?([Aa]jouts?|[Cc]onstats?[[:space:]]+li(é|e)s?)([[:space:]:*(.,-]|$)'
+
+# $1 = commentaires (commentaires_mainteneur_r) → REPLY : ceux dont la première
+# ligne est un titre ou un gras « Ajout » / « Constat lié », dans l'ordre :
+# les ajouts faits au ticket après coup, que le corps du ticket n'a pas
+ajouts_ticket_r() {
+    local ligne bloc="" premiere="" sortie=""
+    while IFS= read -r ligne; do
+        ligne="${ligne%$'\r'}"
+        if [ "$ligne" = "$SEP_COMMENTAIRE" ]; then
+            if [[ "$premiere" =~ $AJOUT_RE ]]; then
+                sans_fin_vide_r "$bloc"
+                sortie="$sortie${sortie:+$'\n\n'}$REPLY"
+            fi
+            bloc="" premiere=""
+            continue
+        fi
+        if [ -z "$premiere" ]; then
+            [ -n "${ligne//[[:space:]]/}" ] || continue
+            premiere="$ligne"
+        fi
+        ligne_reprise_r "$ligne"
+        bloc="$bloc$REPLY"$'\n'
+    done <<<"$1"$'\n'"$SEP_COMMENTAIRE"
+    REPLY="$sortie"
+}
+
+# $1 = commentaires → REPLY : du dernier « Conception retenue », les blocs « Ce
+# qui change » et « Hors périmètre » (titre ou gras, jusqu'au libellé suivant) :
+# le périmètre sans les détails (fichiers, tests) que montre déjà le diff
+resume_conception_r() {
+    local ligne bloc="" dernier="" garder=0 conception=0
+    while IFS= read -r ligne; do
+        ligne="${ligne%$'\r'}"
+        if [ "$ligne" = "$SEP_COMMENTAIRE" ]; then
+            [ "$conception" = 0 ] || dernier="$bloc"
+            bloc="" garder=0 conception=0
+            continue
+        fi
+        if [[ "$ligne" =~ ^(#{1,6}[[:space:]]|\*\*) ]]; then
+            garder=0
+            case "$ligne" in
+                *[Cc]onception\ retenue*) conception=1; continue ;;
+                *[Cc]e\ qui\ change* | *[Hh]ors\ p*) garder=1 ;;
+            esac
+        fi
+        [ "$garder" = 1 ] || continue
+        ligne_reprise_r "$ligne"
+        bloc="$bloc$REPLY"$'\n'
+    done <<<"$1"$'\n'"$SEP_COMMENTAIRE"
+    sans_fin_vide_r "$dernier"
+}
+
+# $1 = description actuelle de la PR → REPLY : sa dernière section « ## Réalisé »
+# (jusqu'au titre suivant ou au pied), écrite par l'auteur : reprise telle quelle
+section_realise_r() {
+    local ligne dedans=0 section=""
+    while IFS= read -r ligne; do
+        ligne="${ligne%$'\r'}"
+        if [[ "$ligne" =~ ^##[[:space:]]+R(é|e)alis(é|e) ]]; then
+            dedans=1 section="$ligne"$'\n'
+        elif [ "$dedans" = 1 ]; then
+            if [[ "$ligne" =~ ^#{1,2}[[:space:]] || "$ligne" == "Ticket : #"* ]]; then
+                dedans=0
+            else
+                section="$section$ligne"$'\n'
+            fi
+        fi
+    done <<<"$1"
+    sans_fin_vide_r "$section"
+}
+
+# REPLY = description de la PR brouillon du ticket $1 (branche $2, PR $3 si
+# elle existe) : le ticket (critères en cases à cocher), ses ajouts en
+# commentaire, le résumé de sa conception, les commits, la section « Réalisé »
+# de l'auteur gardée, puis « Ticket : #N ». Le bot ne régénère que ses sections.
 description_pr_brouillon_r() {
-    local n="$1" branche="$2" corps commits
+    local n="$1" branche="$2" pr="${3:-}" corps commits commentaires
     criteres_coches_r "$(gh issue view "$n" --json body -q .body)"
     corps="$REPLY"
+    commentaires_mainteneur_r "$n"
+    commentaires="$REPLY"
+    ajouts_ticket_r "$commentaires"
+    _tr tk.pr_additions
+    [ -z "$REPLY" ] || corps="$corps"$'\n\n## '"$_T"$'\n'"$REPLY"
+    resume_conception_r "$commentaires"
+    _tr tk.pr_design
+    [ -z "$REPLY" ] || corps="$corps"$'\n\n## '"$_T"$'\n'"$REPLY"
     commits="$(gh api "repos/$GH_REPO/compare/$INTEGRATION...$branche" \
         -q '.commits[] | "- \(.sha[0:7]) \(.commit.message | split("\n")[0])"' 2>/dev/null || true)"
     [ -z "$commits" ] || corps="$corps"$'\n\n## Commits\n'"$commits"
+    if [ -n "$pr" ]; then
+        section_realise_r "$(gh pr view "$pr" --json body -q .body 2>/dev/null || true)"
+        [ -z "$REPLY" ] || corps="$corps"$'\n\n'"$REPLY"
+    fi
     REPLY="$corps"$'\n\nTicket : #'"$n"
 }
 
@@ -124,7 +237,7 @@ cmd_push() {
     [ "$(gh api "repos/$GH_REPO/compare/$INTEGRATION...$PUSH_BRANCH" -q .ahead_by)" != 0 ] || return 0
     titre_pr_brouillon_r "$n" "$PUSH_BRANCH"
     titre="$REPLY"
-    description_pr_brouillon_r "$n" "$PUSH_BRANCH"
+    description_pr_brouillon_r "$n" "$PUSH_BRANCH" "$pr"
     corps="$REPLY"
     if [ -n "$pr" ]; then
         gh pr edit "$pr" --title "$titre" --body "$corps" >/dev/null
