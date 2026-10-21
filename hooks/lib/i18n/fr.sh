@@ -665,6 +665,7 @@ _msg_fr() {
         tk.init_next_wired) _M="Ensuite : committer ces fichiers ; exiger la vérification « ticket » (repowarden proteger --checks \"…,ticket\"). Le job tickets de release.yml est déjà branché." ;;
         tk.prerelease) _M="Disponible en préversion **%s** : à tester avant la production." ;;
         tk.released) _M="Publié dans **%s**." ;;
+        tk.footer) _M="Message de l'App GitHub de ce dépôt ([doc repowarden](https://simdevwarden.github.io/repowarden/industrialisation/#github-app-des-workflows)) : [%s](https://github.com/apps/%s)" ;;
         # Ticket comment
         tk.comment.adding) _M="Ajout d'un commentaire sur le ticket #%s..." ;;
         tk.comment.added) _M="Commentaire ajouté au ticket #%s." ;;

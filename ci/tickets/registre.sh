@@ -34,7 +34,7 @@ inscrire_branche() {
         _tr tk.branch_registered "$b"
     fi
     [ -z "$origine" ] || _T="$_T ($origine)"
-    gh issue comment "$n" --body "$_T"$'\n\n'"$(repere "$b")" >/dev/null
+    commenter "$n" "$_T"$'\n\n'"$(repere "$b")"
     INSCRITES=$((INSCRITES + 1))
 }
 
@@ -65,7 +65,7 @@ nettoyer_branche() {
         notice_t tk.branch_deleted "$branche" "$n"
     else
         _tr tk.branch_kept "$branche" "${avance:-?}" "${prs:--}"
-        gh issue comment "$n" --body "$_T" >/dev/null
+        commenter "$n" "$_T"
     fi
 }
 
@@ -97,6 +97,6 @@ creer_branche() {
         -f oid="$(gh api "repos/$GH_REPO/git/ref/heads/$INTEGRATION" -q .object.sha)" \
         -f name="$branche" >/dev/null
     _tr tk.branch_created "$branche" "$INTEGRATION" "$n" "$branche"
-    gh issue comment "$n" --body "$_T"$'\n\n'"$(repere "$branche")" >/dev/null
+    commenter "$n" "$_T"$'\n\n'"$(repere "$branche")"
     notice_t tk.branch_notice "$branche" "$n"
 }

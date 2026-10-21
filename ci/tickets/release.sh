@@ -10,11 +10,12 @@ cmd_release() {
         [ -n "$n" ] || continue
         if [[ "$TAG" == *-* ]]; then
             _tr tk.prerelease "$TAG"
-            gh issue comment "$n" --body "$_T" >/dev/null
+            commenter "$n" "$_T"
         else
             _tr tk.released "$TAG"
             statut "$n" "$S_DONE"
-            gh issue close "$n" --comment "$_T" >/dev/null
+            pied_r "$_T"
+            gh issue close "$n" --comment "$REPLY" >/dev/null
             nettoyer_branche "$n"
         fi
     done < <(gh issue list --state open --label "$S_PREPROD" --limit 500 --json number -q '.[].number')

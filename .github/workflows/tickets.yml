@@ -158,6 +158,8 @@ jobs:
           AUTO_MERGE: ${{ inputs.auto-merge }}
           REQUIRE_DESIGN: ${{ inputs.require-design }}
           APP_TOKEN: ${{ steps.app.outputs.token != '' }}
+          # Pied des commentaires du bot : lien vers la page de l'App (son avatar mène à une 404)
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
           LABEL: ${{ github.event.label.name }}
           STATE_REASON: ${{ github.event.issue.state_reason }}
           PUSH_BRANCH: ${{ github.ref_name }}
