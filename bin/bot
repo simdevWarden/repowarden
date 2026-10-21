@@ -115,7 +115,24 @@ TRAVAIL="$(mktemp -d)"
 trap 'rm -rf "$TRAVAIL"' EXIT
 # Identité des commits du bot (workflow : <slug>[bot]), crédits de gh
 NOM_BOT="${REPOWARDEN_BOT_NAME:-repowarden-bot}"
-COURRIEL_BOT="${REPOWARDEN_BOT_EMAIL:-repowarden-bot@users.noreply.github.com}"
+
+# Adresse <id>+<slug>[bot]@users.noreply.github.com, comme bot.yml : seule
+# forme que GitHub rattache à l'App. Slug tiré du nom, car un jeton
+# d'installation ne peut pas lire /app ; repli signalé si l'id est introuvable.
+courriel_bot_r() {
+    REPLY="${REPOWARDEN_BOT_EMAIL:-}"
+    [ -z "$REPLY" ] || return 0
+    local slug="${NOM_BOT%\[bot\]}" id
+    id="$(gh api "users/${slug}[bot]" --jq .id 2>/dev/null || true)"
+    case "$id" in
+        "" | *[!0-9]*)
+            REPLY="repowarden-bot@users.noreply.github.com"
+            attention_t bot.email_fallback "${slug}[bot]" "$REPLY" ;;
+        *) REPLY="${id}+${slug}[bot]@users.noreply.github.com" ;;
+    esac
+}
+courriel_bot_r
+COURRIEL_BOT="$REPLY"
 
 # Dernière ligne d'erreur d'une sortie (✖ …), pour le rapport
 derniere_erreur_r() {
