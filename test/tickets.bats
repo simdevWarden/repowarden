@@ -48,7 +48,11 @@ case "$1 $2" in
             *"--auto --squash"*) echo "merge-auto $3" >>"$F/events" ;;
         esac ;;
     "api graphql")
-        case "$*" in *closer*) printf '%s\n' "${FAKE_CLOSER:-}"; exit 0 ;; esac
+        case "$*" in
+            *closer*) printf '%s\n' "${FAKE_CLOSER:-}"; exit 0 ;;
+            # adresse du dépôt, puis les branches liées au ticket
+            *linkedBranches*) printf '%s\n' "${FAKE_LIEES:-}"; exit 0 ;;
+        esac
         for a in "$@"; do case "$a" in name=*) echo "branche-creee ${a#name=}" >>"$F/events" ;; esac; done ;;
     "api -X")
         echo "branche-supprimee ${4#repos/o/r/git/refs/heads/}" >>"$F/events" ;;
@@ -294,6 +298,33 @@ ticket() { printf '%s\n' "$@" >"$F/issues/$N.labels"; }
     echo "refs/heads/fix/12-corrige-le-total-a-payer" >"$F/refs"
     ISSUE=12 ACTION=labeled LABEL=validé run "$TICKETS" issue
     ! grep -q "branche-creee" "$F/events"
+}
+
+@test "tickets : valide avec branche deja faite a son nom -> reprise, lien inscrit une fois, jamais recreee" {
+    N=12 ticket "statut: à valider" "validé" "type: fix"
+    echo "Corrige le total à payer" >"$F/issues/12.title"
+    echo "refs/heads/fix/12-corrige-le-total-a-payer" >"$F/refs"
+    export FAKE_LIEES="https://github.com/o/r"
+    # personne n'est assigne : la branche existante est reprise quand meme
+    ISSUE=12 ACTION=labeled LABEL=validé run "$TICKETS" issue
+    [ "$status" -eq 0 ]
+    ! grep -q "branche-creee" "$F/events"
+    grep -qF "(https://github.com/o/r/tree/fix/12-corrige-le-total-a-payer)" "$F/issues/12.comments"
+    grep -qF "<!-- repowarden:branche fix/12-corrige-le-total-a-payer -->" "$F/issues/12.comments"
+    ! grep -q "repowarden ticket 12" "$F/issues/12.comments"
+    # assigne ensuite : ni creation, ni second commentaire
+    : >"$F/events"
+    echo moi >"$F/issues/12.assignees"
+    ISSUE=12 ACTION=assigned run "$TICKETS" issue
+    [ "$status" -eq 0 ]
+    ! grep -q "branche-creee" "$F/events"
+    ! grep -q "commentaire 12" "$F/events"
+    # branche liee par GitHub (creee par le ticket) : rien a inscrire
+    : >"$F/events"
+    rm "$F/issues/12.comments"
+    export FAKE_LIEES=$'https://github.com/o/r\nfix/12-corrige-le-total-a-payer'
+    ISSUE=12 ACTION=labeled LABEL=validé run "$TICKETS" issue
+    ! grep -q "commentaire 12" "$F/events"
 }
 
 @test "tickets : premier push sur la branche du ticket -> PR brouillon, en cours" {

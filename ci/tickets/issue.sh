@@ -17,8 +17,10 @@ accepter() {
         gh issue edit "$n" --remove-label "$A_DECIDER" >/dev/null
     fi
     # La branche naît quand le ticket est pris (assigné) : un ticket validé
-    # pour plus tard n'a pas de branche qui vieillit en attendant
-    if [ -n "$(assignes "$n")" ]; then
+    # pour plus tard n'a pas de branche qui vieillit en attendant. Une branche
+    # déjà faite à son nom (avant la validation) est reprise, jamais recréée.
+    branche_du_ticket_r "$n"
+    if [ -n "$REPLY" ] || [ -n "$(assignes "$n")" ]; then
         creer_branche "$n"
     else
         _tr tk.validated_waiting "$n"

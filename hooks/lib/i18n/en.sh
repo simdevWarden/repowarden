@@ -56,6 +56,7 @@ _msg_en() {
         tk.cli.silence) _M="Project without ticket tracking? git config repowarden.skip tickets to stop seeing this." ;;
         tk.cli.fetch) _M="Branch of ticket #%s…" ;;
         tk.cli.switched) _M="On branch %s (ticket #%s)." ;;
+        tk.cli.unlinked) _M="Branch %s was created before validation: GitHub cannot link it to ticket #%s afterwards, its link is written on the ticket." ;;
         tk.cli.created_branch) _M="Branch %s created from %s, linked to ticket #%s." ;;
         tk.cli.not_validated) _M="Ticket #%s not validated yet: its branch will be created automatically on validation (\"%s\" label)." ;;
         tk.cli.closed) _M="Ticket #%s is closed: no branch to create." ;;
@@ -643,6 +644,7 @@ _msg_en() {
         tk.pr_backmerge_empty) _M="PR closed automatically: \`%s\` brings no content to \`%s\`. The back-merge is done automatically after a release, only when there is something to bring back." ;;
         tk.pr_delivery_manual) _M="PR closed automatically: the \`%s\` → \`%s\` delivery is opened by the release workflow; a PR opened by hand would never get a deployment approval. Run *Actions → release → Run workflow* on \`%s\` (or \`gh workflow run release.yml --ref %s\`), then **Approve and deploy** on the run." ;;
         tk.branch_registered) _M="Ticket branch: \`%s\`." ;;
+        tk.branch_unlinked) _M="Ticket branch: [\`%s\`](%s). Created before the ticket was validated: GitHub does not link an existing branch, so it does not show under *Development*; this comment keeps its link." ;;
         tk.branch_second) _M="Second branch for this ticket: \`%s\` (already: %s). One ticket, one branch: group the work, or open a separate ticket." ;;
         tk.adopted) _M="Existing tickets: %s sorted, %s branch(es) registered." ;;
         tk.init_adopt) _M="Existing tickets and branches" ;;

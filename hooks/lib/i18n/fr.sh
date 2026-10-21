@@ -56,6 +56,7 @@ _msg_fr() {
         tk.cli.silence) _M="Projet sans suivi de tickets ? git config repowarden.skip tickets pour ne plus le voir." ;;
         tk.cli.fetch) _M="Branche du ticket #%s…" ;;
         tk.cli.switched) _M="Sur la branche %s (ticket #%s)." ;;
+        tk.cli.unlinked) _M="Branche %s créée avant la validation : GitHub ne la lie pas au ticket #%s après coup, son lien est inscrit sur le ticket." ;;
         tk.cli.created_branch) _M="Branche %s créée depuis %s, liée au ticket #%s." ;;
         tk.cli.not_validated) _M="Ticket #%s pas encore validé : sa branche sera créée automatiquement à la validation (étiquette « %s »)." ;;
         tk.cli.closed) _M="Ticket #%s fermé : pas de branche à créer." ;;
@@ -644,6 +645,7 @@ _msg_fr() {
         tk.pr_backmerge_empty) _M="PR fermée automatiquement : \`%s\` n'apporte aucun contenu à \`%s\`. Le retour est fait automatiquement après une release, seulement quand il y a quelque chose à rapporter." ;;
         tk.pr_delivery_manual) _M="PR fermée automatiquement : la livraison \`%s\` → \`%s\` est ouverte par le workflow de release ; une PR ouverte à la main n'aurait jamais d'approbation de déploiement. Lancer *Actions → release → Run workflow* sur \`%s\` (ou \`gh workflow run release.yml --ref %s\`), puis **Approve and deploy** sur le run." ;;
         tk.branch_registered) _M="Branche du ticket : \`%s\`." ;;
+        tk.branch_unlinked) _M="Branche du ticket : [\`%s\`](%s). Créée avant la validation du ticket : GitHub ne lie pas une branche existante, elle n'apparaît donc pas dans « Development » ; ce commentaire en garde le lien." ;;
         tk.branch_second) _M="Seconde branche pour ce ticket : \`%s\` (déjà : %s). Un ticket, une branche : regrouper le travail, ou ouvrir un ticket séparé." ;;
         tk.adopted) _M="Tickets existants : %s rangé(s), %s branche(s) inscrite(s)." ;;
         tk.init_adopt) _M="Tickets et branches existants" ;;
