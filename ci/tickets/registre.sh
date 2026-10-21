@@ -4,20 +4,8 @@
 # Chargé par ci/tickets.sh (après hooks/lib/common.sh et hooks/lib/tickets.sh).
 # shellcheck disable=SC2154 # statuts, réglages et compteurs définis dans les autres modules
 
-# Registre des branches d'un ticket : repère invisible dans les commentaires
-# du bot. GitHub ne lie une branche au ticket qu'à sa création, et une branche
-# liée supprimée y perd son nom : le registre garde le nom de chaque branche.
-REPERE="repowarden:branche"
-
-repere() { printf '<!-- %s %s -->' "$REPERE" "$1"; }
-
-# REPLY = branches inscrites sur le ticket $1 (séparées par des espaces)
-branches_inscrites_r() {
-    local corps
-    corps="$(gh issue view "$1" --json comments -q '.comments[].body' 2>/dev/null || true)"
-    REPLY="$(grep -oE "<!-- $REPERE [^ ]+ -->" <<<"$corps" | awk '{ printf "%s ", $3 }' || true)"
-    REPLY="${REPLY% }"
-}
+# Registre (REPERE, repere, branches_inscrites_r) : hooks/lib/tickets.sh,
+# partagé avec repowarden ticket.
 
 # Inscrit la branche $2 sur le ticket $1, une seule fois ($3 : origine, ex. PR #7).
 # Une seconde branche pour le même ticket est inscrite et signalée.
@@ -70,14 +58,18 @@ nettoyer_branche() {
 }
 
 # Ticket $1 validé : sa branche naît de la branche d'intégration, liée au
-# ticket (panneau « Development »). Rien si elle existe déjà, ou si une PR
-# ouverte cite déjà le ticket (travail commencé hors de sa branche).
+# ticket (panneau « Development »). Rien si une PR ouverte cite déjà le ticket
+# (travail commencé hors de sa branche) ; si elle existe déjà, jamais recréée :
+# faite avant la validation, elle n'est pas liée et son lien est inscrit.
 creer_branche() {
     local n="$1" titre labels branche pr head body
     # Travail déjà mergé ou en production : plus de branche à (re)créer
     travail_termine "$(etiquettes "$n")" && return 0
     branche_du_ticket_r "$n"
-    [ -z "$REPLY" ] || return 0
+    if [ -n "$REPLY" ]; then
+        ticket_note_unlinked_branch "$n" "$REPLY" || true
+        return 0
+    fi
     while IFS=$'\t' read -r pr head; do
         [ -n "$pr" ] || continue
         body="$(gh pr view "$pr" --json body -q .body)"

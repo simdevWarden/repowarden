@@ -21,6 +21,7 @@ case "$1 $2" in
     "issue view")
         case "$*" in
             *assignees*) printf '%s\n' "${FAKE_OWNER:-}" ;;
+            *comments*) cat "$FAKE/comments" 2>/dev/null || true ;;
             *) printf '%s\n' "${FAKE_ISSUE:-$(printf 'OPEN\tAjoute le panier\tvalidé')}" ;;
         esac ;;
     "issue develop")
@@ -30,6 +31,9 @@ case "$1 $2" in
             *) while [ $# -gt 0 ]; do [ "$1" = --name ] && git push -q --no-verify origin "main:refs/heads/$2"; shift; done ;;
         esac ;;
     "issue list") printf '%s\n' "${FAKE_ASSIGNED:-}" ;;
+    "issue comment") printf '%s\n' "$5" >>"$FAKE/comments" ;;
+    # adresse du dépôt, puis les branches liées au ticket
+    "api graphql") printf '%s\n' "${FAKE_LIEES:-}" ;;
     "auth status") exit "${FAKE_GH_AUTH_RC:-0}" ;;
 esac
 exit 0
@@ -130,6 +134,33 @@ gere() {
     [ "$status" -eq 0 ]
     [ "$(git branch --show-current)" = feat/12-panier ]
     [[ "$output" == *"Sur la branche feat/12-panier (ticket #12)"* ]] || false
+}
+
+@test "ticket cli : repowarden ticket <n> sur branche faite avant validation -> reprise, lien inscrit une fois" {
+    git switch -q -c feat/12-panier
+    git push -q --no-verify origin feat/12-panier
+    git switch -q main
+    git branch -q -D feat/12-panier
+    export FAKE_LIEES="https://github.com/o/r"
+    PATH="$F/bin:$PATH" run "$TICKET" 12
+    [ "$status" -eq 0 ]
+    [ "$(git branch --show-current)" = feat/12-panier ]
+    ! grep -q "issue develop" "$F/log"
+    grep -qF "(https://github.com/o/r/tree/feat/12-panier)" "$F/comments"
+    grep -qF "<!-- repowarden:branche feat/12-panier -->" "$F/comments"
+    [[ "$output" == *"avant la validation"* ]] || false
+    # repris une seconde fois : deja inscrite, rien de plus
+    git switch -q main
+    PATH="$F/bin:$PATH" run "$TICKET" 12
+    [ "$(grep -c "repowarden:branche" "$F/comments")" -eq 1 ]
+    # branche liee par GitHub : rien a inscrire
+    rm "$F/comments"
+    git switch -q main
+    export FAKE_LIEES=$'https://github.com/o/r\nfeat/12-panier'
+    PATH="$F/bin:$PATH" run "$TICKET" 12
+    [ "$status" -eq 0 ]
+    [[ ! -e "$F/comments" ]] || false
+    [[ "$output" != *"avant la validation"* ]] || false
 }
 
 @test "ticket cli : repowarden ticket <n> sans branche -> creee et liee, sauf ticket a valider" {
