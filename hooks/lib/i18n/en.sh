@@ -149,6 +149,7 @@ _msg_en() {
         hook.commit_msg.desc_empty) _M="Missing description after \"%s\": describe the change in the imperative mood." ;;
         hook.commit_msg.kept) _M="  Your message is not lost: git commit -e -F .git/COMMIT_EDITMSG" ;;
         hook.commit_msg.dot) _M="Final period removed from the description (same rule as git cc)." ;;
+        hook.commit_msg.detached) _M="👉 Detached HEAD (bisect, trial): no prefix comes from a branch, write the full header (e.g. fix: correct the total)." ;;
         hook.pre_push.1) _M="Push refused: branch name does not follow the convention." ;;
         hook.pre_push.2) _M="Direct push to '%s' refused: it only changes through pull requests." ;;
         hook.pre_push.3) _M="  Create a branch: git switch -c feat/my-feature, then open a PR." ;;
@@ -156,6 +157,9 @@ _msg_en() {
         hook.pre_push.5) _M="%s: no changed file, nothing to test." ;;
         hook.pre_push.6) _M="Nothing to test (branch deletion only)." ;;
         hook.pre_push.7) _M="Pre-push OK" ;;
+        hook.pre_push.msg) _M="Push refused: commit message does not follow the convention (same rule as CI)." ;;
+        hook.pre_push.msg_fix) _M="  Fix: git rebase -i %s (reword), then push again." ;;
+        hook.pre_push.nothing) _M="Nothing to push." ;;
         hook.pre_push.workflow_scope) _M="gh token without the 'workflow' scope: GitHub will refuse a push touching .github/workflows/. Allow it (then sign in again): gh auth refresh -h github.com -s workflow" ;;
         hook.pre_push.lint.missing) _M="%s not installed, %s not checked (install: %s)." ;;
         hook.pre_push.lint.run) _M="%s: %s" ;;

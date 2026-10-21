@@ -128,6 +128,7 @@ _msg_fr() {
         hook.commit_msg.desc_empty) _M="Description manquante après « %s » : décris le changement à l'impératif." ;;
         hook.commit_msg.kept) _M="  Ton message n'est pas perdu : git commit -e -F .git/COMMIT_EDITMSG" ;;
         hook.commit_msg.dot) _M="Point final retiré de la description (même règle que git cc)." ;;
+        hook.commit_msg.detached) _M="👉 HEAD détachée (bisect, essai) : aucun préfixe ne vient d'une branche, écris l'en-tête complet (ex. fix: corrige le calcul)." ;;
         hook.pre_push.1) _M="Push refusé : nom de branche non conforme." ;;
         hook.pre_push.2) _M="Push direct refusé sur '%s' : elle n'évolue que par Pull Request." ;;
         hook.pre_push.3) _M="  Crée une branche : git switch -c feat/ma-feature, puis ouvre une PR." ;;
@@ -135,6 +136,9 @@ _msg_fr() {
         hook.pre_push.5) _M="%s : aucun fichier modifié, rien à tester." ;;
         hook.pre_push.6) _M="Rien à tester (suppression de branche uniquement)." ;;
         hook.pre_push.7) _M="Pre-push OK" ;;
+        hook.pre_push.msg) _M="Push refusé : message de commit non conforme (même règle que la CI)." ;;
+        hook.pre_push.msg_fix) _M="  Corriger : git rebase -i %s (reword), puis relancer le push." ;;
+        hook.pre_push.nothing) _M="Rien à pousser." ;;
         hook.pre_push.workflow_scope) _M="Jeton gh sans le scope « workflow » : GitHub refusera un push touchant .github/workflows/. L'autoriser (puis se reconnecter) : gh auth refresh -h github.com -s workflow" ;;
         hook.pre_push.lint.missing) _M="%s absent, %s non vérifié (installation : %s)." ;;
         hook.pre_push.lint.run) _M="%s : %s" ;;

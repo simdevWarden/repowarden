@@ -87,34 +87,24 @@ changed_files() {
 
 # --- Vérifications ---------------------------------------------------------------
 
-# Bots de mise à jour des dépendances : leurs titres (« bump <paquet> from X
-# to Y ») dépassent souvent 72 caractères ; seul leur format est exigé.
-BOTS='^[0-9]*\+?(dependabot|renovate)\[bot\]@'
+# Branches des bots de dépendances : titre de PR exempté de la longueur
 is_bot_branch() { [[ "$1" == dependabot/* || "$1" == renovate/* ]]; }
 
 check_commits() {
     section_t ci.section.commits
-    local sha subject bad=0 count=0 bot=""
+    local sha email subject bad=0 count=0 bot=""
     is_bot_branch "$(detect_branch)" && bot=1
     if [ -z "$BASE" ]; then info_t ci.check.2; return 0; fi
-    while IFS= read -r sha; do
-        subject="$(git log -1 --format=%s "$sha")"
+    # Séparateur 0x1f (non blanc) : un champ vide ne décale pas les suivants
+    while IFS=$'\x1f' read -r sha email subject; do
+        [ -n "$sha" ] || continue
         count=$((count + 1))
-        if [[ "$subject" =~ ^(fixup|squash|amend)! ]]; then
-            ci_error_t ci.check.3 "${sha:0:7}" "$subject"
-            bad=1
-        elif [[ "$subject" =~ ^(Merge|Revert) ]]; then
-            continue
-        elif ! [[ "$subject" =~ $CC_PATTERN ]]; then
-            ci_error_t ci.check.4 "${sha:0:7}" "$subject"
-            bad=1
-        elif [[ "$(git log -1 --format=%ae "$sha")" =~ $BOTS ]]; then
-            continue
-        elif authored_length "$subject" && [ "$REPLY" -gt 72 ]; then
-            ci_error_t ci.check.5 "${sha:0:7}" "$subject"
+        commit_subject_problem_r "$subject" "$email"
+        if [ -n "$REPLY" ]; then
+            ci_error_t "$REPLY" "${sha:0:7}" "$subject"
             bad=1
         fi
-    done < <(git rev-list --no-merges "$BASE..HEAD")
+    done < <(git log --no-merges --format='%H%x1f%ae%x1f%s' "$BASE..HEAD")
     # Agents IA : ni auteur ni committer, ni signature (messages, description
     # de PR qui devient le message du commit en squash)
     if agents_refused; then

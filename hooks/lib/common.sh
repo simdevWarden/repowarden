@@ -218,6 +218,30 @@ header_valid() {
     [ "$REPLY" -le 72 ]
 }
 
+# Bots de mise à jour des dépendances : leurs titres (« bump <paquet> from X
+# to Y ») dépassent souvent 72 caractères ; seul leur format est exigé.
+BOTS='^[0-9]*\+?(dependabot|renovate)\[bot\]@'
+
+# Règle des en-têtes de commit, commune au pre-push et à la CI : même verdict,
+# même message, que le commit soit vu avant le push ou après.
+# REPLY = clé du message de refus de l'en-tête $1 (e-mail de l'auteur $2),
+# vide si l'en-tête est admis
+commit_subject_problem_r() {
+    if [[ "$1" =~ ^(fixup|squash|amend)! ]]; then
+        REPLY=ci.check.3
+    elif [[ "$1" =~ ^(Merge|Revert) ]]; then
+        REPLY=""
+    elif ! [[ "$1" =~ $CC_PATTERN ]]; then
+        REPLY=ci.check.4
+    elif [[ "$2" =~ $BOTS ]]; then
+        REPLY=""
+    elif authored_length "$1" && [ "$REPLY" -gt 72 ]; then
+        REPLY=ci.check.5
+    else
+        REPLY=""
+    fi
+}
+
 # REPLY = titre de PR conforme déduit de la branche $1 :
 #   feat/ajout-panier → « feat: ajout panier », hotfix/crash → « fix: crash »,
 #   release/1.2.0 → « chore(release): 1.2.0 », develop → livraison sur main

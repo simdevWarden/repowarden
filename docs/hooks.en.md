@@ -8,7 +8,7 @@
 | `pre-commit` | Rejects badly named branches, blocks direct commits on protected branches (`main`/`master` by default), detects secrets, formats **only the staged content** (unstaged work is preserved) |
 | `prepare-commit-msg` | Prefixes the message based on the branch: on `feat/bean`, `git commit -m "add X"` → `feat(bean): add X` |
 | `commit-msg` | Enforces [Conventional Commits](https://www.conventionalcommits.org), 72 characters maximum |
-| `pre-push` | Rejects badly named branches and direct pushes to protected branches (`protectedBranches`, initial creation allowed); **lint** (shellcheck for shell scripts, actionlint for GitHub workflows) then builds and tests **the pushed commit**, only for the affected projects |
+| `pre-push` | Rejects badly named branches and direct pushes to protected branches (`protectedBranches`, initial creation allowed), and the **messages of the pushed commits** (same rule as CI, `git rebase -i` suggested to fix them); **lint** (shellcheck for shell scripts, actionlint for GitHub workflows) then builds and tests **the pushed commit**, only for the affected projects |
 | `post-merge` | After a `git pull`: deletes merged local branches (regular or squash merge) whose remote branch has been deleted; never a branch containing unintegrated work |
 
 One-off bypass: `git commit --no-verify`, `git push --no-verify` — the [CI](ci.md) re-runs the checks.
