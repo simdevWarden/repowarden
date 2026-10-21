@@ -29,6 +29,14 @@ La CI relance tout sur Linux, macOS et Windows, plus un job e2e par langage avec
 - **Performance** : chaque création de processus coûte 20 à 50 ms sous Windows. Lire la config avec `cfg_r` (sans sous-shell), réutiliser `GIT_TOPLEVEL`, éviter `$(…)` dans les boucles.
 - Un outil absent n'est **jamais bloquant** côté poste (`warn` / `tool_missing`) ; le mode strict de la CI le rend bloquant.
 
+## Tests contre GitHub
+
+`test/gh/` lance pour de vrai chaque commande qui appelle `gh` (`ticket`, `tickets sync`, `pr`, `run`) contre un dépôt de test, remis à zéro à chaque passage (tickets et PR fermés, branches supprimées). Workflow `integration-gh.yml` : sur `develop` et à la demande, jamais sur une PR ; sauté (job vert) tant que rien n'est configuré.
+
+- **Dépôt de test** : initialisé (README), topic `repowarden-it` (sans lui, rien n'est fait) ; un workflow trivial (`on: [push, pull_request]`, une étape `run: "true"`) donne des runs à `run list`.
+- **Variable** `REPOWARDEN_IT_REPO` (`propriétaire/nom`) et **secret** `REPOWARDEN_IT_TOKEN` : jeton fine-grained limité au dépôt de test (Contents, Issues, Pull requests en écriture ; Actions en lecture).
+- En local, `gh` connecté : `REPOWARDEN_IT_REPO=propriétaire/nom bats test/gh/`.
+
 ## Ajouter un langage ou un outil
 
 1. `hooks/lang/<nom>.sh` : `register`, `<nom>_format`, `<nom>_test` (voir `docs/technologies.md`).

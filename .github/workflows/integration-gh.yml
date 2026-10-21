@@ -1,0 +1,46 @@
+# Commandes qui appellent gh, lancées contre un vrai dépôt GitHub de test
+# (test/gh/commandes.bats) : les tests bats simulent gh et ne voient pas un
+# appel que GitHub refuse. Jamais sur pull_request : aucune PR (de fork ou
+# non) n'a besoin du secret ni n'est bloquée par ce job.
+name: integration-gh
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Le dépôt de test est remis à zéro à chaque passage : un seul à la fois
+concurrency:
+  group: integration-gh
+  cancel-in-progress: false
+
+jobs:
+  integration-gh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configuration
+        id: config
+        env:
+          IT_REPO: ${{ vars.REPOWARDEN_IT_REPO }}
+          IT_TOKEN: ${{ secrets.REPOWARDEN_IT_TOKEN }}
+        run: |
+          if [ -z "$IT_REPO" ] || [ -z "$IT_TOKEN" ]; then
+            echo "::notice::Tests contre GitHub sautés : variable REPOWARDEN_IT_REPO ou secret REPOWARDEN_IT_TOKEN absent (voir CONTRIBUTING.md)"
+            echo "pret=false" >>"$GITHUB_OUTPUT"
+          else
+            echo "pret=true" >>"$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.config.outputs.pret == 'true'
+      - name: Installer bats
+        if: steps.config.outputs.pret == 'true'
+        run: npm install -g bats@1.13.0
+      - name: Tests contre ${{ vars.REPOWARDEN_IT_REPO }}
+        if: steps.config.outputs.pret == 'true'
+        env:
+          REPOWARDEN_IT_REPO: ${{ vars.REPOWARDEN_IT_REPO }}
+          GH_TOKEN: ${{ secrets.REPOWARDEN_IT_TOKEN }}
+        run: bats --print-output-on-failure test/gh/
