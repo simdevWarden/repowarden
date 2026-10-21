@@ -1,0 +1,86 @@
+# Verrous pip des PR Dependabot régénérés avec la commande de leur en-tête
+# (uv pip compile --generate-hashes --universal --python-version 3.12…) :
+# Dependabot les recompile sans ces options, les marqueurs disparaissent et
+# --require-hashes échoue. Le commit est fait au nom de la GitHub App sur la
+# même PR (le jeton d'une PR Dependabot est en lecture seule et ce qu'il pousse
+# ne relancerait pas la CI). Logique : ci/verrous-pip.sh.
+#
+# À configurer par le mainteneur : une PR Dependabot ne voit que les secrets
+# **Dependabot** (Settings > Secrets and variables > Dependabot), pas ceux des
+# Actions. Y créer REPOWARDEN_APP_KEY (même clé que le secret Actions), et
+# REPOWARDEN_APP_CLIENT_ID si la variable du même nom n'est pas visible.
+# Sans clé : avertissement, rien n'est poussé.
+# Après le commit du bot, Dependabot ne met plus la PR à jour seul
+# (« @dependabot recreate » repart de zéro, le bot repasse).
+name: verrous-pip
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - ci/requirements/*.txt
+      - ci/requirements/*.in
+      - docs/requirements.txt
+      - docs/requirements.in
+
+permissions: {}
+
+jobs:
+  verrous:
+    # PR de Dependabot, poussée par Dependabot : le push du bot (autre acteur)
+    # ne relance pas le job, et rien ne tourne sur les autres PR
+    if: github.event.pull_request.user.login == 'dependabot[bot]' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    concurrency:
+      group: verrous-pip-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    env:
+      HAS_KEY: ${{ secrets.REPOWARDEN_APP_KEY != '' }}
+    steps:
+      - name: Clé de l'App absente ?
+        if: env.HAS_KEY != 'true'
+        run: |
+          echo "::warning title=Verrous pip non régénérés::Secret Dependabot REPOWARDEN_APP_KEY absent (Settings > Secrets and variables > Dependabot) : les PR Dependabot ne voient pas les secrets des Actions."
+      - name: Jeton de l'App
+        id: app
+        if: env.HAS_KEY == 'true'
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.REPOWARDEN_APP_CLIENT_ID || secrets.REPOWARDEN_APP_CLIENT_ID }}
+          private-key: ${{ secrets.REPOWARDEN_APP_KEY }}
+          permission-contents: write
+      # Branche de la PR (pas le commit de merge) et historique complet pour
+      # comparer à la base ; le jeton de l'App sert au push
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: env.HAS_KEY == 'true'
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          token: ${{ steps.app.outputs.token }}
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        if: env.HAS_KEY == 'true'
+        with:
+          enable-cache: false
+      - name: Identité du bot
+        id: identite
+        if: env.HAS_KEY == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          id="$(gh api "users/${SLUG}[bot]" --jq .id)"
+          {
+            echo "name=${SLUG}[bot]"
+            echo "email=${id}+${SLUG}[bot]@users.noreply.github.com"
+          } >>"$GITHUB_OUTPUT"
+      - name: Verrous
+        if: env.HAS_KEY == 'true'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          REPOWARDEN_BOT_NAME: ${{ steps.identite.outputs.name }}
+          REPOWARDEN_BOT_EMAIL: ${{ steps.identite.outputs.email }}
+        run: bash ci/verrous-pip.sh
