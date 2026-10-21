@@ -125,6 +125,14 @@ gere() {
     [[ "$output" == *"Ticket #42 créé, à valider"* ]] || false
 }
 
+@test "ticket cli : ticket nouveau --type inconnu -> refuse avant gh, types listes" {
+    gere
+    PATH="$F/bin:$PATH" run "$TICKET" nouveau "Ajoute le panier" --type ci
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"ci"*"feat, fix, docs, refactor, chore"* ]] || false
+    [[ ! -e "$F/log" ]] || false
+}
+
 @test "ticket cli : repowarden ticket <n> -> le ticket est pris (assigne a soi)" {
     git config repowarden.integrationBranch main
     PATH="$F/bin:$PATH" run "$TICKET" 12

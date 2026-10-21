@@ -51,7 +51,7 @@ on:
         type: string
         default: main
       auto-validate:
-        description: "Ticket ouvert par un mainteneur (droits d'écriture) validé d'office : maintainers, ou never (un mainteneur pose toujours « validé »)"
+        description: "Ticket ouvert par un mainteneur (droits d'écriture) validé d'office, sauf s'il porte « à décider » : maintainers, ou never (un mainteneur pose toujours « validé »)"
         type: string
         default: maintainers
       require-design:
