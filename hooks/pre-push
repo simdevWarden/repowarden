@@ -48,6 +48,43 @@ fi
 
 REMOTE="${1:-origin}"
 
+# Messages des commits poussés : même règle et mêmes messages que la CI, pour
+# un commit créé hors hooks (autre outil, rebase sans hooks, --no-verify).
+# Seuls les commits absents du remote sont vus : l'historique déjà poussé
+# n'est pas rejugé.
+if ! skipped commit-msg; then
+    MSG_BAD=""
+    while read -r _ local_sha remote_ref remote_sha; do
+        [[ "$remote_ref" == refs/heads/* ]] || continue
+        [[ "$local_sha" =~ ^0+$ ]] && continue
+        if [[ ! "$remote_sha" =~ ^0+$ ]] && git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+            plage=("$remote_sha..$local_sha")
+        else
+            plage=("$local_sha" --not --remotes="$REMOTE")
+        fi
+        # Séparateur 0x1f (non blanc) : un champ vide ne décale pas les suivants
+        while IFS=$'\x1f' read -r sha email subject; do
+            [ -n "$sha" ] || continue
+            commit_subject_problem_r "$subject" "$email"
+            [ -n "$REPLY" ] || continue
+            [ -n "$MSG_BAD" ] || err_t hook.pre_push.msg
+            # git log va du plus récent au plus ancien : MSG_BAD finit sur le
+            # plus ancien commit fautif, point de départ de la correction
+            MSG_BAD="$sha"
+            _tr "$REPLY" "${sha:0:7}" "$subject"
+            echo "  $_T" >&2
+        done < <(git log --no-merges --format='%H%x1f%ae%x1f%s' "${plage[@]}")
+    done <<<"$REFS"
+    if [ -n "$MSG_BAD" ]; then
+        if git rev-parse -q --verify "$MSG_BAD^" >/dev/null; then
+            echo_t hook.pre_push.msg_fix "${MSG_BAD:0:7}^" >&2
+        else
+            echo_t hook.pre_push.msg_fix "--root" >&2
+        fi
+        exit 1
+    fi
+fi
+
 # Fichiers modifiés par le push de <sha> : depuis l'état distant connu, ou pour
 # une nouvelle branche depuis le dernier commit déjà présent sur le remote.
 changed_files() {
@@ -196,5 +233,10 @@ while read -r _ local_sha _ remote_sha; do
 done <<<"$REFS"
 
 rm -f "$CHANGED"
-[ -n "$TESTED" ] || info_t hook.pre_push.6
+# Entrée vide : git n'a rien à envoyer (« Everything up-to-date »)
+if [ -z "$REFS" ]; then
+    info_t hook.pre_push.nothing
+elif [ -z "$TESTED" ]; then
+    info_t hook.pre_push.6
+fi
 ok_t hook.pre_push.7
