@@ -64,6 +64,15 @@ git config repowarden.skip "protect-branch,format" # désactive des étapes
 git config repowarden.skip "node"                  # désactive un langage
 ```
 
+**Sauter une étape une seule fois**, sans rien changer à la configuration : `git -c repowarden.skip=<valeur> <commande>`.
+
+```bash
+git -c repowarden.skip=tests push                   # ce push sans les tests
+git -c repowarden.skip=protect-branch commit -m "…" # ce commit sur une branche protégée
+```
+
+Les messages de refus donnent la marche à suivre (créer une branche, la renommer…), jamais la commande pour désactiver la règle : sauter une étape reste un choix délibéré, à faire ponctuellement.
+
 ## Ce qui peut être désactivé (`skip`)
 
 | Catégorie          | Valeurs                                                                                          |

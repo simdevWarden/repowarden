@@ -48,6 +48,8 @@ gere() {
     run git switch -c feat/panier
     [ "$status" -eq 0 ]
     [[ "$output" == *"Branche feat/panier sans ticket"* ]] || false
+    # ce qu'est un ticket ici, avec le lien vers la doc
+    [[ "$output" == *"https://simdevwarden.github.io/repowarden/tickets/"* ]] || false
     [[ "$output" == *"repowarden.skip tickets"* ]] || false
     [[ "$output" != *"ticket nouveau"* ]] || false
 }

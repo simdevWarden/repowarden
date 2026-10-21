@@ -65,6 +65,15 @@ git config repowarden.skip "protect-branch,format" # disables steps
 git config repowarden.skip "node"                  # disables a language
 ```
 
+**Skip a step just once**, without changing the configuration: `git -c repowarden.skip=<value> <command>`.
+
+```bash
+git -c repowarden.skip=tests push                   # this push without the tests
+git -c repowarden.skip=protect-branch commit -m "…" # this commit on a protected branch
+```
+
+Refusal messages give the way forward (create a branch, rename it…), never the command to disable the rule: skipping a step remains a deliberate choice, made once.
+
 ## What can be disabled (`skip`)
 
 | Category            | Values                                                                                           |

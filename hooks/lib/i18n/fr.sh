@@ -50,6 +50,7 @@ _msg_fr() {
         cc.refs_prompt_ticket) _M="Références (« - » pour aucune) [%s] : " ;;
         cc.refs_prompt) _M="Références (ex. %s ; Entrée pour aucune) : " ;;
         tk.cli.no_ticket) _M="Branche %s sans ticket : ce travail ne sera relié à aucun ticket (non bloquant)." ;;
+        tk.cli.explain) _M="Ticket : issue GitHub d'où part chaque modification (branche type/<n°>-sujet, PR qui la cite) ; son cycle : https://simdevwarden.github.io/repowarden/tickets/" ;;
         tk.cli.propose) _M="Partir d'un ticket : repowarden ticket nouveau \"<titre>\"." ;;
         tk.cli.propose_cc) _M="Partir d'un ticket : repowarden ticket nouveau \"<titre>\" (ou réponds oui à git cc)." ;;
         tk.cli.silence) _M="Projet sans suivi de tickets ? git config repowarden.skip tickets pour ne plus le voir." ;;
@@ -109,7 +110,6 @@ _msg_fr() {
         # Hooks et plugins de langage
         hook.pre_commit.1) _M="Commit refusé : nom de branche non conforme." ;;
         hook.pre_commit.2) _M="Commit direct sur '%s' interdit. Crée une branche : git switch -c feat/ma-feature" ;;
-        hook.pre_commit.3) _M="  (désactiver pour ce dépôt : git config repowarden.skip protect-branch)" ;;
         hook.pre_commit.4) _M="Détection de secrets (gitleaks)" ;;
         hook.pre_commit.5) _M="Secret détecté : commit refusé." ;;
         hook.secrets.where) _M="  %s:%s (%s)" ;;
@@ -134,7 +134,6 @@ _msg_fr() {
         hook.pre_push.1) _M="Push refusé : nom de branche non conforme." ;;
         hook.pre_push.2) _M="Push direct refusé sur '%s' : elle n'évolue que par Pull Request." ;;
         hook.pre_push.3) _M="  Crée une branche : git switch -c feat/ma-feature, puis ouvre une PR." ;;
-        hook.pre_push.4) _M="  (désactiver pour ce dépôt : git config repowarden.skip protect-branch)" ;;
         hook.pre_push.5) _M="%s : aucun fichier modifié, rien à tester." ;;
         hook.pre_push.6) _M="Rien à tester (suppression de branche uniquement)." ;;
         hook.pre_push.7) _M="Pre-push OK" ;;

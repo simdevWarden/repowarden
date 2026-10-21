@@ -26,7 +26,6 @@ fi
 PROTECTED="$(cfg protectedBranches "main master")"
 if ! skipped protect-branch && [[ " $PROTECTED " == *" $BRANCH "* ]] && git rev-parse --verify -q HEAD >/dev/null; then
     err_t hook.pre_commit.2 "$BRANCH" >&2
-    echo_t hook.pre_commit.3 >&2
     exit 1
 fi
 
