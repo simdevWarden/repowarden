@@ -310,7 +310,6 @@ EOF
 
 Allowed exceptions: $allowed
   (change: git config repowarden.allowedBranches "main develop release/*")
-Disable for this repository: git config repowarden.skip branch-name
 EOF
     else
         cat >&2 <<EOF
@@ -333,7 +332,6 @@ EOF
 
 Exceptions autorisées : $allowed
   (modifier : git config repowarden.allowedBranches "main develop release/*")
-Désactiver pour ce dépôt : git config repowarden.skip branch-name
 EOF
     fi
 }

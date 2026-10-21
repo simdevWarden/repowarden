@@ -171,6 +171,7 @@ ticket_hint() {
     branch_ticket_r "$branch"
     [ -z "$REPLY" ] || return 0
     attention_t tk.cli.no_ticket "$branch"
+    dim_t tk.cli.explain
     if tickets_managed && has gh; then
         # git cc ne propose de créer le ticket qu'avec ticketAutoCreate
         if ticket_auto_create; then dim_t tk.cli.propose_cc; else dim_t tk.cli.propose; fi

@@ -41,7 +41,6 @@ if ! skipped protect-branch; then
         [[ "$remote_sha" =~ ^0+$ ]] && continue
         err_t hook.pre_push.2 "$branch" >&2
         echo_t hook.pre_push.3 >&2
-        echo_t hook.pre_push.4 >&2
         exit 1
     done <<<"$REFS"
 fi
