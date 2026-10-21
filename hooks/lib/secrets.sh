@@ -47,3 +47,55 @@ secrets_report() {
         printf '%s' "$empreintes"
     fi
 }
+
+# REPLY = commande d'installation de gitleaks pour ce système (bash le connaît
+# sans sous-processus)
+gitleaks_install_r() {
+    case "${OSTYPE:-}" in
+        darwin*) REPLY="brew install gitleaks" ;;
+        msys* | cygwin* | win*) REPLY="winget install gitleaks" ;;
+        *) REPLY="https://github.com/gitleaks/gitleaks#installing" ;;
+    esac
+}
+
+# Noms de fichiers sensibles par défaut (réglage repowarden.sensitiveFiles)
+SENSITIVE_FILES_DEFAULT='.env .env.* *token* *secret* *.pem *.key id_rsa*'
+
+# REPLY = fichiers non suivis et non ignorés (.gitignore, .git/info/exclude,
+# exclusion globale) au nom sensible, un par ligne depuis la racine : un
+# « git add . » les publierait, et gitleaks ne les lit qu'une fois indexés.
+# Seul le nom est comparé (sans casse) : le contenu n'est jamais lu.
+# .env.example, modèle fait pour être versionné, n'est jamais signalé.
+sensitive_files_r() {
+    local f nom m trouves="" nocase=""
+    local -a motifs=()
+    cfg_r sensitiveFiles "$SENSITIVE_FILES_DEFAULT"
+    # read -a : motifs découpés sans être développés sur les fichiers présents
+    read -r -a motifs <<<"${REPLY//,/ }"
+    shopt -q nocasematch && nocase=1
+    shopt -s nocasematch
+    while IFS= read -r -d '' f; do
+        nom="${f##*/}"
+        [[ "$nom" != .env.example ]] || continue
+        for m in ${motifs[@]+"${motifs[@]}"}; do
+            # shellcheck disable=SC2053 # $m est un motif
+            if [[ "$nom" == $m ]]; then
+                trouves="$trouves${trouves:+$'\n'}$f"
+                break
+            fi
+        done
+    done < <(git -C "$GIT_TOPLEVEL" ls-files -z --others --exclude-standard 2>/dev/null)
+    [ -n "$nocase" ] || shopt -u nocasematch
+    REPLY="$trouves"
+}
+
+# Avertit, sans bloquer, des fichiers sensibles $1 (un par ligne, sortie de
+# sensitive_files_r) avec les lignes à ajouter à .gitignore
+sensitive_files_warn() {
+    local f
+    warn_t hook.sensitive.found
+    while IFS= read -r f; do
+        echo "    $f"
+    done <<<"$1"
+    echo_t hook.sensitive.hint
+}

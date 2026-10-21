@@ -9,6 +9,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # shellcheck source=../hooks/lib/common.sh
 source "$ROOT/hooks/lib/common.sh"
+# shellcheck source=../hooks/lib/secrets.sh
+source "$ROOT/hooks/lib/secrets.sh"
 exec 2>&1 # une seule sortie, dans l'ordre (avertissements compris)
 # shellcheck disable=SC2034 # lu par check_version (common.sh)
 HOOKS_DIR="$ROOT/hooks"
@@ -93,6 +95,11 @@ if [ -n "$GIT_TOPLEVEL" ]; then
             ok_t st.repo_version_ok "$attendue"
         fi
     fi
+    # Fichier sensible ni suivi ni ignoré (même avertissement qu'au pre-commit)
+    if ! skipped secrets && ! skipped sensitive-files; then
+        sensitive_files_r
+        [ -z "$REPLY" ] || sensitive_files_warn "$REPLY"
+    fi
     info_t st.repo_forge "$FORGE"
     [ "$FORGE" != github ] || dim_t st.repo_rules
 fi
@@ -103,6 +110,11 @@ for outil in gitleaks ruff vulture staticcheck pmd; do
     if has "$outil"; then presents="$presents $outil"; else absents="$absents $outil"; fi
 done
 info_t st.tools "${presents# }" "${absents# }"
+# Sans gitleaks, les secrets ne sont vérifiés que par la CI
+if ! has gitleaks && ! skipped secrets; then
+    gitleaks_install_r
+    suivant="${suivant:-$REPLY}"
+fi
 
 echo
 if [ -n "$suivant" ]; then

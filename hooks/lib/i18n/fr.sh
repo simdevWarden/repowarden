@@ -120,7 +120,9 @@ _msg_fr() {
         hook.secrets.todo_3) _M="  3. Clé qui a pu fuir ailleurs (déjà poussée, partagée) : la révoquer chez son fournisseur." ;;
         hook.secrets.todo_4) _M="  Faux positif : ajouter son empreinte à .gitleaksignore :" ;;
         hook.secrets.failed) _M="gitleaks en échec (code %s) : commit refusé, détection de secrets non faite." ;;
-        hook.pre_commit.6) _M="gitleaks absent, détection de secrets ignorée (installation : %s)." ;;
+        hook.pre_commit.6) _M="gitleaks absent : secrets non vérifiés avant le commit, la CI (vérification secrets) fera le contrôle. Installation : %s" ;;
+        hook.sensitive.found) _M="Fichier sensible ni suivi ni ignoré : un git add . le publierait. Lignes à ajouter à .gitignore :" ;;
+        hook.sensitive.hint) _M="  (noms comparés, contenu jamais lu ; motifs : repowarden.sensitiveFiles ; désactiver : git config repowarden.skip sensitive-files)" ;;
         hook.pre_commit.7) _M="Pre-commit OK" ;;
         hook.commit_msg.1) _M="Première ligne trop longue (%s > 72 caractères)." ;;
         hook.commit_msg.type_unknown) _M="Type « %s » inconnu. Voulais-tu : %s" ;;

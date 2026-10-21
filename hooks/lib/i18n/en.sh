@@ -141,7 +141,9 @@ _msg_en() {
         hook.secrets.todo_3) _M="  3. Key that may have leaked elsewhere (already pushed, shared): revoke it at its provider." ;;
         hook.secrets.todo_4) _M="  False positive: add its fingerprint to .gitleaksignore:" ;;
         hook.secrets.failed) _M="gitleaks failed (code %s): commit refused, secret detection not done." ;;
-        hook.pre_commit.6) _M="gitleaks not installed, secret detection skipped (install: %s)." ;;
+        hook.pre_commit.6) _M="gitleaks not installed: secrets not checked before the commit, the CI (secrets check) will do it. Install: %s" ;;
+        hook.sensitive.found) _M="Sensitive file neither tracked nor ignored: git add . would publish it. Lines to add to .gitignore:" ;;
+        hook.sensitive.hint) _M="  (names compared, content never read; patterns: repowarden.sensitiveFiles; disable: git config repowarden.skip sensitive-files)" ;;
         hook.pre_commit.7) _M="Pre-commit OK" ;;
         hook.commit_msg.1) _M="First line too long (%s > 72 characters)." ;;
         hook.commit_msg.type_unknown) _M="Unknown type \"%s\". Did you mean: %s" ;;

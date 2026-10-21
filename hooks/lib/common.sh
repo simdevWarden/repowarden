@@ -341,7 +341,7 @@ EOF
 # Vrai si l'élément est désactivé (repowarden.skip, git config ou .repowarden.conf).
 # Valeurs : true|all, ou liste séparée par espaces/virgules parmi
 # pre-commit prepare-commit-msg commit-msg pre-push post-checkout
-# branch-name protect-branch secrets format tests, ou un langage (node, python…)
+# branch-name protect-branch secrets sensitive-files format tests, ou un langage (node, python…)
 skipped() {
     local v
     cfg_r skip

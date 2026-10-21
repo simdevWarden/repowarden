@@ -29,7 +29,19 @@ Que faire :
     config/app.ini:github-pat:3
 ```
 
-gitleaks en panne (configuration invalide, version incompatible) refuse aussi le commit, avec son message d'erreur : la détection n'a pas été faite, ce n'est jamais présenté comme une fuite. Sans gitleaks, la détection est ignorée avec la commande d'installation ; la vérification `secrets` de la [CI](ci.md) la refait. Désactiver pour un dépôt : `git config repowarden.skip secrets`.
+gitleaks en panne (configuration invalide, version incompatible) refuse aussi le commit, avec son message d'erreur : la détection n'a pas été faite, ce n'est jamais présenté comme une fuite. Sans gitleaks, le commit passe avec un avertissement : la vérification `secrets` de la [CI](ci.md) fera le contrôle, et la commande d'installation est donnée (aussi proposée en étape suivante par `repowarden statut`). Désactiver pour un dépôt : `git config repowarden.skip secrets`.
+
+### Fichier sensible ni suivi ni ignoré
+
+gitleaks ne lit un fichier qu'une fois indexé. Avant, un fichier non suivi au **nom** sensible, absent de `.gitignore` (et de `.git/info/exclude`), est signalé à chaque commit et par `repowarden statut` : un `git add .` le publierait. Avertissement seulement, le commit passe ; le contenu du fichier n'est **jamais lu**.
+
+```text
+⚠ Fichier sensible ni suivi ni ignoré : un git add . le publierait. Lignes à ajouter à .gitignore :
+    .env
+    outils/set-npm-token.sh
+```
+
+Noms signalés par défaut (sans casse) : `.env`, `.env.*`, `*token*`, `*secret*`, `*.pem`, `*.key`, `id_rsa*` ; `.env.example` jamais. Autres motifs : `sensitiveFiles = .env *.p12` dans `.repowarden.conf` (remplace la liste). Désactiver : `git config repowarden.skip sensitive-files` (`skip secrets` le coupe aussi).
 
 ## Lint au pre-push
 
