@@ -213,7 +213,8 @@ fi
 
 skipped tests && { info "Tests désactivés (repowarden.skip)."; exit 0; }
 
-run_tests_for() { test_projects <"$1"; }
+# Succès : une ligne de résumé par projet ; échec : sortie complète
+run_tests_for() { test_projects resume <"$1"; }
 
 TESTED=""
 CHANGED="$(git rev-parse --absolute-git-dir)/repowarden-changed-files"
