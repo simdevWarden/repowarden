@@ -226,3 +226,75 @@ MD
     [[ "$output" != *"ticket 12"* ]] || false
     [ "$(printf '%s\n' "$output" | grep -c ':')" -eq 2 ]
 }
+
+# --- pr checks, run list, --help des sous-commandes (ticket #427) -------------
+
+# gh simulé : journal des appels dans $GH_LOG ; gh pr checks répond le JSON
+# de $GH_CHECKS (ce que donne -q '.[] | …' sur la réponse réelle)
+setup_gh_log() {
+    F="$BATS_TEST_TMPDIR/gh"
+    mkdir -p "$F/bin"
+    cat >"$F/bin/gh" <<'GH'
+#!/usr/bin/env bash
+echo "$*" >>"$GH_LOG"
+case "$*" in
+    "pr checks "*) printf '%b' "${GH_CHECKS:-}" ;;
+    "repo view "*) echo o/r ;;
+esac
+exit 0
+GH
+    chmod +x "$F/bin/gh"
+    export GH_LOG="$BATS_TEST_TMPDIR/gh.log"
+    : >"$GH_LOG"
+}
+
+@test "aide : --help de chaque sous-commande de ticket, pr, run (code 0, sans gh)" {
+    setup_gh_log
+    git switch -q -c feat/panier
+    for sous in "ticket nouveau" "ticket 12" "ticket comment" "ticket label" \
+        "pr checks" "pr label" "run list" "run rerun"; do
+        PATH="$F/bin:$PATH" run "$RW" $sous --help
+        if [ "$status" -ne 0 ]; then
+            echo "repowarden $sous --help : code $status"
+            echo "$output"
+            return 1
+        fi
+        [[ "$output" == *"Usage"* ]] || false
+        [[ "$output" != *"Argument inconnu"* ]] || false
+    done
+    [ ! -s "$GH_LOG" ] || { cat "$GH_LOG"; return 1; }
+    [ "$(git symbolic-ref --short HEAD)" = feat/panier ]
+}
+
+@test "pr checks : echecs et attentes listes, verdict, code 1 si un job echoue" {
+    setup_gh_log
+    export GH_CHECKS='pass\tlint\thttps://x/1\nfail\ttests (ubuntu)\thttps://x/2\npending\te2e (go)\thttps://x/3\n'
+    PATH="$F/bin:$PATH" run "$RW" pr checks 42
+    [ "$status" -eq 1 ]
+    grep -q '^pr checks 42 ' "$GH_LOG"
+    ! grep -q 'check-runs' "$GH_LOG"
+    [[ "$output" == *"tests (ubuntu)"*"https://x/2"* ]] || false
+    [[ "$output" == *"e2e (go)"* ]] || false
+    [[ "$output" == *"1 réussi(s), 1 en échec, 1 en attente"* ]] || false
+    [[ "$output" != *"lint"* ]] || false
+}
+
+@test "pr checks : tout vert -> verdict et code 0" {
+    setup_gh_log
+    export GH_CHECKS='pass\tlint\thttps://x/1\nskipping\tdeploy\thttps://x/4\n'
+    PATH="$F/bin:$PATH" run "$RW" pr checks 42
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Tous les checks de la PR #42 sont verts"* ]] || false
+}
+
+@test "run list : sans argument -> runs recents de tous les workflows" {
+    setup_gh_log
+    PATH="$F/bin:$PATH" run "$RW" run list
+    [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+    [[ "$output" != *"unbound variable"* ]] || false
+    grep -q '^run list --repo o/r --limit 20 ' "$GH_LOG"
+    ! grep -q -- '--workflow' "$GH_LOG"
+    # identifiants entiers (--jq), pas en notation scientifique (--template)
+    grep -q -- '--jq' "$GH_LOG"
+    ! grep -q -- '--template' "$GH_LOG"
+}

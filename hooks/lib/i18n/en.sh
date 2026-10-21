@@ -121,7 +121,7 @@ _msg_en() {
         help.code-mort) _M="Usage: repowarden code-mort [base]\n\nDead code introduced by your branch (like CI): only added/changed lines\nsince base (commits, staged/uncommitted, new files). Default: merge-base\nwith origin/main. See docs/code-mort.md (proven vs candidates)." ;;
         help.ticket) _M="Usage: repowarden ticket <n>                          branch for ticket (created, linked if needed)\n       repowarden ticket                              ticket of current branch\n       repowarden ticket nouveau \"<title>\" [--type fix] [--description \"…\"]\n       repowarden ticket comment <n> \"<text>\"         add comment\n       repowarden ticket label <n> <label> [--remove] manage labels\n\nTicket first: taking <n> assigns to you and switches to its branch\n(created from develop if needed). \"nouveau\" creates a ticket (\"à valider\"\nif tracking is managed). Needs gh connected (https://cli.github.com)." ;;
         help.tickets) _M="Usage: repowarden tickets init [--repo owner/name] [--sans-validation-auto]\n       repowarden tickets sync\n\nSets up ticket tracking: labels, issue template, workflow; classifies\nexisting tickets; records PR branches. sync checks out local branches for\ntickets assigned to you (auto with ticketSync=auto, manual by default)." ;;
-        help.pr) _M="Usage: repowarden pr label <n> <label> [--remove]\n       repowarden pr checks <n>\n\nlabel adds or removes a label from PR #<n>; checks shows its checks\n(name, conclusion, status, link).\nExamples:\n  repowarden pr label 123 \"ready-for-review\"\n  repowarden pr label 123 \"needs-changes\" --remove\n  repowarden pr checks 123" ;;
+        help.pr) _M="Usage: repowarden pr label <n> <label> [--remove]\n       repowarden pr checks <n>\n\nlabel adds or removes a label from PR #<n>; checks lists its failed\njobs (with their link) and pending ones, then the verdict; exit 1 if a job fails.\nExamples:\n  repowarden pr label 123 \"ready-for-review\"\n  repowarden pr label 123 \"needs-changes\" --remove\n  repowarden pr checks 123" ;;
         help.run) _M="Usage: repowarden run rerun <run-id|--failed|--workflow <name>>\n       repowarden run list [--workflow <name>] [--limit N]\n\nrerun restarts a GitHub Actions workflow. list shows recent runs\n(default limit 20).\nExamples:\n  repowarden run rerun --failed\n  repowarden run list --workflow \"CI\" --limit 10" ;;
         help.proteger) _M="Usage: repowarden proteger [--repo owner/name] [--checks \"repowarden,tests (ubuntu-latest)\"]\n       [--relecteurs N] [--codeowners] [--environnement NAME] [--approbateurs \"login …\"]\n       [--sans-tags] [--dry-run] [--verifier]\n\nProtects GitHub repo per .repowarden.conf: required PR, required checks,\nno force push/deletion, ruleset, squash merges, v* tags reserved to\nworkflows, optional human approvals. --verifier checks online rules\nwithout changes. Needs gh and admin rights." ;;
         help.migrer) _M="Usage: repowarden migrer [--pr] [--hooks]\n\nMigrates from repogarde to repowarden (docs/migration-v4.md): configs,\nworkflows, renames, lists manual steps left. Safe to rerun.\n  --pr     on chore/migration-repowarden-vN: commit, push and PR\n  --hooks  also move leftover lefthook hooks to .git/hooks-lefthook/" ;;
@@ -689,6 +689,11 @@ _msg_en() {
         run.listing.workflow) _M="Listing runs for workflow \"%s\"..." ;;
         # PR checks
         pr.checks.checking) _M="Checking checks for PR #%s..." ;;
+        pr.checks.failed) _M="Failed: %s  %s" ;;
+        pr.checks.pending) _M="Pending: %s" ;;
+        pr.checks.verdict) _M="PR #%s: %s passed, %s failed, %s pending." ;;
+        pr.checks.green) _M="All checks of PR #%s are green." ;;
+        pr.checks.none) _M="No check on PR #%s." ;;
         # AI agent guard (repowarden garde, repowarden agents)
         garde.format) _M="Unknown format \"%s\": claude or opencode." ;;
         garde.no_jq) _M="repowarden garde: jq missing, action not checked (install jq: https://jqlang.org)." ;;
