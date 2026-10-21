@@ -57,6 +57,10 @@ Un seul vérificateur pour tous les outils : il lit l'action sur l'entrée stand
 
 Formats : `--format claude` (`tool_name`, `tool_input`, `cwd` : entrée du hook `PreToolUse`), `--format opencode` (défaut : `tool`, `args`, `cwd`).
 
+## Consignes de code
+
+Toute nouvelle fonction a, juste au-dessus, une à deux lignes qui disent ce qu'elle fait et **pourquoi**, sans paraphraser le code : des fonctionnalités documentées dans le code, sans gros blocs de commentaires. À reprendre dans les consignes du projet (`AGENTS.md`, `CLAUDE.md`…) ; le pre-commit et la CI signalent les oublis ([fonctions sans commentaire](hooks.md#fonctions-sans-commentaire)).
+
 ## Limites
 
 - **Filet, pas mur** : les hooks git et la vérification `ticket` en CI restent la protection. Une modification faite par le shell (`sed -i`, redirection `>`, script) n'est pas vue avant le commit, où les hooks la vérifient.

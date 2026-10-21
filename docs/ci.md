@@ -43,7 +43,7 @@ jobs:
 
 | Entrée | Défaut | Rôle |
 |---|---|---|
-| `checks` | `commits branch secrets format tests deadcode` | vérifications lancées |
+| `checks` | `commits branch secrets format tests deadcode comments` | vérifications lancées |
 | `strict` | `false` | un outil de formatage / test absent fait échouer |
 | `megalinter` | `false` | lance aussi MegaLinter |
 | `fix-pr` | `false` | sur une PR : recible une PR mal visée (flux `integrationBranch`, doublon fermé) et remplace un titre non conforme, puis vérifie avec les valeurs corrigées ; demande `permissions: pull-requests: write` |

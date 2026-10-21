@@ -79,7 +79,7 @@ Refusal messages give the way forward (create a branch, rename it…), never the
 | Category            | Values                                                                                           |
 | ------------------- | ------------------------------------------------------------------------------------------------ |
 | Hooks               | `pre-commit`, `prepare-commit-msg`, `commit-msg`, `pre-push`, `post-checkout`, `post-merge`      |
-| Steps               | `branch-name`, `protect-branch`, `secrets`, `sensitive-files`, `format`, `tests`, `deadcode`, `prune-branches` |
+| Steps               | `branch-name`, `protect-branch`, `secrets`, `sensitive-files`, `format`, `tests`, `deadcode`, `comments`, `prune-branches` |
 | Languages and tools | `maven`, `gradle`, `node`, `python`, `go`, `helm`, `docker`… (file name in `hooks/lang/`)        |
 | Everything          | `true`                                                                                           |
 

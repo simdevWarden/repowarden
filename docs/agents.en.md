@@ -57,6 +57,10 @@ One checker for all tools: it reads the action on standard input (JSON) and answ
 
 Formats: `--format claude` (`tool_name`, `tool_input`, `cwd`: the `PreToolUse` hook input), `--format opencode` (default: `tool`, `args`, `cwd`).
 
+## Code instructions
+
+Every new function has, right above it, one or two lines saying what it does and **why**, without paraphrasing the code: features documented in the code, without big comment blocks. Copy it into the project instructions (`AGENTS.md`, `CLAUDE.md`…); the pre-commit hook and the CI report omissions ([functions without a comment](hooks.md#functions-without-a-comment)).
+
 ## Limitations
 
 - **Safety net, not a wall**: git hooks and the `ticket` check in CI remain the protection. A change made through the shell (`sed -i`, `>` redirection, script) is not seen before the commit, where the hooks check it.

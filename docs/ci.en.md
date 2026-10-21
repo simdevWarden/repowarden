@@ -43,7 +43,7 @@ jobs:
 
 | Input | Default | Role |
 |---|---|---|
-| `checks` | `commits branch secrets format tests deadcode` | checks to run |
+| `checks` | `commits branch secrets format tests deadcode comments` | checks to run |
 | `strict` | `false` | a missing formatting / test tool causes a failure |
 | `megalinter` | `false` | also runs MegaLinter |
 | `fix-pr` | `false` | on a PR: retargets a wrongly targeted PR (`integrationBranch` flow, duplicate closed) and replaces a non-compliant title, then checks with the corrected values; requires `permissions: pull-requests: write` |

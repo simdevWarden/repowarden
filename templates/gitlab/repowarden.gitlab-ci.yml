@@ -25,7 +25,7 @@
     GIT_DEPTH: "0"
     REPOWARDEN_URL: https://github.com/simdevWarden/repowarden.git
     REPOWARDEN_REF: v4 # dernière 4.x (vX.Y.Z pour figer)
-    REPOWARDEN_CHECKS: commits branch secrets format tests deadcode
+    REPOWARDEN_CHECKS: commits branch secrets format tests deadcode comments
     REPOWARDEN_STRICT: "false"
     GITLEAKS_VERSION: 8.30.1
     REPOWARDEN_BIN: $CI_PROJECT_DIR/.repowarden-bin

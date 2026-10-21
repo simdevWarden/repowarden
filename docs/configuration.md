@@ -78,7 +78,7 @@ Les messages de refus donnent la marche à suivre (créer une branche, la renomm
 | Catégorie          | Valeurs                                                                                          |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
 | Hooks              | `pre-commit`, `prepare-commit-msg`, `commit-msg`, `pre-push`, `post-checkout`, `post-merge`      |
-| Étapes             | `branch-name`, `protect-branch`, `secrets`, `sensitive-files`, `format`, `tests`, `deadcode`, `prune-branches` |
+| Étapes             | `branch-name`, `protect-branch`, `secrets`, `sensitive-files`, `format`, `tests`, `deadcode`, `comments`, `prune-branches` |
 | Langages et outils | `maven`, `gradle`, `node`, `python`, `go`, `helm`, `docker`… (nom du fichier dans `hooks/lang/`) |
 | Tout               | `true`                                                                                           |
 

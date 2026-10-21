@@ -2,7 +2,7 @@
 # Vérifications CI : mêmes règles que les hooks, mais non contournables.
 # Fonctionne sur GitHub Actions, GitLab CI ou tout autre CI (variables REPOWARDEN_*).
 #
-#   ci/check.sh [commits] [branch] [secrets] [format] [tests] [deadcode]   (défaut : tout)
+#   ci/check.sh [commits] [branch] [secrets] [format] [tests] [deadcode] [comments]   (défaut : tout)
 #
 # Variables (toutes optionnelles, détectées automatiquement sur GitHub/GitLab) :
 #   REPOWARDEN_CHECKS   liste des vérifications (si aucun argument)
@@ -232,6 +232,14 @@ check_deadcode() {
     changed_files | without_excluded | deadcode_projects "$BASE"
 }
 
+# Fonctions ajoutées sans commentaire : avertissement, jamais un échec
+check_comments() {
+    section_t cm.section
+    if [ -z "$BASE" ]; then info_t cm.no_base; return 0; fi
+    comments_check "$BASE" HEAD
+    [ "$REPLY" != 0 ] || ok_t cm.none
+}
+
 check_tests() {
     section_t ci.section.tests
     changed_files | without_excluded | test_projects
@@ -239,7 +247,7 @@ check_tests() {
 
 # --- Exécution ---------------------------------------------------------------------
 
-CHECKS="${*:-${REPOWARDEN_CHECKS:-commits branch secrets format tests deadcode}}"
+CHECKS="${*:-${REPOWARDEN_CHECKS:-commits branch secrets format tests deadcode comments}}"
 REPOWARDEN_WARN_FILE="$(mktemp)"
 export REPOWARDEN_WARN_FILE
 trap 'rm -f "$REPOWARDEN_WARN_FILE"' EXIT
