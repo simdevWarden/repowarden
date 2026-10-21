@@ -286,13 +286,12 @@ workflows_repowarden() {
     [[ "$output" != *"corriger les lignes uses:"* ]] || false
 }
 
-@test "statut : seule alerte une ligne uses: -> etape suivante, pas tout est pret" {
+@test "statut : ligne uses: a corriger -> etape suivante, pas tout est pret" {
     workflows_repowarden simdevWarden/repowarden@main
-    # Hooks et git cc de cette installation, dans ce dépôt seulement
-    export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global.gitconfig"
-    touch "$GIT_CONFIG_GLOBAL"
-    git config alias.cc "!$(cd "$BATS_TEST_DIRNAME/.." && pwd -P)/bin/commit"
     run "$BATS_TEST_DIRNAME/../bin/statut"
-    [[ "$output" == *"corriger les lignes uses: signalées ci-dessus"* ]] || false
+    [[ "$output" == *".github/workflows/ci.yml:5 : repowarden appelé sur une branche (@main)"* ]] || false
+    # Étape suivante : celle-ci, ou une étape prioritaire selon le poste
+    # (hooks ou git cc d'une autre installation)
+    [[ "$output" == *"Étape suivante :"* ]] || false
     [[ "$output" != *"Tout est prêt"* ]] || false
 }
