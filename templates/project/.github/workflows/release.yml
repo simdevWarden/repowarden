@@ -49,14 +49,16 @@ jobs:
   #     npm-token: ${{ secrets.NPM_TOKEN }} # première publication seulement
 
   # Tickets passés en préprod à chaque préversion, en done à chaque release
+  # ou livraison sans nouvelle version
   # (mise en place : repowarden tickets init, voir la doc Tickets) :
   # tickets:
   #   needs: release
-  #   if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true'
+  #   if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true' || needs.release.outputs.delivered_without_version != ''
   #   uses: simdevWarden/repowarden/.github/workflows/tickets.yml@v4
   #   permissions: { issues: write, pull-requests: write, statuses: write }
   #   with:
   #     tag: ${{ needs.release.outputs.tag_name || needs.release.outputs.prerelease_tag }}
+  #     delivered-sha: ${{ needs.release.outputs.delivered_without_version }}
 
   # Publication propre au projet, après une release (exemple). L'environnement
   # « production » (bin/proteger --environnement production) fait attendre

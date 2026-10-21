@@ -269,6 +269,25 @@ ticket() { printf '%s\n' "$@" >"$F/issues/$N.labels"; }
     [[ "$output" == "Bonjour"* ]] || false
 }
 
+@test "tickets : livraison sur main sans nouvelle version -> preprod en done, ferme avec le commit" {
+    N=12 ticket "validé" "statut: préprod"
+    N=13 ticket "validé" "statut: en cours"
+    DELIVERED_SHA=0123456789abcdef MAIN=main run "$TICKETS" release
+    [ "$status" -eq 0 ]
+    [ "$(labels 12 | grep statut)" = "statut: done" ]
+    grep -qx "fermé 12" "$F/events"
+    grep -q "issue close 12 --comment .*sans nouvelle version.*0123456" "$F/log"
+    # ticket pas encore livre : intact
+    [ "$(labels 13 | grep statut)" = "statut: en cours" ]
+    ! grep -q "fermé 13" "$F/events"
+    # ni tag ni commit livre : aucun ticket ferme
+    : >"$F/events"
+    N=12 ticket "validé" "statut: préprod"
+    run "$TICKETS" release
+    [ "$status" -ne 0 ]
+    ! grep -q "fermé" "$F/events"
+}
+
 @test "tickets : bots et livraisons sans ticket exige" {
     ACTION=opened AUTHOR='dependabot[bot]' run "$TICKETS" pr
     [ "$status" -eq 0 ]

@@ -17,8 +17,12 @@ le détail est dans la doc, voir « Où trouver le reste ».
 5. **Seul `develop` entre dans `main`**, par la PR de livraison, **toujours
    avec une approbation humaine**. Le ticket est fermé à la release.
 6. **Ces règles sont des contrôles** : la vérification `ticket` (exigée) refuse une PR sans conception écrite sur son ticket, qui cite plusieurs tickets, dont la branche ne porte pas le numéro du ticket, ou dont un commit cite un autre ticket.
-7. **Création de tickets gelée** tant que le backlog actif n'est pas traité :
-   un défaut découvert est noté sur le ticket existant le plus proche.
+7. **Un défaut, un ticket** : un défaut découvert devient un ticket ; s'il est
+   lié à un ticket ouvert, il y est noté en « Ajout ». Le **gel** de la
+   création de tickets est une décision du mainteneur, notée ici avec sa date
+   et sa condition de levée ; seul le mainteneur le lève, en mettant cette
+   ligne à jour. Pendant un gel, un défaut est noté sur le ticket existant le
+   plus proche. État : **pas de gel** (levé le 21/10/2026 par le mainteneur).
 
 ## Commandes
 

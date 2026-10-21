@@ -326,7 +326,7 @@ Lancer le workflow `release` à la main (Run workflow) publie la dernière relea
 !!! warning "Workflows qui déploient"
     Un workflow qui déploie quand il n'est pas lancé par une PR (site, environnement) serait lancé sur la branche de release : lister explicitement les workflows de CI avec `workflows:`.
 
-Sorties : `release_created`, `tag_name`, `version`, `major`, `sha` (mode tag : aussi `prerelease_*` et `delivery_pr`, numéro de la PR de livraison), pour enchaîner la publication propre au projet :
+Sorties : `release_created`, `tag_name`, `version`, `major`, `sha` (mode tag : aussi `prerelease_*`, `delivery_pr`, numéro de la PR de livraison, et `delivered_without_version`, commit livré sur `main` sans nouvelle version quand la livraison n'a ni `fix` ni `feat`, pour fermer tout de même les tickets livrés), pour enchaîner la publication propre au projet :
 
 ```yaml
   publier:

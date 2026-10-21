@@ -552,6 +552,7 @@ _msg_fr() {
         bot.ignored) _M="ignoré (bot = off)" ;;
         bot.mode_invalid) _M="bot = %s : auto, pr ou off attendu" ;;
         bot.clone_failed) _M="clone impossible : %s" ;;
+        bot.email_fallback) _M="Utilisateur bot %s introuvable : commits signés %s, rattachés à aucun compte (REPOWARDEN_BOT_EMAIL pour fixer l'adresse)." ;;
         bot.prot_ok) _M="à jour" ;;
         bot.prot_stale) _M="⚠ périmée : repowarden proteger" ;;
         bot.prot_applied) _M="✔ appliquée" ;;
@@ -666,6 +667,7 @@ _msg_fr() {
         tk.prerelease) _M="Disponible en préversion **%s** : à tester avant la production." ;;
         tk.released) _M="Publié dans **%s**." ;;
         tk.footer) _M="Message de l'App GitHub de ce dépôt ([doc repowarden](https://simdevwarden.github.io/repowarden/industrialisation/#github-app-des-workflows)) : [%s](https://github.com/apps/%s)" ;;
+        tk.delivered) _M="Livré sur **%s**, sans nouvelle version (commit %s)." ;;
         # Ticket comment
         tk.comment.adding) _M="Ajout d'un commentaire sur le ticket #%s..." ;;
         tk.comment.added) _M="Commentaire ajouté au ticket #%s." ;;
