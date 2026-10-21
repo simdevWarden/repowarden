@@ -260,6 +260,22 @@ ticket() { printf '%s\n' "$@" >"$F/issues/$N.labels"; }
     grep -qx "fermé 12" "$F/events"
 }
 
+@test "tickets : pied du bot -> lien vers la page de l'App en fin de commentaire, une seule fois" {
+    N=12 ticket "validé" "statut: préprod"
+    # sans App (jeton des Actions) : aucun pied
+    TAG=v3.6.0-next.1 run "$TICKETS" release
+    ! grep -q "github.com/apps/" "$F/issues/12.comments"
+    # avec l'App : le commentaire se termine par le lien vers sa page
+    : >"$F/issues/12.comments"
+    APP_SLUG=mon-bot TAG=v3.6.0-next.2 run "$TICKETS" release
+    [[ "$(tail -n 1 "$F/issues/12.comments")" == *"(https://github.com/apps/mon-bot)"* ]] || false
+    # texte deja signe (repris, mis a jour) : pas de second pied
+    run bash -c 'source "$1/hooks/lib/common.sh"; source "$1/ci/tickets/commun.sh"
+        APP_SLUG=mon-bot; pied_r "Bonjour"; pied_r "$REPLY"; printf "%s" "$REPLY"' _ "$BATS_TEST_DIRNAME/.."
+    [ "$(grep -c "github.com/apps/mon-bot" <<<"$output")" -eq 1 ]
+    [[ "$output" == "Bonjour"* ]] || false
+}
+
 @test "tickets : livraison sur main sans nouvelle version -> preprod en done, ferme avec le commit" {
     N=12 ticket "validé" "statut: préprod"
     N=13 ticket "validé" "statut: en cours"

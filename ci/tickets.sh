@@ -25,8 +25,8 @@
 # feat/12-sujet. « Closes #12 » fermerait le ticket dès le merge dans develop :
 # c'est la release qui le ferme.
 #
-# Variables : GH_TOKEN, GH_REPO, INTEGRATION ; pr : PR, ACTION, MERGED, DRAFT,
-# HEAD, BASE, HEAD_SHA, AUTHOR ; issue : ISSUE, ACTION, LABEL, STATE_REASON ;
+# Variables : GH_TOKEN, GH_REPO, INTEGRATION, APP_SLUG (pied des commentaires) ;
+# pr : PR, ACTION, MERGED, DRAFT, HEAD, BASE, HEAD_SHA, AUTHOR ; issue : ISSUE, ACTION, LABEL, STATE_REASON ;
 # push : PUSH_BRANCH, DELETED, PUSHER, SHA ; revue : PR, HEAD, REVIEW_STATE ;
 # release : TAG, ou DELIVERED_SHA et MAIN (livraison sans nouvelle version)
 set -euo pipefail

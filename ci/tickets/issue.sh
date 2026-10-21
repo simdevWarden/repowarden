@@ -24,7 +24,7 @@ accepter() {
         creer_branche "$n"
     else
         _tr tk.validated_waiting "$n"
-        gh issue comment "$n" --body "$_T" >/dev/null
+        commenter "$n" "$_T"
     fi
     while IFS=$'\t' read -r pr head sha base brouillon; do
         [ -n "$pr" ] || continue
@@ -119,7 +119,7 @@ cmd_issue() {
                     gh issue reopen "$ISSUE" >/dev/null
                     statut "$ISSUE" "$S_PREPROD"
                     _tr tk.reopened "$fpr" "$fbase"
-                    gh issue comment "$ISSUE" --body "$_T" >/dev/null
+                    commenter "$ISSUE" "$_T"
                     notice "$_T"
                     return 0
                 fi

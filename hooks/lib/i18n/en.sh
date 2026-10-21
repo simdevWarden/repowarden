@@ -680,6 +680,7 @@ _msg_en() {
         tk.init_next_wired) _M="Next: commit these files; require the \"ticket\" check (repowarden proteger --checks \"…,ticket\"). The tickets job of release.yml is already wired." ;;
         tk.prerelease) _M="Available in pre-release **%s**: to be tested before production." ;;
         tk.released) _M="Released in **%s**." ;;
+        tk.footer) _M="Posted by this repository's GitHub App ([repowarden docs](https://simdevwarden.github.io/repowarden/en/industrialisation/#github-app-for-workflows)): [%s](https://github.com/apps/%s)" ;;
         tk.delivered) _M="Delivered to **%s**, without a new version (commit %s)." ;;
         # Ticket comment
         tk.comment.adding) _M="Adding comment to ticket #%s..." ;;

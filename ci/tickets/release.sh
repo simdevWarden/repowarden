@@ -21,10 +21,11 @@ cmd_release() {
     while IFS= read -r n; do
         [ -n "$n" ] || continue
         if [[ "$tag" == *-* ]]; then
-            gh issue comment "$n" --body "$msg" >/dev/null
+            commenter "$n" "$msg"
         else
             statut "$n" "$S_DONE"
-            gh issue close "$n" --comment "$msg" >/dev/null
+            pied_r "$msg"
+            gh issue close "$n" --comment "$REPLY" >/dev/null
             nettoyer_branche "$n"
         fi
     done < <(gh issue list --state open --label "$S_PREPROD" --limit 500 --json number -q '.[].number')

@@ -50,7 +50,7 @@ cmd_pr() {
         for n in $tickets; do
             statut "$n" "$S_PREPROD"
             _tr tk.merged "$PR" "$BASE"
-            gh issue comment "$n" --body "$_T" >/dev/null
+            commenter "$n" "$_T"
         done
         return 0
     fi
