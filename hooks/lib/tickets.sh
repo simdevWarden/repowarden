@@ -168,12 +168,19 @@ ticket_auto_create() {
 # Branche de travail sans ticket : avertissement, jamais bloquant. Création
 # proposée seulement si repowarden gère la vie des tickets du projet (et que
 # gh est là pour la faire) ; sinon, comment faire taire l'avertissement.
+# Projet sans suivi géré : une fois par branche seulement (le répéter à chaque
+# commit n'apprend rien), mémorisé dans la config locale de la branche, que git
+# efface avec elle.
 ticket_hint() {
     local branch="$1"
     skipped tickets && return 0
     work_branch "$branch" || return 0
     branch_ticket_r "$branch"
     [ -z "$REPLY" ] || return 0
+    if ! tickets_managed; then
+        [ "$(git config --get "branch.$branch.repowardenTicketWarned" 2>/dev/null)" != true ] || return 0
+        git config "branch.$branch.repowardenTicketWarned" true 2>/dev/null || true
+    fi
     attention_t tk.cli.no_ticket "$branch"
     dim_t tk.cli.explain
     if tickets_managed && has gh; then

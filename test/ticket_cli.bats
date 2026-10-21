@@ -54,6 +54,33 @@ gere() {
     [[ "$output" != *"ticket nouveau"* ]] || false
 }
 
+@test "ticket cli : suivi non gere -> prevenu une seule fois par branche" {
+    run git switch -c feat/panier
+    [[ "$output" == *"sans ticket"* ]] || false
+    echo a >a.txt && git add a.txt
+    run "$CC" -m "ajoute le panier"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"sans ticket"* ]] || false
+    git switch -q main
+    run git switch feat/panier
+    [[ "$output" != *"sans ticket"* ]] || false
+    # une autre branche est prévenue, une fois
+    run git switch -c feat/autre
+    [[ "$output" == *"Branche feat/autre sans ticket"* ]] || false
+    # rien de versionné : la mémoire est dans la config locale du clone
+    [ -z "$(git status --porcelain)" ]
+}
+
+@test "ticket cli : suivi gere -> prevenu a chaque passage sur la branche" {
+    gere
+    git add .github && git commit -q --no-verify -m "ci: tickets"
+    PATH="$F/bin:$PATH" run git switch -c feat/panier
+    [[ "$output" == *"sans ticket"* ]] || false
+    git switch -q main
+    PATH="$F/bin:$PATH" run git switch feat/panier
+    [[ "$output" == *"sans ticket"* ]] || false
+}
+
 @test "ticket cli : suivi gere par repowarden -> creation du ticket proposee" {
     gere
     PATH="$F/bin:$PATH" run git switch -c feat/panier
@@ -72,7 +99,8 @@ gere() {
 }
 
 @test "ticket cli : git cc sans ticket -> commit fait, prevenu (jamais bloque)" {
-    git switch -q -c feat/panier
+    # branche créée sans le hook : git cc est la première occasion de prévenir
+    git -c repowarden.skip=post-checkout switch -q -c feat/panier
     echo a >a.txt && git add a.txt
     run "$CC" -m "ajoute le panier"
     [ "$status" -eq 0 ]
