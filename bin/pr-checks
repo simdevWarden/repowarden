@@ -21,9 +21,41 @@ if [[ "$1" == "--help" || "$1" == "-h" ]]; then
 fi
 command -v gh >/dev/null || { err_t bot.no_gh; exit 1; }
 
-n="${1}"
+n="${1#\#}"
 
 step_t pr.checks.checking "$n"
-gh api "repos/{{owner}}/{{repo}}/pulls/$n/check-runs" --jq '.check_runs[] | {name: .name, conclusion: .conclusion, status: .status, url: .html_url}' 2>/dev/null | while IFS= read -r line; do
-    echo "$line"
-done
+# gh pr checks résout le commit de tête de la PR : les check-runs y sont
+# rattachés, pas à la PR. Le verdict se calcule sur les lignes, pas sur son
+# code ; sans ligne, un code non nul est une vraie erreur (PR introuvable,
+# aucun check), déjà expliquée par gh
+rc=0
+lignes="$(gh pr checks "$n" --json name,bucket,link \
+    -q '.[] | [.bucket, .name, .link] | @tsv')" || rc=$?
+if [ -z "$lignes" ]; then
+    [ "$rc" -ne 0 ] || info_t pr.checks.none "$n"
+    exit "$rc"
+fi
+
+reussis=0 echecs=0 attentes=0
+while IFS=$'\t' read -r etat nom lien; do
+    case "$etat" in
+        pass | skipping) reussis=$((reussis + 1)) ;;
+        fail | cancel)
+            echecs=$((echecs + 1))
+            err_t pr.checks.failed "$nom" "$lien"
+            ;;
+        pending)
+            attentes=$((attentes + 1))
+            info_t pr.checks.pending "$nom"
+            ;;
+    esac
+done <<<"$lignes"
+
+if [ "$echecs" -gt 0 ]; then
+    err_t pr.checks.verdict "$n" "$reussis" "$echecs" "$attentes"
+    exit 1
+elif [ "$attentes" -gt 0 ]; then
+    info_t pr.checks.verdict "$n" "$reussis" "$echecs" "$attentes"
+else
+    ok_t pr.checks.green "$n"
+fi
