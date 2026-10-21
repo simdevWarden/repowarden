@@ -19,6 +19,7 @@ Versioned at the project root, in `git config` format, read **by the hooks and b
     exclude = vendor/* generated/*      # paths neither formatted nor tested
     allowAgentSignatures = false        # AI agents (author, Co-Authored-By) refused; default false
     releaseUpdate = npm update -g my-tool     # "Update" command in the release notes
+    sensitiveFiles = .env .env.* *.pem  # names reported when neither tracked nor ignored (see Hooks)
     # Organization bot (repowarden bot)
     bot = auto                          # auto (default): protection applied and migration PRs; pr: PRs only; off: ignored
     requiredChecks = repowarden,tests   # required checks set by the bot; default: the online ones
@@ -64,12 +65,21 @@ git config repowarden.skip "protect-branch,format" # disables steps
 git config repowarden.skip "node"                  # disables a language
 ```
 
+**Skip a step just once**, without changing the configuration: `git -c repowarden.skip=<value> <command>`.
+
+```bash
+git -c repowarden.skip=tests push                   # this push without the tests
+git -c repowarden.skip=protect-branch commit -m "…" # this commit on a protected branch
+```
+
+Refusal messages give the way forward (create a branch, rename it…), never the command to disable the rule: skipping a step remains a deliberate choice, made once.
+
 ## What can be disabled (`skip`)
 
 | Category            | Values                                                                                           |
 | ------------------- | ------------------------------------------------------------------------------------------------ |
 | Hooks               | `pre-commit`, `prepare-commit-msg`, `commit-msg`, `pre-push`, `post-checkout`, `post-merge`      |
-| Steps               | `branch-name`, `protect-branch`, `secrets`, `format`, `tests`, `deadcode`, `prune-branches`                  |
+| Steps               | `branch-name`, `protect-branch`, `secrets`, `sensitive-files`, `format`, `tests`, `deadcode`, `prune-branches` |
 | Languages and tools | `maven`, `gradle`, `node`, `python`, `go`, `helm`, `docker`… (file name in `hooks/lang/`)        |
 | Everything          | `true`                                                                                           |
 

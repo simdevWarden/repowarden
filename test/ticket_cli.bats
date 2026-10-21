@@ -48,6 +48,8 @@ gere() {
     run git switch -c feat/panier
     [ "$status" -eq 0 ]
     [[ "$output" == *"Branche feat/panier sans ticket"* ]] || false
+    # ce qu'est un ticket ici, avec le lien vers la doc
+    [[ "$output" == *"https://simdevwarden.github.io/repowarden/tickets/"* ]] || false
     [[ "$output" == *"repowarden.skip tickets"* ]] || false
     [[ "$output" != *"ticket nouveau"* ]] || false
 }
@@ -121,6 +123,14 @@ gere() {
     [ "$status" -eq 0 ]
     grep -q -- "--label statut: à valider --label type: fix" "$F/log"
     [[ "$output" == *"Ticket #42 créé, à valider"* ]] || false
+}
+
+@test "ticket cli : ticket nouveau --type inconnu -> refuse avant gh, types listes" {
+    gere
+    PATH="$F/bin:$PATH" run "$TICKET" nouveau "Ajoute le panier" --type ci
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"ci"*"feat, fix, docs, refactor, chore"* ]] || false
+    [[ ! -e "$F/log" ]] || false
 }
 
 @test "ticket cli : repowarden ticket <n> -> le ticket est pris (assigne a soi)" {

@@ -26,7 +26,6 @@ fi
 PROTECTED="$(cfg protectedBranches "main master")"
 if ! skipped protect-branch && [[ " $PROTECTED " == *" $BRANCH "* ]] && git rev-parse --verify -q HEAD >/dev/null; then
     err_t hook.pre_commit.2 "$BRANCH" >&2
-    echo_t hook.pre_commit.3 >&2
     exit 1
 fi
 
@@ -55,13 +54,16 @@ if ! skipped secrets; then
         fi
         rm -f "$rapport" "$journal"
     else
-        # Installation adaptée au système (bash le connaît sans sous-processus)
-        case "${OSTYPE:-}" in
-            darwin*) warn_t hook.pre_commit.6 "brew install gitleaks" ;;
-            msys* | cygwin* | win*) warn_t hook.pre_commit.6 "winget install gitleaks" ;;
-            *) warn_t hook.pre_commit.6 "https://github.com/gitleaks/gitleaks#installing" ;;
-        esac
+        gitleaks_install_r
+        warn_t hook.pre_commit.6 "$REPLY"
     fi
+fi
+
+# 2 bis. Fichier sensible ni suivi ni ignoré : un « git add . » le publierait
+# (avertissement seulement, contenu jamais lu)
+if ! skipped secrets && ! skipped sensitive-files; then
+    sensitive_files_r
+    [ -z "$REPLY" ] || sensitive_files_warn "$REPLY" >&2
 fi
 
 # 3. Formatage : chaque fichier stagé avec l'outil de son langage / projet

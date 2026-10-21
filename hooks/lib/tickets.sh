@@ -12,6 +12,10 @@ S_ENCOURS="statut: en cours"
 S_RELECTURE="statut: en relecture"
 S_PREPROD="statut: préprod"
 S_DONE="statut: done"
+# Posée à l'ouverture : pas de validation d'office, un mainteneur décide
+A_DECIDER="à décider"
+# Types de ticket (étiquettes « type: … », préfixe de la branche)
+TYPES_TICKET="feat fix docs refactor chore"
 
 # Vrai si les étiquettes $1 (une par ligne) disent le travail terminé : mergé
 # (préprod) ou en production (done). Un tel ticket n'a plus de branche à créer.
@@ -171,6 +175,7 @@ ticket_hint() {
     branch_ticket_r "$branch"
     [ -z "$REPLY" ] || return 0
     attention_t tk.cli.no_ticket "$branch"
+    dim_t tk.cli.explain
     if tickets_managed && has gh; then
         # git cc ne propose de créer le ticket qu'avec ticketAutoCreate
         if ticket_auto_create; then dim_t tk.cli.propose_cc; else dim_t tk.cli.propose; fi

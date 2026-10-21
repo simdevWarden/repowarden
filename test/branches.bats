@@ -55,6 +55,9 @@ setup() { setup_repo; initial_commit; }
     run git commit -q --allow-empty -m "feat: x"
     [ "$status" -ne 0 ]
     [[ "$output" == *"Commit refusé : nom de branche non conforme"* ]] || false
+    # la marche à suivre, jamais la désactivation de la règle
+    [[ "$output" == *"git branch -m"* ]] || false
+    [[ "$output" != *"repowarden.skip"* ]] || false
 }
 
 @test "pre-push : refuse une branche mal nommee" {
@@ -79,6 +82,15 @@ setup() { setup_repo; initial_commit; }
     run git commit -q --allow-empty -m "fix: x"
     [ "$status" -ne 0 ]
     [[ "$output" == *"Commit direct sur 'main' interdit"* ]] || false
+    [[ "$output" != *"repowarden.skip"* ]] || false
+}
+
+@test "main : saut ponctuel git -c repowarden.skip, sans rien ecrire dans la config" {
+    run git -c repowarden.skip="secrets protect-branch" commit -q --allow-empty -m "fix: x"
+    [ "$status" -eq 0 ]
+    [ "$(git config --get repowarden.skip)" = secrets ]
+    run git commit -q --allow-empty -m "fix: y"
+    [ "$status" -ne 0 ]
 }
 
 @test "main : repowarden.skip protect-branch l'autorise" {
@@ -93,6 +105,8 @@ setup() { setup_repo; initial_commit; }
     run git push -q origin main
     [ "$status" -ne 0 ]
     [[ "$output" == *"Push direct refusé sur 'main'"* ]] || false
+    [[ "$output" == *"git switch -c"* ]] || false
+    [[ "$output" != *"repowarden.skip"* ]] || false
     [ "$(git rev-parse origin/main)" != "$(git rev-parse main)" ]
 }
 
@@ -218,10 +232,12 @@ server_squash_and_delete() {
     run git commit -q --allow-empty -m "fix: x"
     [ "$status" -ne 0 ]
     [[ "$output" == *"Direct commit on 'main' forbidden"* ]] || false
+    [[ "$output" != *"repowarden.skip"* ]] || false
     git switch -q -c Bad 2>/dev/null
     git commit -q --no-verify --allow-empty -m "feat: x"
     run git push -q origin Bad
     [ "$status" -ne 0 ]
     [[ "$output" == *"Invalid branch name"* ]] || false
     [[ "$output" == *"new feature"* ]] || false
+    [[ "$output" != *"repowarden.skip"* ]] || false
 }

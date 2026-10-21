@@ -8,7 +8,7 @@
 | `pre-commit` | Rejects badly named branches, blocks direct commits on protected branches (`main`/`master` by default), detects secrets, formats **only the staged content** (unstaged work is preserved) |
 | `prepare-commit-msg` | Prefixes the message based on the branch: on `feat/bean`, `git commit -m "add X"` → `feat(bean): add X` |
 | `commit-msg` | Enforces [Conventional Commits](https://www.conventionalcommits.org), 72 characters maximum |
-| `pre-push` | Rejects badly named branches and direct pushes to protected branches (`protectedBranches`, initial creation allowed); **lint** (shellcheck for shell scripts, actionlint for GitHub workflows) then builds and tests **the pushed commit**, only for the affected projects (success: one summary line per project; failure: full output) |
+| `pre-push` | Rejects badly named branches and direct pushes to protected branches (`protectedBranches`, initial creation allowed), and the **messages of the pushed commits** (same rule as CI, `git rebase -i` suggested to fix them); **lint** (shellcheck for shell scripts, actionlint for GitHub workflows) then builds and tests **the pushed commit**, only for the affected projects (success: one summary line per project; failure: full output) |
 | `post-merge` | After a `git pull`: deletes merged local branches (regular or squash merge) whose remote branch has been deleted; never a branch containing unintegrated work |
 
 One-off bypass: `git commit --no-verify`, `git push --no-verify` — the [CI](ci.md) re-runs the checks.
@@ -29,7 +29,19 @@ What to do:
     config/app.ini:github-pat:3
 ```
 
-A failing gitleaks (invalid configuration, incompatible version) also rejects the commit, with its error message: detection was not done, and it is never presented as a leak. Without gitleaks, detection is skipped with the install command; the [CI](ci.md) `secrets` check runs it again. Disable for a repository: `git config repowarden.skip secrets`.
+A failing gitleaks (invalid configuration, incompatible version) also rejects the commit, with its error message: detection was not done, and it is never presented as a leak. Without gitleaks, the commit goes through with a warning: the [CI](ci.md) `secrets` check will do it, and the install command is given (also offered as the next step by `repowarden statut`). Disable for a repository: `git config repowarden.skip secrets`.
+
+### Sensitive file neither tracked nor ignored
+
+gitleaks only reads a file once it is staged. Before that, an untracked file with a sensitive **name**, missing from `.gitignore` (and `.git/info/exclude`), is reported at each commit and by `repowarden statut`: a `git add .` would publish it. Warning only, the commit goes through; the file's content is **never read**.
+
+```text
+⚠ Sensitive file neither tracked nor ignored: git add . would publish it. Lines to add to .gitignore:
+    .env
+    tools/set-npm-token.sh
+```
+
+Names reported by default (case-insensitive): `.env`, `.env.*`, `*token*`, `*secret*`, `*.pem`, `*.key`, `id_rsa*`; never `.env.example`. Other patterns: `sensitiveFiles = .env *.p12` in `.repowarden.conf` (replaces the list). Disable: `git config repowarden.skip sensitive-files` (`skip secrets` disables it too).
 
 ## Lint at pre-push
 

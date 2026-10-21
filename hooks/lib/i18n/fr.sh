@@ -50,6 +50,7 @@ _msg_fr() {
         cc.refs_prompt_ticket) _M="Références (« - » pour aucune) [%s] : " ;;
         cc.refs_prompt) _M="Références (ex. %s ; Entrée pour aucune) : " ;;
         tk.cli.no_ticket) _M="Branche %s sans ticket : ce travail ne sera relié à aucun ticket (non bloquant)." ;;
+        tk.cli.explain) _M="Ticket : issue GitHub d'où part chaque modification (branche type/<n°>-sujet, PR qui la cite) ; son cycle : https://simdevwarden.github.io/repowarden/tickets/" ;;
         tk.cli.propose) _M="Partir d'un ticket : repowarden ticket nouveau \"<titre>\"." ;;
         tk.cli.propose_cc) _M="Partir d'un ticket : repowarden ticket nouveau \"<titre>\" (ou réponds oui à git cc)." ;;
         tk.cli.silence) _M="Projet sans suivi de tickets ? git config repowarden.skip tickets pour ne plus le voir." ;;
@@ -62,6 +63,7 @@ _msg_fr() {
         tk.cli.issue_created) _M="Ticket #%s créé, à valider. Sa branche sera créée à la validation ; ensuite : repowarden ticket %s" ;;
         tk.cli.issue_created_branch) _M="Ticket #%s créé." ;;
         tk.cli.title_required) _M="Titre du ticket obligatoire : repowarden ticket nouveau \"<titre>\"" ;;
+        tk.cli.bad_type) _M="Type de ticket inconnu : %s (types : %s)" ;;
         tk.cli.current) _M="Branche %s : ticket #%s." ;;
         tk.cli.no_ticket_here) _M="Aucun ticket pour cette branche." ;;
         cc.ticket_offer) _M="Aucun ticket pour cette branche. En créer un maintenant (titre : la description) ? [o/N] : " ;;
@@ -109,7 +111,6 @@ _msg_fr() {
         # Hooks et plugins de langage
         hook.pre_commit.1) _M="Commit refusé : nom de branche non conforme." ;;
         hook.pre_commit.2) _M="Commit direct sur '%s' interdit. Crée une branche : git switch -c feat/ma-feature" ;;
-        hook.pre_commit.3) _M="  (désactiver pour ce dépôt : git config repowarden.skip protect-branch)" ;;
         hook.pre_commit.4) _M="Détection de secrets (gitleaks)" ;;
         hook.pre_commit.5) _M="Secret détecté : commit refusé." ;;
         hook.secrets.where) _M="  %s:%s (%s)" ;;
@@ -120,7 +121,9 @@ _msg_fr() {
         hook.secrets.todo_3) _M="  3. Clé qui a pu fuir ailleurs (déjà poussée, partagée) : la révoquer chez son fournisseur." ;;
         hook.secrets.todo_4) _M="  Faux positif : ajouter son empreinte à .gitleaksignore :" ;;
         hook.secrets.failed) _M="gitleaks en échec (code %s) : commit refusé, détection de secrets non faite." ;;
-        hook.pre_commit.6) _M="gitleaks absent, détection de secrets ignorée (installation : %s)." ;;
+        hook.pre_commit.6) _M="gitleaks absent : secrets non vérifiés avant le commit, la CI (vérification secrets) fera le contrôle. Installation : %s" ;;
+        hook.sensitive.found) _M="Fichier sensible ni suivi ni ignoré : un git add . le publierait. Lignes à ajouter à .gitignore :" ;;
+        hook.sensitive.hint) _M="  (noms comparés, contenu jamais lu ; motifs : repowarden.sensitiveFiles ; désactiver : git config repowarden.skip sensitive-files)" ;;
         hook.pre_commit.7) _M="Pre-commit OK" ;;
         hook.commit_msg.1) _M="Première ligne trop longue (%s > 72 caractères)." ;;
         hook.commit_msg.type_unknown) _M="Type « %s » inconnu. Voulais-tu : %s" ;;
@@ -128,13 +131,16 @@ _msg_fr() {
         hook.commit_msg.desc_empty) _M="Description manquante après « %s » : décris le changement à l'impératif." ;;
         hook.commit_msg.kept) _M="  Ton message n'est pas perdu : git commit -e -F .git/COMMIT_EDITMSG" ;;
         hook.commit_msg.dot) _M="Point final retiré de la description (même règle que git cc)." ;;
+        hook.commit_msg.detached) _M="👉 HEAD détachée (bisect, essai) : aucun préfixe ne vient d'une branche, écris l'en-tête complet (ex. fix: corrige le calcul)." ;;
         hook.pre_push.1) _M="Push refusé : nom de branche non conforme." ;;
         hook.pre_push.2) _M="Push direct refusé sur '%s' : elle n'évolue que par Pull Request." ;;
         hook.pre_push.3) _M="  Crée une branche : git switch -c feat/ma-feature, puis ouvre une PR." ;;
-        hook.pre_push.4) _M="  (désactiver pour ce dépôt : git config repowarden.skip protect-branch)" ;;
         hook.pre_push.5) _M="%s : aucun fichier modifié, rien à tester." ;;
         hook.pre_push.6) _M="Rien à tester (suppression de branche uniquement)." ;;
         hook.pre_push.7) _M="Pre-push OK" ;;
+        hook.pre_push.msg) _M="Push refusé : message de commit non conforme (même règle que la CI)." ;;
+        hook.pre_push.msg_fix) _M="  Corriger : git rebase -i %s (reword), puis relancer le push." ;;
+        hook.pre_push.nothing) _M="Rien à pousser." ;;
         hook.pre_push.workflow_scope) _M="Jeton gh sans le scope « workflow » : GitHub refusera un push touchant .github/workflows/. L'autoriser (puis se reconnecter) : gh auth refresh -h github.com -s workflow" ;;
         hook.pre_push.lint.missing) _M="%s absent, %s non vérifié (installation : %s)." ;;
         hook.pre_push.lint.run) _M="%s : %s" ;;
@@ -487,6 +493,10 @@ _msg_fr() {
         st.repo_version_ok) _M="Version demandée par le projet (%s) : respectée" ;;
         st.repo_forge) _M="Plateforme : %s" ;;
         st.repo_rules) _M="Règles GitHub à jour ? repowarden proteger --verifier (lecture seule)" ;;
+        st.wf_owner) _M="%s:%s : repowarden appelé depuis un autre dépôt que le dépôt officiel (%s) ; attendu : %s" ;;
+        st.wf_branch) _M="%s:%s : repowarden appelé sur une branche (@%s), cassé dès qu'elle disparaît ; attendu : %s" ;;
+        st.wf_old) _M="%s:%s : repowarden appelé dans une majeure dépassée (@%s) ; attendu : %s" ;;
+        st.wf_fix) _M="corriger les lignes uses: signalées ci-dessus" ;;
         st.tools) _M="Outils présents : %s · absents : %s (selon les langages des projets)" ;;
         st.next) _M="Étape suivante :" ;;
         st.ready) _M="Tout est prêt : git cc pour commiter, repowarden code-mort sur une branche." ;;
