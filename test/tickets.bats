@@ -285,9 +285,10 @@ ticket() { printf '%s\n' "$@" >"$F/issues/$N.labels"; }
     grep -qxF '<!-- repowarden:pied -->' <<<"$output"
     local line
     while IFS= read -r line; do
-        [[ "$line" == "<!--"* ]] || continue
-        [[ "$line" == "<!-- repowarden:pied -->" ]] || continue
-        [[ "$line" != *"-->"* ]] || [[ "${line#*-->}" == "" ]] || false
+        case "$line" in
+            "<!-- repowarden:pied -->") continue ;;
+            "<!--"*) [[ "$line" != *"-->"* ]] || [[ "${line#*-->}" == "" ]] || false ;;
+        esac
     done <<<"$output"
     local idx
     idx="$(grep -nF '<!-- repowarden:pied -->' <<<"$output" | head -n1 | cut -d: -f1)"
