@@ -26,9 +26,9 @@ Seulement dans un dépôt repowarden (`.repowarden.conf`, réglage `repowarden.*
 | `gh pr create` | toujours : la PR brouillon est ouverte par le bot au premier push | `git push -u origin HEAD` |
 | `gh run rerun` | toujours | `repowarden run rerun <id>` |
 | `gh pr ready`, `gh pr merge`, `gh pr review --approve`, `gh api …/pending_deployments` en écriture | toujours, même avec un ticket : décision du mainteneur | annoncer la PR prête, le mainteneur décide |
-| écriture GitHub hors du circuit des PR : `gh api` en écriture (`-X` autre que `GET`, `-f`/`-F`/`--input` sans `-X GET`, mutation `graphql`), `gh repo edit\|delete`, `gh variable\|secret set\|delete`, `gh release create\|edit\|delete`, `gh workflow run\|enable\|disable`, `gh run cancel\|delete`, `gh label create\|edit\|delete` | sans préfixe `REPOWARDEN_TICKET=<n>` d'un ticket **ouvert et validé** (lu par `gh issue view <n>`, dans le dépôt courant ou celui de `-R`) ; ticket illisible : refusé (écriture sans preuve de ticket) | créer le ticket (`repowarden ticket nouveau`), le faire valider, puis `REPOWARDEN_TICKET=<n> gh …` |
+| toute autre commande `gh` (refus par défaut) : `gh api` en écriture (`-X` autre que `GET`, `-f`/`-F`/`--input` sans `-X GET`, mutation `graphql`), `gh repo edit`, `gh issue close`, `gh pr comment`, `gh pr review` sans `--approve`, `gh release create`, `gh label create`, `gh gist`, sous-commande inconnue… | sans préfixe `REPOWARDEN_TICKET=<n>` d'un ticket **ouvert et validé** (lu par `gh issue view <n>`, dans le dépôt courant ou celui de `-R`) ; ticket illisible : refusé (écriture sans preuve de ticket) | créer le ticket (`repowarden ticket nouveau`), le faire valider, puis `REPOWARDEN_TICKET=<n> gh …` |
 
-Les lectures `gh` (`view`, `list`, `status`, `gh pr checks`, `gh pr diff`, `gh api` en lecture, `gh auth status`) et `gh pr edit` (description de la PR) sont permises. Tout changement, réglage GitHub compris, part d'un ticket créé avant.
+Seules les lectures `gh` connues sont permises sans ticket : `view`, `list`, `status`, `checks`, `diff`, `watch`, `gh search`, `gh browse`, `gh api` en lecture, `gh auth status`, l'aide (`--help`), ainsi que `gh pr edit` (description de la PR). **Tout ce qui n'est pas une lecture est refusé sans ticket**, une sous-commande oubliée ou future comprise. Tout changement, réglage GitHub compris, part d'un ticket créé avant.
 
 L'aide et l'aperçu (`--help`, `-h`, `--dry-run` de `repowarden cc`, `git cc`, `git commit`) sont toujours permis : rien n'est commité. Chaque commande d'une ligne shell est vérifiée (`&&`, `;`, `|`…), dans le bon dépôt (`cd`, `git -C`). Un refus vaut pour **toute la ligne** : rien n'en est lancé, pas même les autres commandes (`git add a.txt && git commit …` n'ajoute rien), et le message le dit. Un refus donne la raison et la commande :
 
@@ -73,7 +73,7 @@ Toute nouvelle fonction a, juste au-dessus, une à deux lignes qui disent ce qu'
 ## Limites
 
 - **Filet, pas mur** : les hooks git et la vérification `ticket` en CI restent la protection. Une modification faite par le shell (`sed -i`, redirection `>`, script) n'est pas vue avant le commit, où les hooks la vérifient.
-- **Écritures GitHub** : seules celles de `gh` sont vues ; l'interface web et `curl` vers l'API ne le sont pas.
+- **Écritures GitHub** : seules celles de `gh` sont vues, et seulement depuis un dépôt repowarden : `gh -R …` lancé hors d'un tel dépôt n'est pas vu ; l'interface web et `curl` vers l'API non plus.
 - **Lecture d'une ligne shell** : découpage simple (sans interpréter les guillemets ni les sous-shells) ; une commande cachée dans `bash -c "…"` ou une variable n'est pas vue.
 - **Prérequis** : `repowarden` dans le `PATH` (`npm install -g repowarden`) et [jq](https://jqlang.org). Sinon, rien n'est bloqué (le garde-fou ne bloque jamais un agent par une panne).
 - **opencode** : l'API des plugins évolue ; le garde-fou utilise le crochet documenté `tool.execute.before`. La nouvelle API `{ id, setup }` (paquet `@opencode-ai/plugin`, v2) n'expose pas encore les outils.

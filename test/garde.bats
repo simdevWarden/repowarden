@@ -338,8 +338,6 @@ GH
         [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
         [[ "$output" == *"décision du mainteneur"* ]] || false
     done
-    run shell 'gh pr review 3 --comment -b "ok"'
-    [ "$status" -eq 0 ]
 }
 
 @test "garde gh : ecriture hors circuit refusee sans ticket" {
@@ -398,4 +396,23 @@ GH
     [[ "$output" == *"without a ticket"* ]] || false
     REPOWARDEN_LANG=en run shell 'gh pr merge 3'
     [[ "$output" == *"maintainer's decision"* ]] || false
+}
+
+@test "garde gh : refus par defaut, toute commande gh hors lectures connues demande un ticket" {
+    gh_simule
+    for c in 'gh search issues panier' 'gh browse --no-browser' 'gh status' 'gh pr checks 3 --watch' \
+        'gh run watch 1' 'gh issue close --help' 'gh secret list' 'gh label list'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refusé : $output"; return 1; }
+    done
+    for c in 'gh issue close 12' 'gh issue reopen 12' 'gh issue delete 12 --yes' 'gh issue develop 12' \
+        'gh issue transfer 12 o/autre' 'gh issue pin 12' 'gh issue lock 12' 'gh pr close 3' 'gh pr reopen 3' \
+        'gh pr comment 3 --body x' 'gh pr review 3 --comment -b ok' 'gh gist create a.txt' \
+        'gh codespace delete -c x' 'gh frobnique truc' 'gh repo frobnique'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"sans ticket"*"REPOWARDEN_TICKET=<n>"* ]] || false
+        FAKE_TICKET='OPEN\nvalidé' run shell "REPOWARDEN_TICKET=12 $c"
+        [ "$status" -eq 0 ] || { echo "REPOWARDEN_TICKET=12 $c refusé : $output"; return 1; }
+    done
 }
