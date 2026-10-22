@@ -285,3 +285,117 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     [[ "$output" == *"git switch -c <type>/<topic>"* ]] || false
     [[ "$output" == *"Nothing on this line was run"* ]] || false
 }
+
+# gh simulé (ticket #454) : journal des appels ; gh issue view rend
+# $FAKE_TICKET (état puis étiquettes, une par ligne), code $FAKE_TICKET_RC
+gh_simule() {
+    mkdir -p "$BATS_TEST_TMPDIR/gh/bin"
+    cat >"$BATS_TEST_TMPDIR/gh/bin/gh" <<'GH'
+#!/usr/bin/env bash
+echo "$*" >>"$BATS_TEST_TMPDIR/gh/log"
+case "$1 $2" in
+    "issue view") [ -n "${FAKE_TICKET:-}" ] && printf '%b\n' "$FAKE_TICKET"; exit "${FAKE_TICKET_RC:-0}" ;;
+esac
+exit 0
+GH
+    chmod +x "$BATS_TEST_TMPDIR/gh/bin/gh"
+    export PATH="$BATS_TEST_TMPDIR/gh/bin:$PATH"
+}
+
+@test "garde gh : lectures permises ; ecritures du circuit refusees, avec la commande repowarden" {
+    gh_simule
+    for c in 'gh issue view 12' 'gh issue list --label validé' 'gh issue status' 'gh pr view 3' 'gh pr list' \
+        'gh pr status' 'gh pr checks 3' 'gh pr diff 3' 'gh run view 1 --log-failed' 'gh run list' \
+        'gh release view v1' 'gh release list' 'gh repo view' 'gh workflow view ci.yml' 'gh workflow list' \
+        'gh api repos/o/r/pulls' 'gh api -X GET repos/o/r/issues -f state=open' 'gh auth status' \
+        "gh api graphql -f query='query { viewer { login } }'" 'gh pr edit 3 --body x' 'gh -R o/r issue view 1'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refusé : $output"; return 1; }
+    done
+    run shell 'gh issue create --title x --body y'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"repowarden ticket nouveau"* ]] || false
+    for c in 'gh issue comment 12 --body x' 'gh issue edit 12 --add-label validé'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"repowarden ticket comment"*"repowarden ticket label"* ]] || false
+    done
+    run shell 'gh pr create --fill'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"git push -u origin HEAD"* ]] || false
+    run shell 'gh run rerun 123 --failed'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"repowarden run rerun"* ]] || false
+}
+
+@test "garde gh : decisions du mainteneur refusees, meme avec un ticket valide" {
+    gh_simule
+    export FAKE_TICKET='OPEN\nvalidé'
+    for c in 'gh pr ready 3' 'gh pr merge 3 --squash' 'gh pr review 3 --approve' 'gh pr review 3 -a' \
+        'gh api -X POST repos/o/r/actions/runs/1/pending_deployments -f state=approved' \
+        'REPOWARDEN_TICKET=12 gh pr merge 3'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"décision du mainteneur"* ]] || false
+    done
+    run shell 'gh pr review 3 --comment -b "ok"'
+    [ "$status" -eq 0 ]
+}
+
+@test "garde gh : ecriture hors circuit refusee sans ticket" {
+    gh_simule
+    for c in 'gh api -X PATCH repos/o/r -f allow_auto_merge=true' 'gh api repos/o/r/labels -f name=x' \
+        'gh api --method DELETE repos/o/r/hooks/1' 'gh api repos/o/r/rulesets --input r.json' \
+        "gh api graphql -f query='mutation { x }'" 'gh repo edit --enable-auto-merge' 'gh repo delete o/r --yes' \
+        'gh variable set X --body 1' 'gh secret delete X' 'gh release create v1' 'gh release edit v1' \
+        'gh release delete v1' 'gh workflow run ci.yml' 'gh workflow enable ci.yml' 'gh workflow disable ci.yml' \
+        'gh run cancel 1' 'gh run delete 1' 'gh label create x' 'gh label edit x' 'gh label delete x'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"sans ticket"*"REPOWARDEN_TICKET=<n>"* ]] || false
+    done
+    [ ! -s "$BATS_TEST_TMPDIR/gh/log" ]
+}
+
+@test "garde gh : prefixe REPOWARDEN_TICKET d'un ticket ouvert et valide" {
+    gh_simule
+    export FAKE_TICKET='OPEN\nfeat\nvalidé'
+    run shell 'REPOWARDEN_TICKET=12 gh repo edit --enable-auto-merge'
+    [ "$status" -eq 0 ]
+    grep -q '^issue view 12 --json state,labels' "$BATS_TEST_TMPDIR/gh/log"
+    # Ticket d'un autre dépôt (-R) : lu dans ce dépôt
+    run shell 'env REPOWARDEN_TICKET=7 gh label create x -R o/autre'
+    [ "$status" -eq 0 ]
+    grep -q '^issue view 7 .*-R o/autre' "$BATS_TEST_TMPDIR/gh/log"
+    # Fermé, non validé : refusé
+    for t in 'CLOSED\nvalidé' 'OPEN\nstatut: à valider'; do
+        FAKE_TICKET="$t" run shell 'REPOWARDEN_TICKET=12 gh repo edit --enable-auto-merge'
+        [ "$status" -eq 2 ] || { echo "$t permis"; return 1; }
+        [[ "$output" == *"#12 n'est pas ouvert et validé"* ]] || false
+    done
+    # Illisible (gh en échec, numéro invalide) : écriture sans preuve de ticket
+    FAKE_TICKET="" FAKE_TICKET_RC=1 run shell 'REPOWARDEN_TICKET=12 gh repo edit --enable-auto-merge'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"#12 illisible"* ]] || false
+    run shell 'REPOWARDEN_TICKET=abc gh repo edit --enable-auto-merge'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"illisible"* ]] || false
+}
+
+@test "garde gh : lignes composees, hors depot repowarden permis, anglais" {
+    gh_simule
+    run shell 'git status && gh issue create --title x'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"Rien de cette ligne"* ]] || false
+    run shell "cd /tmp; '/usr/local/bin/gh' pr merge 3"
+    [ "$status" -eq 0 ]
+    run shell "cd $BATS_TEST_TMPDIR && gh pr merge 3"
+    [ "$status" -eq 0 ]
+    run shell 'echo x | gh pr merge 3'
+    [ "$status" -eq 2 ]
+    REPOWARDEN_LANG=en run shell 'gh repo edit --enable-auto-merge'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"without a ticket"* ]] || false
+    REPOWARDEN_LANG=en run shell 'gh pr merge 3'
+    [[ "$output" == *"maintainer's decision"* ]] || false
+}

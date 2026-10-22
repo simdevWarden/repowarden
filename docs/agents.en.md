@@ -21,6 +21,14 @@ Only in a repowarden repository (`.repowarden.conf`, a `repowarden.*` setting or
 | `--no-verify` (and `git commit -n`) | always | run it again without, fix what the hooks report |
 | `git add .`, `-A`, `--all` | always | `git add <files>` |
 | forced `git push`: `--force`, `-f` (`-uf`…), `--force-with-lease[=…]`, `--force-if-includes`, `+branch` refspec | always: it rewrites the history already pushed | fix it with a new commit (`repowarden cc …`), then `git push` without forcing |
+| `gh issue create` | always | `repowarden ticket nouveau "<title>"` |
+| `gh issue comment`, `gh issue edit` | always | `repowarden ticket comment <n> "…"`, `repowarden ticket label <n> <label>` |
+| `gh pr create` | always: the draft PR is opened by the bot on the first push | `git push -u origin HEAD` |
+| `gh run rerun` | always | `repowarden run rerun <id>` |
+| `gh pr ready`, `gh pr merge`, `gh pr review --approve`, writing `gh api …/pending_deployments` | always, even with a ticket: the maintainer's decision | say the PR is ready, the maintainer decides |
+| GitHub write outside the PR flow: writing `gh api` (`-X` other than `GET`, `-f`/`-F`/`--input` without `-X GET`, `graphql` mutation), `gh repo edit\|delete`, `gh variable\|secret set\|delete`, `gh release create\|edit\|delete`, `gh workflow run\|enable\|disable`, `gh run cancel\|delete`, `gh label create\|edit\|delete` | without a `REPOWARDEN_TICKET=<n>` prefix of an **open and validated** ticket (read with `gh issue view <n>`, in the current repository or the `-R` one); unreadable ticket: refused (a write without proof of a ticket) | create the ticket (`repowarden ticket nouveau`), get it validated, then `REPOWARDEN_TICKET=<n> gh …` |
+
+`gh` reads (`view`, `list`, `status`, `gh pr checks`, `gh pr diff`, read-only `gh api`, `gh auth status`) and `gh pr edit` (PR description) are allowed. Every change, GitHub settings included, starts from a ticket created beforehand.
 
 Help and preview (`--help`, `-h`, `--dry-run` of `repowarden cc`, `git cc`, `git commit`) are always allowed: nothing is committed. Each command of a shell line is checked (`&&`, `;`, `|`…), in the right repository (`cd`, `git -C`). A refusal applies to **the whole line**: none of it runs, not even the other commands (`git add a.txt && git commit …` adds nothing), and the message says so. A refusal gives the reason and the command:
 
@@ -36,7 +44,7 @@ Help and preview (`--help`, `-h`, `--dry-run` of `repowarden cc`, `git cc`, `git
 | [Claude Code](https://code.claude.com/docs/en/hooks) | `PreToolUse` hook (`Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `Bash` tools): `repowarden garde --format claude` | `.claude/settings.json` | `$CLAUDE_CONFIG_DIR/settings.json` ([if set](https://code.claude.com/docs/en/settings)), else `~/.claude/settings.json` |
 | [opencode](https://opencode.ai/docs/plugins/) | plugin, `tool.execute.before` hook (`edit`, `write`, `apply_patch`, `bash` tools) | `.opencode/plugins/repowarden-garde.js` | `$OPENCODE_CONFIG_DIR/plugins/` ([if set](https://opencode.ai/docs/config/)), else `${XDG_CONFIG_HOME:-~/.config}/opencode/plugins/` |
 
-`repowarden agents init --claude` or `--opencode` for a single tool. Re-runnable: an existing `settings.json` is completed (nothing if the hook is already there), a modified plugin is kept as is and reported. Nothing is ever overwritten. repowarden hooks inactive (repository, or `--global` without `repowarden install --global`): reported, with the command, since the guard will then refuse commits.
+`repowarden agents init --claude` or `--opencode` for a single tool. Re-runnable: an existing `settings.json` is completed (nothing if the hook is already there), a modified plugin is kept as is and reported. Nothing is ever overwritten. repowarden hooks inactive (repository, or `--global` without `repowarden install --global`): reported, with the command, since the guard will then refuse commits. `repowarden statut` and `repowarden install` report an agent present (`claude` or `opencode` in the `PATH`, or their configuration folder) with the guard wired neither in the repository nor for the user, with `repowarden agents init`; `install` offers it in a terminal.
 
 ### Removing the guard
 
@@ -65,6 +73,7 @@ Every new function has, right above it, one or two lines saying what it does and
 ## Limitations
 
 - **Safety net, not a wall**: git hooks and the `ticket` check in CI remain the protection. A change made through the shell (`sed -i`, `>` redirection, script) is not seen before the commit, where the hooks check it.
+- **GitHub writes**: only `gh` ones are seen; the web interface and `curl` to the API are not.
 - **Reading a shell line**: simple splitting (quotes and subshells are not interpreted); a command hidden in `bash -c "…"` or in a variable is not seen.
 - **Requirements**: `repowarden` on the `PATH` (`npm install -g repowarden`) and [jq](https://jqlang.org). Otherwise nothing is blocked (the guard never blocks an agent because of a failure).
 - **opencode**: the plugin API is evolving; the guard uses the documented `tool.execute.before` hook. The new `{ id, setup }` API (`@opencode-ai/plugin` package, v2) does not expose tools yet.

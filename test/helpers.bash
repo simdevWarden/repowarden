@@ -48,3 +48,17 @@ subject() { git log -1 --format=%s "${1:-HEAD}"; }
 require() {
     command -v "$1" >/dev/null 2>&1 || skip "$1 absent"
 }
+
+# Garde-fou des agents IA branché dans le dépôt de test : sur un poste où
+# Claude Code ou opencode est installé, statut ne le réclame plus
+garde_branche() {
+    mkdir -p .claude
+    printf '{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"repowarden garde --format claude"}]}]}}\n' >.claude/settings.json
+}
+
+# Poste de test avec Claude Code (~/.claude), garde-fou branché nulle part
+agent_sans_garde() {
+    export HOME="$BATS_TEST_TMPDIR/home"
+    mkdir -p "$HOME/.claude"
+    unset CLAUDE_CONFIG_DIR OPENCODE_CONFIG_DIR XDG_CONFIG_HOME
+}

@@ -11,6 +11,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "$ROOT/hooks/lib/common.sh"
 # shellcheck source=../hooks/lib/secrets.sh
 source "$ROOT/hooks/lib/secrets.sh"
+# shellcheck source=../hooks/lib/agents.sh
+source "$ROOT/hooks/lib/agents.sh"
 exec 2>&1 # une seule sortie, dans l'ordre (avertissements compris)
 # shellcheck disable=SC2034 # lu par check_version (common.sh)
 HOOKS_DIR="$ROOT/hooks"
@@ -138,6 +140,15 @@ if [ -n "$GIT_TOPLEVEL" ]; then
     fi
     info_t st.repo_forge "$FORGE"
     [ "$FORGE" != github ] || dim_t st.repo_rules
+fi
+
+# Agent IA sans garde-fou : ses actions ne seraient vérifiées qu'au commit.
+# Branché dans le dépôt (à versionner), ou pour l'utilisateur hors dépôt
+if agents_sans_garde "$GIT_TOPLEVEL"; then
+    cmd_agents="repowarden agents init"
+    [ -n "$GIT_TOPLEVEL" ] || cmd_agents="repowarden agents init --global"
+    attention_t st.agents_sans_garde "$cmd_agents"
+    suivant="${suivant:-$cmd_agents}"
 fi
 
 # Outils : secrets, code mort (selon les langages)

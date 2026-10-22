@@ -104,6 +104,8 @@ _msg_fr() {
         install.purge_needs_uninstall) _M="--purge et --scan s'utilisent avec --uninstall." ;;
         install.replaced) _M="core.hooksPath (%s) valait '%s', remplacé." ;;
         install.enabled) _M="Hooks activés (%s) → %s" ;;
+        install.agents_ask) _M="Agent IA sans garde-fou (Claude Code, opencode). Brancher le garde-fou (%s) ?" ;;
+        install.agents_later) _M="Agent IA sans garde-fou (Claude Code, opencode) : le brancher avec %s" ;;
         install.local_wins) _M="Un core.hooksPath local (ex. husky) reste prioritaire dans le dépôt concerné." ;;
         install.bots_never) _M="Les bots du dépôt ne seront plus proposés (repowarden.bots = off) ; à la demande : repowarden bots" ;;
         install.lang_set) _M="Langue des messages : français (changer : %s --global --lang en)" ;;
@@ -510,6 +512,7 @@ _msg_fr() {
         st.wf_old) _M="%s:%s : repowarden appelé dans une majeure dépassée (@%s) ; attendu : %s" ;;
         st.wf_fix) _M="corriger les lignes uses: signalées ci-dessus" ;;
         st.tools) _M="Outils présents : %s · absents : %s (selon les langages des projets)" ;;
+        st.agents_sans_garde) _M="Agent IA sans garde-fou (Claude Code, opencode) : ses actions ne sont vérifiées qu'au commit. → %s" ;;
         st.next) _M="Étape suivante :" ;;
         st.ready) _M="Tout est prêt : git cc pour commiter, repowarden code-mort sur une branche." ;;
         st.help) _M="Toutes les commandes : repowarden --help" ;;
@@ -730,6 +733,14 @@ _msg_fr() {
         garde.commit_protegee) _M="commande refusée : « %s » ; « %s » est une branche protégée, le commit y serait refusé.\n  → Travailler sur la branche d'un ticket : repowarden ticket <n>, puis relancer." ;;
         garde.commit_protegee_libre) _M="commande refusée : « %s » ; « %s » est une branche protégée, le commit y serait refusé.\n  → Créer une branche de travail (les modifications suivent) : git switch -c <type>/<sujet>, puis relancer." ;;
         garde.ligne_entiere) _M="  Rien de cette ligne n'a été lancé, pas même les autres commandes : les relancer à part." ;;
+        garde.gh_ticket_nouveau) _M="commande refusée : « %s » ; un ticket se crée par repowarden (statut, type, validation).\n  → repowarden ticket nouveau \"<titre>\" [--type fix] [--description \"…\"]" ;;
+        garde.gh_ticket_comment) _M="commande refusée : « %s » ; un ticket se commente et s'étiquette par repowarden.\n  → repowarden ticket comment <n> \"<texte>\" ; repowarden ticket label <n> <label> [--remove]" ;;
+        garde.gh_pr_create) _M="commande refusée : « %s » ; la PR brouillon est ouverte par le bot au premier push de la branche du ticket.\n  → git push -u origin HEAD" ;;
+        garde.gh_rerun) _M="commande refusée : « %s » ; un workflow se relance par repowarden.\n  → repowarden run rerun <run-id|--failed>" ;;
+        garde.gh_mainteneur) _M="commande refusée : « %s » ; c'est une décision du mainteneur (sortie du brouillon, merge, approbation, déploiement).\n  → Annoncer que la PR est prête (CI verte) et laisser le mainteneur décider." ;;
+        garde.gh_sans_ticket) _M="commande refusée : « %s » modifie GitHub hors du circuit des PR, sans ticket.\n  → Créer le ticket (repowarden ticket nouveau), le faire valider, puis relancer : REPOWARDEN_TICKET=<n> %s" ;;
+        garde.gh_ticket_illisible) _M="commande refusée : « %s » ; ticket #%s illisible (gh issue view) : écriture sans preuve de ticket.\n  → Vérifier le numéro et gh auth status, puis relancer : REPOWARDEN_TICKET=<n> gh …" ;;
+        garde.gh_ticket_non_valide) _M="commande refusée : « %s » ; le ticket #%s n'est pas ouvert et validé (étiquette « %s »).\n  → Faire valider le ticket par le mainteneur, puis relancer." ;;
         agents.added) _M="%s : garde-fou ajouté (%s)." ;;
         agents.present) _M="%s : garde-fou déjà en place (%s)." ;;
         agents.kept) _M="%s : %s existe et diffère du modèle ; gardé tel quel (modèle : %s)." ;;

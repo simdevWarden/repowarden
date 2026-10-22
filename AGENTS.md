@@ -5,7 +5,8 @@ le détail est dans la doc, voir « Où trouver le reste ».
 
 ## Processus
 
-1. **Tout part d'un ticket** (issue GitHub). Pas de modification sans ticket.
+1. **Tout part d'un ticket** (issue GitHub). Pas de modification sans ticket :
+   tout changement, y compris un réglage GitHub, part d'un ticket créé avant.
 2. **La conception est écrite dans le ticket avant le code** : ce qui change,
    fichiers touchés, hors périmètre (commentaire « Conception retenue »). Un
    écart en cours de route est d'abord noté sur le ticket.
