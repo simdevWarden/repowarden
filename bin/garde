@@ -193,6 +193,17 @@ verifier_git() {
                 [ -n "$amend" ] && [ -n "$noedit" ] && exit 0
                 refuser garde.commit "$ligne"
                 ;;
+            push)
+                for mot in ${args_git[@]+"${args_git[@]}"}; do
+                    case "$mot" in
+                        # Force push : réécrit l'historique distant partagé (AGENTS.md l'interdit).
+                        # Options courtes groupées : -f (-uf…) ; refspec forcé : +branche
+                        --force | --force-with-lease | --force-with-lease=* | --force-if-includes | +*)
+                            refuser garde.force_push "$ligne" ;;
+                        -[!-]*) [[ "$mot" != *f* ]] || refuser garde.force_push "$ligne" ;;
+                    esac
+                done
+                ;;
             cc)
                 lecture_seule ${args_git[@]+"${args_git[@]}"} || verifier_commit "$ligne"
                 ;;
