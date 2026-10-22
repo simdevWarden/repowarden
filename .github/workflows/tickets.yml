@@ -80,6 +80,10 @@ on:
         description: "GitHub App des workflows (repowarden app init : vars.REPOWARDEN_APP_CLIENT_ID) ; vide : jeton des Actions"
         type: string
         default: ""
+      lang:
+        description: "Langue des textes du bot (fr, en) ; vide : lang du .repowarden.conf de la branche par défaut du projet, sinon anglais"
+        type: string
+        default: ""
       repowarden-ref:
         description: Version de repowarden dont les scripts sont utilisés
         type: string
@@ -176,7 +180,12 @@ jobs:
           REVIEW_STATE: ${{ github.event.review.state }}
           AUTO_CREATE: ${{ inputs.auto-create }}
           DELIVERY_WORKFLOW: ${{ inputs.delivery-workflow }}
+          LANG_INPUT: ${{ inputs.lang }}
         run: |
+          # Langue du projet (description des PR, commentaires, pied du bot) :
+          # son dépôt n'est pas récupéré, lang est lu par l'API
+          REPOWARDEN_LANG="$(bash .repowarden-ci/ci/langue-projet.sh)"
+          export REPOWARDEN_LANG
           if [ -n "$TAG" ] || [ -n "$DELIVERED_SHA" ]; then
             bash .repowarden-ci/ci/tickets.sh release
           elif [ "$EVENT" = issues ]; then
