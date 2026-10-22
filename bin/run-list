@@ -14,7 +14,7 @@ aide() {
     printf '%b\n' "$_T"
 }
 
-if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     aide
     exit 0
 fi
@@ -34,14 +34,15 @@ done
 
 repo="${GH_REPO:-$(gh repo view --json nameWithOwner -q .nameWithOwner)}"
 
+# --jq plutôt que --template : le gabarit Go écrit les identifiants en
+# notation scientifique (3.96e+10), inutilisables par run rerun
+filtre=()
 if [ -n "$workflow" ]; then
     step_t run.listing.workflow "$workflow"
-    gh run list --repo "$repo" --workflow "$workflow" --limit "$limit" \
-        --json databaseId,name,conclusion,createdAt,headBranch \
-        --template '{{range .}}{{.databaseId}}	{{.name}}	{{.conclusion}}	{{.createdAt}}	{{.headBranch}}{{"\n"}}{{end}}'
+    filtre=(--workflow "$workflow")
 else
     step_t run.listing.all
-    gh run list --repo "$repo" --limit "$limit" \
-        --json databaseId,name,conclusion,createdAt,headBranch \
-        --template '{{range .}}{{.databaseId}}	{{.name}}	{{.conclusion}}	{{.createdAt}}	{{.headBranch}}{{"\n"}}{{end}}'
 fi
+gh run list --repo "$repo" ${filtre[@]+"${filtre[@]}"} --limit "$limit" \
+    --json databaseId,name,conclusion,createdAt,headBranch \
+    --jq '.[] | [.databaseId, .name, .conclusion, .createdAt, .headBranch] | @tsv'

@@ -56,5 +56,17 @@ repowarden_version_r() {
     fi
 }
 
+# REPLY = version majeure dont le tag flottant (vN) est publié, pour la
+# version $1 de repowarden : sa majeure ; préversion d'une nouvelle majeure
+# (X.0.0-next) : X-1, vX n'existant pas encore ; 0.0.0-dev (clone sans
+# tags) : vide. REPOWARDEN_MAJEURE l'impose (tests, clone sans tags).
+repowarden_majeure_r() {
+    if [ -n "${REPOWARDEN_MAJEURE:-}" ]; then REPLY="$REPOWARDEN_MAJEURE"; return; fi
+    if [ -z "$1" ] || [ "$1" = 0.0.0-dev ]; then REPLY=""; return; fi
+    REPLY="${1%%.*}"
+    REPLY="${REPLY%%-*}"
+    [[ "$1" != *.0.0-* ]] || REPLY=$((REPLY - 1))
+}
+
 # En-tête de marque
 brand() { echo "${UI_C}${UI_B}◆ repowarden${UI_N}${UI_D}${1:+ · $1}${UI_N}"; }

@@ -177,6 +177,9 @@ on:
       delivery_pr:
         description: "Mode tag : numéro de la PR de livraison créée ou mise à jour (vide : aucune)"
         value: ${{ jobs.tag.outputs.delivery_pr }}
+      delivered_without_version:
+        description: "Mode tag : commit livré sur la branche principale sans nouvelle version (ni fix ni feat) ; vide sinon"
+        value: ${{ jobs.tag.outputs.delivered_without_version }}
 
 permissions: {}
 
@@ -212,7 +215,7 @@ jobs:
       - name: Jeton de l'App
         id: app
         if: inputs.app-client-id != ''
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ inputs.app-client-id }}
           private-key: ${{ secrets.app-key }}
@@ -425,6 +428,7 @@ jobs:
       prerelease_tag: ${{ steps.preversion.outputs.tag }}
       prerelease_version: ${{ steps.preversion.outputs.version }}
       delivery_pr: ${{ steps.livraison.outputs.pr }}
+      delivered_without_version: ${{ steps.publier.outputs.delivered_without_version }}
     env:
       HAS_APP: ${{ inputs.app-client-id != '' && secrets.app-key != '' }}
       HAS_OLD_BOT: ${{ secrets.app-id != '' && secrets.app-key != '' }}
@@ -450,7 +454,7 @@ jobs:
       - name: Jeton de l'App
         id: app
         if: inputs.app-client-id != ''
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ inputs.app-client-id }}
           private-key: ${{ secrets.app-key }}
@@ -674,6 +678,12 @@ jobs:
           version="$(bash .repowarden-ci/ci/version.sh next HEAD)"
           if [ -z "$version" ]; then
             echo "Rien à publier."
+            # Livraison sans fix ni feat (docs, refactor, CI) : main à jour
+            # sans tag ; signalée pour fermer tout de même les tickets livrés.
+            # Un lancement manuel ou planifié ne livre rien.
+            if [ "$GITHUB_EVENT_NAME" = push ]; then
+              echo "delivered_without_version=$GITHUB_SHA" >>"$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
           tag="v$version"
@@ -789,7 +799,7 @@ jobs:
       - name: Jeton de l'App
         id: app
         if: inputs.app-client-id != ''
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ inputs.app-client-id }}
           private-key: ${{ secrets.app-key }}

@@ -109,14 +109,15 @@ jobs:
       dist-tag: next
 
   # Tickets : en préprod à chaque préversion (commentaire), done et fermés à
-  # chaque release
+  # chaque release, ou à une livraison sans nouvelle version
   tickets:
     needs: release
-    if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true'
+    if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true' || needs.release.outputs.delivered_without_version != ''
     uses: ./.github/workflows/tickets.yml
     permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
     with:
       tag: ${{ needs.release.outputs.tag_name || needs.release.outputs.prerelease_tag }}
+      delivered-sha: ${{ needs.release.outputs.delivered_without_version }}
       repowarden-repository: ${{ github.repository }}
       repowarden-ref: ${{ github.sha }}
       app-client-id: ${{ vars.REPOWARDEN_APP_CLIENT_ID }}

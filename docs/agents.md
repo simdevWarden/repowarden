@@ -21,7 +21,7 @@ Seulement dans un dépôt repowarden (`.repowarden.conf`, réglage `repowarden.*
 | `--no-verify` (et `git commit -n`) | toujours | relancer sans, corriger ce que les hooks signalent |
 | `git add .`, `-A`, `--all` | toujours | `git add <fichiers>` |
 
-Chaque commande d'une ligne shell est vérifiée (`&&`, `;`, `|`…), dans le bon dépôt (`cd`, `git -C`). Un refus vaut pour **toute la ligne** : rien n'en est lancé, pas même les autres commandes (`git add a.txt && git commit …` n'ajoute rien), et le message le dit. Un refus donne la raison et la commande :
+L'aide et l'aperçu (`--help`, `-h`, `--dry-run` de `repowarden cc`, `git cc`, `git commit`) sont toujours permis : rien n'est commité. Chaque commande d'une ligne shell est vérifiée (`&&`, `;`, `|`…), dans le bon dépôt (`cd`, `git -C`). Un refus vaut pour **toute la ligne** : rien n'en est lancé, pas même les autres commandes (`git add a.txt && git commit …` n'ajoute rien), et le message le dit. Un refus donne la raison et la commande :
 
 ```text
 ✖ repowarden : modification refusée : « main » est une branche protégée.
@@ -56,6 +56,10 @@ Un seul vérificateur pour tous les outils : il lit l'action sur l'entrée stand
 | autre | garde-fou en panne (jq absent, JSON illisible) | rien n'est bloqué : un avertissement seulement |
 
 Formats : `--format claude` (`tool_name`, `tool_input`, `cwd` : entrée du hook `PreToolUse`), `--format opencode` (défaut : `tool`, `args`, `cwd`).
+
+## Consignes de code
+
+Toute nouvelle fonction a, juste au-dessus, une à deux lignes qui disent ce qu'elle fait et **pourquoi**, sans paraphraser le code : des fonctionnalités documentées dans le code, sans gros blocs de commentaires. À reprendre dans les consignes du projet (`AGENTS.md`, `CLAUDE.md`…) ; le pre-commit et la CI signalent les oublis ([fonctions sans commentaire](hooks.md#fonctions-sans-commentaire)).
 
 ## Limites
 

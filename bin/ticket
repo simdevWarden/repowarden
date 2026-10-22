@@ -18,7 +18,9 @@ source "$ROOT/hooks/lib/common.sh"
 # shellcheck source=../hooks/lib/tickets.sh
 source "$ROOT/hooks/lib/tickets.sh"
 
-aide() { _tr help.ticket; printf '%b\n' "$_T" >&2; }
+# Aide sur la sortie standard quand elle est demandée (code 0) ; les cas
+# d'erreur la redirigent eux-mêmes vers stderr
+aide() { _tr help.ticket; printf '%b\n' "$_T"; }
 
 [ -n "$GIT_TOPLEVEL" ] || { err_t install.not_repo; exit 1; }
 cd "$GIT_TOPLEVEL"
@@ -62,9 +64,14 @@ cmd_ticket() {
     git fetch -q origin --prune
     ticket_remote_branch_r "$n"
     if [ -n "$REPLY" ]; then
-        switch_to "$REPLY"
+        local existante="$REPLY"
+        switch_to "$existante"
         prendre "$n"
-        ok_t tk.cli.switched "$REPLY" "$n"
+        ok_t tk.cli.switched "$existante" "$n"
+        # Faite avant la validation : jamais recréée, son lien va sur le ticket
+        if ticket_note_unlinked_branch "$n" "$existante"; then
+            attention_t tk.cli.unlinked "$existante" "$n"
+        fi
         return 0
     fi
     json="$(gh issue view "$n" --json state,title,labels \
@@ -97,12 +104,18 @@ cmd_nouveau() {
             --type) shift; type="${1:?--type attend un type}" ;;
             --description) shift; description="${1:?--description attend un texte}" ;;
             --porcelain) porcelain=1 ;;
+            -h | --help) aide; exit 0 ;;
             -*) err_t install.unknown_arg "$1"; exit 1 ;;
             *) titre="$1" ;;
         esac
         shift
     done
     [ -n "$titre" ] || { err_t tk.cli.title_required; exit 1; }
+    # Étiquette « type: … » inexistante : gh refuserait de créer le ticket
+    if [ -n "$type" ] && tickets_managed && [[ " $TYPES_TICKET " != *" $type "* ]]; then
+        err_t tk.cli.bad_type "$type" "${TYPES_TICKET// /, }"
+        exit 1
+    fi
     gh_ready || exit 1
     if tickets_managed; then
         etiquettes+=(--label "$S_AVALIDER")
@@ -146,6 +159,8 @@ case "${1:-}" in
         ;;
     *)
         if [[ "$1" =~ ^#?[0-9]+$ ]]; then
+            # ticket <n> --help : l'aide, sans prendre le ticket
+            case "${2:-}" in -h | --help) aide; exit 0 ;; esac
             cmd_ticket "${1#\#}"
         else
             err_t install.unknown_arg "$1"

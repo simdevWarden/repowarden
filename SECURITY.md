@@ -42,7 +42,7 @@ slsa-verifier verify-artifact "repowarden-$TAG.tar.gz" \
 ## Ce que repowarden fait pour la sécurité
 
 - Détection de secrets (gitleaks) dans les hooks et en CI ; gitleaks installé en CI à **version figée avec somme SHA-256 vérifiée**.
-- Actions GitHub figées par SHA, outils Python de la CI figés par empreinte (`--require-hashes`), mis à jour par Dependabot ; workflows sans droits par défaut.
+- Actions GitHub figées par SHA, outils Python de la CI figés par empreinte (`--require-hashes`), mis à jour par Dependabot (verrous pip régénérés avec la commande de leur en-tête par le workflow `verrous-pip`, qui demande le secret **Dependabot** `REPOWARDEN_APP_KEY`) ; workflows sans droits par défaut.
 - Analyse CodeQL des workflows, évaluation OpenSSF Scorecard.
 - Aucun secret utilisé par les workflows hors `GITHUB_TOKEN` (lecture seule par défaut) et le jeton optionnel de release.
 - Les hooks n'exécutent que les outils installés sur le poste ou déclarés par le projet ; aucun téléchargement au moment du commit.

@@ -5,12 +5,16 @@
 # Chargé par ci/tickets.sh (après hooks/lib/common.sh et hooks/lib/tickets.sh).
 # shellcheck disable=SC2154 # statuts, réglages et compteurs définis dans les autres modules
 
+# Ligne de description lue comme référence de ticket (« Ticket : #12 », mot-clé
+# de fermeture) : partagée avec la PR brouillon, qui cite ces lignes reprises
+REF_TICKET_RE='^[[:space:]]*(Tickets?|Refs?|Closes|Fixes|Resolves)[[:space:]]*:?[[:space:]]*(.*)$'
+
 # REPLY = numéros de tickets (uniques) cités par la description $1 (« Ticket : #12 »,
 # « Tickets : #3, #4 », ou un mot-clé de fermeture) et la branche $2 (type/12-sujet)
 pr_tickets_r() {
     local body="$1" branch="$2" found="" n line
     while IFS= read -r line; do
-        if [[ "$line" =~ ^[[:space:]]*(Tickets?|Refs?|Closes|Fixes|Resolves)[[:space:]]*:?[[:space:]]*(.*)$ ]]; then
+        if [[ "$line" =~ $REF_TICKET_RE ]]; then
             for n in $(grep -oE '#[0-9]+' <<<"${BASH_REMATCH[2]}" | tr -d '#'); do
                 [[ " $found " == *" $n "* ]] || found="$found $n"
             done
@@ -53,10 +57,31 @@ statut() {
     gh issue edit "$n" --add-label "$s" ${retirer[@]+"${retirer[@]}"} >/dev/null
 }
 
+# Pied des commentaires du bot : l'avatar d'une App mène à une page 404 sur
+# GitHub (pas de profil), le pied dit d'où vient le bot. Repère invisible : un
+# texte déjà signé (repris, mis à jour) n'en reçoit pas un second.
+PIED="<!-- repowarden:pied -->"
+
+# REPLY = texte $1 terminé par le pied (page de l'App APP_SLUG, doc) ; sans
+# slug (jeton des Actions, github-actions[bot]) ou déjà signé, texte inchangé
+pied_r() {
+    REPLY="$1"
+    [ -n "${APP_SLUG:-}" ] && [[ "$REPLY" != *"$PIED"* ]] || return 0
+    _tr tk.footer "$APP_SLUG" "$APP_SLUG"
+    REPLY="$REPLY"$'\n\n'"$PIED<sub>$_T</sub>"
+}
+
+# Commentaire $2 du bot sur le ticket $1, avec son pied
+commenter() {
+    pied_r "$2"
+    gh issue comment "$1" --body "$REPLY" >/dev/null
+}
+
 # Ferme la PR $1 avec le commentaire $2 ; déjà fermée ou mergée entre-temps
 # (merge pendant le run) : rien à faire, pas un échec
 fermer_pr() {
-    gh pr close "$1" --comment "$2" >/dev/null 2>&1 && return 0
+    pied_r "$2"
+    gh pr close "$1" --comment "$REPLY" >/dev/null 2>&1 && return 0
     [ "$(gh pr view "$1" --json state -q .state 2>/dev/null)" != OPEN ]
 }
 

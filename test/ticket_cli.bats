@@ -21,6 +21,7 @@ case "$1 $2" in
     "issue view")
         case "$*" in
             *assignees*) printf '%s\n' "${FAKE_OWNER:-}" ;;
+            *comments*) cat "$FAKE/comments" 2>/dev/null || true ;;
             *) printf '%s\n' "${FAKE_ISSUE:-$(printf 'OPEN\tAjoute le panier\tvalidé')}" ;;
         esac ;;
     "issue develop")
@@ -30,6 +31,9 @@ case "$1 $2" in
             *) while [ $# -gt 0 ]; do [ "$1" = --name ] && git push -q --no-verify origin "main:refs/heads/$2"; shift; done ;;
         esac ;;
     "issue list") printf '%s\n' "${FAKE_ASSIGNED:-}" ;;
+    "issue comment") printf '%s\n' "$5" >>"$FAKE/comments" ;;
+    # adresse du dépôt, puis les branches liées au ticket
+    "api graphql") printf '%s\n' "${FAKE_LIEES:-}" ;;
     "auth status") exit "${FAKE_GH_AUTH_RC:-0}" ;;
 esac
 exit 0
@@ -48,8 +52,37 @@ gere() {
     run git switch -c feat/panier
     [ "$status" -eq 0 ]
     [[ "$output" == *"Branche feat/panier sans ticket"* ]] || false
+    # ce qu'est un ticket ici, avec le lien vers la doc
+    [[ "$output" == *"https://simdevwarden.github.io/repowarden/tickets/"* ]] || false
     [[ "$output" == *"repowarden.skip tickets"* ]] || false
     [[ "$output" != *"ticket nouveau"* ]] || false
+}
+
+@test "ticket cli : suivi non gere -> prevenu une seule fois par branche" {
+    run git switch -c feat/panier
+    [[ "$output" == *"sans ticket"* ]] || false
+    echo a >a.txt && git add a.txt
+    run "$CC" -m "ajoute le panier"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"sans ticket"* ]] || false
+    git switch -q main
+    run git switch feat/panier
+    [[ "$output" != *"sans ticket"* ]] || false
+    # une autre branche est prévenue, une fois
+    run git switch -c feat/autre
+    [[ "$output" == *"Branche feat/autre sans ticket"* ]] || false
+    # rien de versionné : la mémoire est dans la config locale du clone
+    [ -z "$(git status --porcelain)" ]
+}
+
+@test "ticket cli : suivi gere -> prevenu a chaque passage sur la branche" {
+    gere
+    git add .github && git commit -q --no-verify -m "ci: tickets"
+    PATH="$F/bin:$PATH" run git switch -c feat/panier
+    [[ "$output" == *"sans ticket"* ]] || false
+    git switch -q main
+    PATH="$F/bin:$PATH" run git switch feat/panier
+    [[ "$output" == *"sans ticket"* ]] || false
 }
 
 @test "ticket cli : suivi gere par repowarden -> creation du ticket proposee" {
@@ -70,7 +103,8 @@ gere() {
 }
 
 @test "ticket cli : git cc sans ticket -> commit fait, prevenu (jamais bloque)" {
-    git switch -q -c feat/panier
+    # branche créée sans le hook : git cc est la première occasion de prévenir
+    git -c repowarden.skip=post-checkout switch -q -c feat/panier
     echo a >a.txt && git add a.txt
     run "$CC" -m "ajoute le panier"
     [ "$status" -eq 0 ]
@@ -102,6 +136,33 @@ gere() {
     [[ "$output" == *"Sur la branche feat/12-panier (ticket #12)"* ]] || false
 }
 
+@test "ticket cli : repowarden ticket <n> sur branche faite avant validation -> reprise, lien inscrit une fois" {
+    git switch -q -c feat/12-panier
+    git push -q --no-verify origin feat/12-panier
+    git switch -q main
+    git branch -q -D feat/12-panier
+    export FAKE_LIEES="https://github.com/o/r"
+    PATH="$F/bin:$PATH" run "$TICKET" 12
+    [ "$status" -eq 0 ]
+    [ "$(git branch --show-current)" = feat/12-panier ]
+    ! grep -q "issue develop" "$F/log"
+    grep -qF "(https://github.com/o/r/tree/feat/12-panier)" "$F/comments"
+    grep -qF "<!-- repowarden:branche feat/12-panier -->" "$F/comments"
+    [[ "$output" == *"avant la validation"* ]] || false
+    # repris une seconde fois : deja inscrite, rien de plus
+    git switch -q main
+    PATH="$F/bin:$PATH" run "$TICKET" 12
+    [ "$(grep -c "repowarden:branche" "$F/comments")" -eq 1 ]
+    # branche liee par GitHub : rien a inscrire
+    rm "$F/comments"
+    git switch -q main
+    export FAKE_LIEES=$'https://github.com/o/r\nfeat/12-panier'
+    PATH="$F/bin:$PATH" run "$TICKET" 12
+    [ "$status" -eq 0 ]
+    [[ ! -e "$F/comments" ]] || false
+    [[ "$output" != *"avant la validation"* ]] || false
+}
+
 @test "ticket cli : repowarden ticket <n> sans branche -> creee et liee, sauf ticket a valider" {
     git config repowarden.integrationBranch main
     PATH="$F/bin:$PATH" run "$TICKET" 12
@@ -121,6 +182,14 @@ gere() {
     [ "$status" -eq 0 ]
     grep -q -- "--label statut: à valider --label type: fix" "$F/log"
     [[ "$output" == *"Ticket #42 créé, à valider"* ]] || false
+}
+
+@test "ticket cli : ticket nouveau --type inconnu -> refuse avant gh, types listes" {
+    gere
+    PATH="$F/bin:$PATH" run "$TICKET" nouveau "Ajoute le panier" --type ci
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"ci"*"feat, fix, docs, refactor, chore"* ]] || false
+    [[ ! -e "$F/log" ]] || false
 }
 
 @test "ticket cli : repowarden ticket <n> -> le ticket est pris (assigne a soi)" {

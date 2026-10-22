@@ -21,7 +21,7 @@ Only in a repowarden repository (`.repowarden.conf`, a `repowarden.*` setting or
 | `--no-verify` (and `git commit -n`) | always | run it again without, fix what the hooks report |
 | `git add .`, `-A`, `--all` | always | `git add <files>` |
 
-Each command of a shell line is checked (`&&`, `;`, `|`…), in the right repository (`cd`, `git -C`). A refusal applies to **the whole line**: none of it runs, not even the other commands (`git add a.txt && git commit …` adds nothing), and the message says so. A refusal gives the reason and the command:
+Help and preview (`--help`, `-h`, `--dry-run` of `repowarden cc`, `git cc`, `git commit`) are always allowed: nothing is committed. Each command of a shell line is checked (`&&`, `;`, `|`…), in the right repository (`cd`, `git -C`). A refusal applies to **the whole line**: none of it runs, not even the other commands (`git add a.txt && git commit …` adds nothing), and the message says so. A refusal gives the reason and the command:
 
 ```text
 ✖ repowarden : change refused: "main" is a protected branch.
@@ -56,6 +56,10 @@ One checker for all tools: it reads the action on standard input (JSON) and answ
 | other | guard out of order (jq missing, unreadable JSON) | nothing is blocked: a warning only |
 
 Formats: `--format claude` (`tool_name`, `tool_input`, `cwd`: the `PreToolUse` hook input), `--format opencode` (default: `tool`, `args`, `cwd`).
+
+## Code instructions
+
+Every new function has, right above it, one or two lines saying what it does and **why**, without paraphrasing the code: features documented in the code, without big comment blocks. Copy it into the project instructions (`AGENTS.md`, `CLAUDE.md`…); the pre-commit hook and the CI report omissions ([functions without a comment](hooks.md#functions-without-a-comment)).
 
 ## Limitations
 

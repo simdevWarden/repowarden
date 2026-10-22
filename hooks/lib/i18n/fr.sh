@@ -50,11 +50,13 @@ _msg_fr() {
         cc.refs_prompt_ticket) _M="Références (« - » pour aucune) [%s] : " ;;
         cc.refs_prompt) _M="Références (ex. %s ; Entrée pour aucune) : " ;;
         tk.cli.no_ticket) _M="Branche %s sans ticket : ce travail ne sera relié à aucun ticket (non bloquant)." ;;
+        tk.cli.explain) _M="Ticket : issue GitHub d'où part chaque modification (branche type/<n°>-sujet, PR qui la cite) ; son cycle : https://simdevwarden.github.io/repowarden/tickets/" ;;
         tk.cli.propose) _M="Partir d'un ticket : repowarden ticket nouveau \"<titre>\"." ;;
         tk.cli.propose_cc) _M="Partir d'un ticket : repowarden ticket nouveau \"<titre>\" (ou réponds oui à git cc)." ;;
         tk.cli.silence) _M="Projet sans suivi de tickets ? git config repowarden.skip tickets pour ne plus le voir." ;;
         tk.cli.fetch) _M="Branche du ticket #%s…" ;;
         tk.cli.switched) _M="Sur la branche %s (ticket #%s)." ;;
+        tk.cli.unlinked) _M="Branche %s créée avant la validation : GitHub ne la lie pas au ticket #%s après coup, son lien est inscrit sur le ticket." ;;
         tk.cli.created_branch) _M="Branche %s créée depuis %s, liée au ticket #%s." ;;
         tk.cli.not_validated) _M="Ticket #%s pas encore validé : sa branche sera créée automatiquement à la validation (étiquette « %s »)." ;;
         tk.cli.closed) _M="Ticket #%s fermé : pas de branche à créer." ;;
@@ -62,6 +64,7 @@ _msg_fr() {
         tk.cli.issue_created) _M="Ticket #%s créé, à valider. Sa branche sera créée à la validation ; ensuite : repowarden ticket %s" ;;
         tk.cli.issue_created_branch) _M="Ticket #%s créé." ;;
         tk.cli.title_required) _M="Titre du ticket obligatoire : repowarden ticket nouveau \"<titre>\"" ;;
+        tk.cli.bad_type) _M="Type de ticket inconnu : %s (types : %s)" ;;
         tk.cli.current) _M="Branche %s : ticket #%s." ;;
         tk.cli.no_ticket_here) _M="Aucun ticket pour cette branche." ;;
         cc.ticket_offer) _M="Aucun ticket pour cette branche. En créer un maintenant (titre : la description) ? [o/N] : " ;;
@@ -109,7 +112,6 @@ _msg_fr() {
         # Hooks et plugins de langage
         hook.pre_commit.1) _M="Commit refusé : nom de branche non conforme." ;;
         hook.pre_commit.2) _M="Commit direct sur '%s' interdit. Crée une branche : git switch -c feat/ma-feature" ;;
-        hook.pre_commit.3) _M="  (désactiver pour ce dépôt : git config repowarden.skip protect-branch)" ;;
         hook.pre_commit.4) _M="Détection de secrets (gitleaks)" ;;
         hook.pre_commit.5) _M="Secret détecté : commit refusé." ;;
         hook.secrets.where) _M="  %s:%s (%s)" ;;
@@ -120,7 +122,9 @@ _msg_fr() {
         hook.secrets.todo_3) _M="  3. Clé qui a pu fuir ailleurs (déjà poussée, partagée) : la révoquer chez son fournisseur." ;;
         hook.secrets.todo_4) _M="  Faux positif : ajouter son empreinte à .gitleaksignore :" ;;
         hook.secrets.failed) _M="gitleaks en échec (code %s) : commit refusé, détection de secrets non faite." ;;
-        hook.pre_commit.6) _M="gitleaks absent, détection de secrets ignorée (installation : %s)." ;;
+        hook.pre_commit.6) _M="gitleaks absent : secrets non vérifiés avant le commit, la CI (vérification secrets) fera le contrôle. Installation : %s" ;;
+        hook.sensitive.found) _M="Fichier sensible ni suivi ni ignoré : un git add . le publierait. Lignes à ajouter à .gitignore :" ;;
+        hook.sensitive.hint) _M="  (noms comparés, contenu jamais lu ; motifs : repowarden.sensitiveFiles ; désactiver : git config repowarden.skip sensitive-files)" ;;
         hook.pre_commit.7) _M="Pre-commit OK" ;;
         hook.commit_msg.1) _M="Première ligne trop longue (%s > 72 caractères)." ;;
         hook.commit_msg.type_unknown) _M="Type « %s » inconnu. Voulais-tu : %s" ;;
@@ -128,13 +132,16 @@ _msg_fr() {
         hook.commit_msg.desc_empty) _M="Description manquante après « %s » : décris le changement à l'impératif." ;;
         hook.commit_msg.kept) _M="  Ton message n'est pas perdu : git commit -e -F .git/COMMIT_EDITMSG" ;;
         hook.commit_msg.dot) _M="Point final retiré de la description (même règle que git cc)." ;;
+        hook.commit_msg.detached) _M="👉 HEAD détachée (bisect, essai) : aucun préfixe ne vient d'une branche, écris l'en-tête complet (ex. fix: corrige le calcul)." ;;
         hook.pre_push.1) _M="Push refusé : nom de branche non conforme." ;;
         hook.pre_push.2) _M="Push direct refusé sur '%s' : elle n'évolue que par Pull Request." ;;
         hook.pre_push.3) _M="  Crée une branche : git switch -c feat/ma-feature, puis ouvre une PR." ;;
-        hook.pre_push.4) _M="  (désactiver pour ce dépôt : git config repowarden.skip protect-branch)" ;;
         hook.pre_push.5) _M="%s : aucun fichier modifié, rien à tester." ;;
         hook.pre_push.6) _M="Rien à tester (suppression de branche uniquement)." ;;
         hook.pre_push.7) _M="Pre-push OK" ;;
+        hook.pre_push.msg) _M="Push refusé : message de commit non conforme (même règle que la CI)." ;;
+        hook.pre_push.msg_fix) _M="  Corriger : git rebase -i %s (reword), puis relancer le push." ;;
+        hook.pre_push.nothing) _M="Rien à pousser." ;;
         hook.pre_push.workflow_scope) _M="Jeton gh sans le scope « workflow » : GitHub refusera un push touchant .github/workflows/. L'autoriser (puis se reconnecter) : gh auth refresh -h github.com -s workflow" ;;
         hook.pre_push.lint.missing) _M="%s absent, %s non vérifié (installation : %s)." ;;
         hook.pre_push.lint.run) _M="%s : %s" ;;
@@ -238,7 +245,7 @@ _msg_fr() {
         help.code-mort) _M="Usage : repowarden code-mort [base]\n\nCode mort introduit par ta branche, comme en CI : seules les lignes ajoutées\nou modifiées depuis la base comptent (commits, modifications en cours,\nnouveaux fichiers). Défaut : point de départ de la branche depuis origin/main.\nVoir docs/code-mort.md : ce qui est prouvé (bloquant) et ce qui est candidat." ;;
         help.ticket) _M="Usage : repowarden ticket <n>                          branche du ticket (créée, liée, si besoin)\n        repowarden ticket                              ticket de la branche courante\n        repowarden ticket nouveau \"<titre>\" [--type fix] [--description \"…\"]\n        repowarden ticket comment <n> \"<texte>\"        commentaire sur le ticket\n        repowarden ticket label <n> <label> [--remove] labels du ticket\n\nLe ticket d'abord : prendre <n> l'assigne à toi et place sur sa branche\n(créée depuis develop au besoin) ; nouveau crée le ticket (« à valider » si\nle suivi est géré par repowarden). Demande gh connecté (https://cli.github.com)." ;;
         help.tickets) _M="Usage : repowarden tickets init [--repo propriétaire/nom] [--sans-validation-auto]\n        repowarden tickets sync\n\nPrépare le suivi des tickets d'un dépôt GitHub (relançable sans risque) :\nétiquettes (« validé », statuts et types, préfixe des branches), modèle de\nticket, workflow ; tickets existants rangés ; branches des PR inscrites sur\nleurs tickets. sync : branches locales des tickets qui me sont assignés\n(automatique avec ticketSync = auto, défaut manual)." ;;
-        help.pr) _M="Usage : repowarden pr label <n> <label> [--remove]\n        repowarden pr checks <n>\n\nlabel ajoute ou retire un label sur la PR #<n> ; checks affiche l'état de\nses checks (nom, conclusion, statut, lien).\nExemples :\n  repowarden pr label 123 \"ready-for-review\"\n  repowarden pr label 123 \"needs-changes\" --remove\n  repowarden pr checks 123" ;;
+        help.pr) _M="Usage : repowarden pr label <n> <label> [--remove]\n        repowarden pr checks <n>\n\nlabel ajoute ou retire un label sur la PR #<n> ; checks liste ses jobs en\néchec (avec leur lien) et en attente, puis le verdict ; code 1 si un job échoue.\nExemples :\n  repowarden pr label 123 \"ready-for-review\"\n  repowarden pr label 123 \"needs-changes\" --remove\n  repowarden pr checks 123" ;;
         help.run) _M="Usage : repowarden run rerun <run-id|--failed|--workflow <nom>>\n        repowarden run list [--workflow <nom>] [--limit N]\n\nrerun relance un workflow GitHub Actions : un run par son id, le dernier\néchoué (--failed) ou le dernier d'un workflow (--workflow) ; list affiche\nles runs récents (--limit, défaut 20).\nExemples :\n  repowarden run rerun --failed\n  repowarden run list --workflow \"CI\" --limit 10" ;;
         help.proteger) _M="Usage : repowarden proteger [--repo propriétaire/nom] [--checks \"repowarden,tests (ubuntu-latest)\"]\n        [--relecteurs N] [--codeowners] [--environnement NOM] [--approbateurs \"login …\"]\n        [--sans-tags] [--dry-run] [--verifier]\n\nProtège le dépôt GitHub courant d'après .repowarden.conf (relançable sans\nrisque) : PR obligatoire, vérifications exigées, ni suppression ni push forcé\n(ruleset « repowarden »), merge squash, tags v* réservés aux workflows,\nvalidation humaine optionnelle. --verifier compare les règles en ligne sans\nrien modifier. Réglages équivalents dans .repowarden.conf. Demande gh et les\ndroits d'administration du dépôt." ;;
         help.migrer) _M="Usage : repowarden migrer [--pr] [--hooks]\n\nPassage de repogarde à repowarden dans le projet courant\n(docs/migration-v4.md) : configuration (.repowarden.conf, .repowarden/),\nworkflows (uses: vers le dépôt repowarden et sa version majeure, anciens\nnoms), puis la liste de ce qui reste à faire à la main. Relançable : rien\nn'est fait deux fois.\n  --pr     sur la branche chore/migration-repowarden-vN : commit, push et PR\n  --hooks  déplace aussi les hooks lefthook résiduels dans .git/hooks-lefthook/" ;;
@@ -288,6 +295,11 @@ _msg_fr() {
         ci.fix_pr.2) _M="PR #%s reciblée : %s → %s (flux %s)" ;;
         ci.fix_pr.3) _M="Titre conforme : %s" ;;
         ci.fix_pr.4) _M="Titre « %s » remplacé par « %s »" ;;
+        ci.verrous_pip.compile) _M="Verrou %s : commande de son en-tête relancée" ;;
+        ci.verrous_pip.refused) _M="Verrou %s ignoré : la sortie de la commande de son en-tête n'est pas ce fichier" ;;
+        ci.verrous_pip.compliant) _M="Verrous pip conformes à leur en-tête : aucun commit" ;;
+        ci.verrous_pip.committed) _M="Verrous régénérés et commités : %s" ;;
+        ci.verrous_pip.pushed) _M="Commit poussé sur %s" ;;
         ci.version.1) _M="version annoncée par la PR de livraison" ;;
         ci.version.2) _M="Aucun feat, fix, perf ni changement incompatible depuis %s : pas de version." ;;
         ci.version.3) _M="première version" ;;
@@ -421,6 +433,12 @@ _msg_fr() {
         dc.knip_file) _M="fichier jamais importé" ;;
         dc.knip_export) _M="export jamais importé :" ;;
         dc.knip_dep) _M="dépendance jamais importée :" ;;
+        # Fonctions ajoutées sans commentaire
+        cm.section) _M="Fonctions sans commentaire (nouveau code uniquement)" ;;
+        cm.no_base) _M="Pas de base : contrôle des commentaires ignoré." ;;
+        cm.missing) _M="%s : fonction %s sans commentaire juste au-dessus" ;;
+        cm.summary) _M="%s fonction(s) ajoutée(s) sans commentaire : une à deux lignes juste au-dessus, qui disent ce qu'elle fait et pourquoi (avertissement, non bloquant)." ;;
+        cm.none) _M="Chaque fonction ajoutée est commentée." ;;
         ci.section.commits) _M="Messages de commit (Conventional Commits)" ;;
         ci.section.branch) _M="Nom de branche" ;;
         ci.section.secrets) _M="Secrets (gitleaks)" ;;
@@ -487,6 +505,10 @@ _msg_fr() {
         st.repo_version_ok) _M="Version demandée par le projet (%s) : respectée" ;;
         st.repo_forge) _M="Plateforme : %s" ;;
         st.repo_rules) _M="Règles GitHub à jour ? repowarden proteger --verifier (lecture seule)" ;;
+        st.wf_owner) _M="%s:%s : repowarden appelé depuis un autre dépôt que le dépôt officiel (%s) ; attendu : %s" ;;
+        st.wf_branch) _M="%s:%s : repowarden appelé sur une branche (@%s), cassé dès qu'elle disparaît ; attendu : %s" ;;
+        st.wf_old) _M="%s:%s : repowarden appelé dans une majeure dépassée (@%s) ; attendu : %s" ;;
+        st.wf_fix) _M="corriger les lignes uses: signalées ci-dessus" ;;
         st.tools) _M="Outils présents : %s · absents : %s (selon les langages des projets)" ;;
         st.next) _M="Étape suivante :" ;;
         st.ready) _M="Tout est prêt : git cc pour commiter, repowarden code-mort sur une branche." ;;
@@ -542,6 +564,7 @@ _msg_fr() {
         bot.ignored) _M="ignoré (bot = off)" ;;
         bot.mode_invalid) _M="bot = %s : auto, pr ou off attendu" ;;
         bot.clone_failed) _M="clone impossible : %s" ;;
+        bot.email_fallback) _M="Utilisateur bot %s introuvable : commits signés %s, rattachés à aucun compte (REPOWARDEN_BOT_EMAIL pour fixer l'adresse)." ;;
         bot.prot_ok) _M="à jour" ;;
         bot.prot_stale) _M="⚠ périmée : repowarden proteger" ;;
         bot.prot_applied) _M="✔ appliquée" ;;
@@ -634,6 +657,7 @@ _msg_fr() {
         tk.pr_backmerge_empty) _M="PR fermée automatiquement : \`%s\` n'apporte aucun contenu à \`%s\`. Le retour est fait automatiquement après une release, seulement quand il y a quelque chose à rapporter." ;;
         tk.pr_delivery_manual) _M="PR fermée automatiquement : la livraison \`%s\` → \`%s\` est ouverte par le workflow de release ; une PR ouverte à la main n'aurait jamais d'approbation de déploiement. Lancer *Actions → release → Run workflow* sur \`%s\` (ou \`gh workflow run release.yml --ref %s\`), puis **Approve and deploy** sur le run." ;;
         tk.branch_registered) _M="Branche du ticket : \`%s\`." ;;
+        tk.branch_unlinked) _M="Branche du ticket : [\`%s\`](%s). Créée avant la validation du ticket : GitHub ne lie pas une branche existante, elle n'apparaît donc pas dans « Development » ; ce commentaire en garde le lien." ;;
         tk.branch_second) _M="Seconde branche pour ce ticket : \`%s\` (déjà : %s). Un ticket, une branche : regrouper le travail, ou ouvrir un ticket séparé." ;;
         tk.adopted) _M="Tickets existants : %s rangé(s), %s branche(s) inscrite(s)." ;;
         tk.init_adopt) _M="Tickets et branches existants" ;;
@@ -642,6 +666,8 @@ _msg_fr() {
         tk.branch_kept) _M="Branche \`%s\` gardée : %s commit(s) absent(s) de la branche d'intégration, PR ouverte(s) : %s. À supprimer à la main si le travail est ailleurs." ;;
         tk.draft_opened) _M="PR #%s ouverte en brouillon pour le ticket #%s" ;;
         tk.draft_updated) _M="PR #%s (ticket #%s) : titre et description repris du ticket" ;;
+        tk.pr_additions) _M="Ajouts du ticket" ;;
+        tk.pr_design) _M="Conception (résumé)" ;;
         tk.created_body) _M="Ticket créé automatiquement pour la PR #%s, qui n'en citait aucun. À valider par un mainteneur (étiquette « validé »)." ;;
         tk.created) _M="Ticket #%s créé pour la PR #%s et relié à sa description : à valider par un mainteneur." ;;
         tk.init_labels) _M="Étiquettes (statuts et validation)" ;;
@@ -655,6 +681,8 @@ _msg_fr() {
         tk.init_next_wired) _M="Ensuite : committer ces fichiers ; exiger la vérification « ticket » (repowarden proteger --checks \"…,ticket\"). Le job tickets de release.yml est déjà branché." ;;
         tk.prerelease) _M="Disponible en préversion **%s** : à tester avant la production." ;;
         tk.released) _M="Publié dans **%s**." ;;
+        tk.footer) _M="Message de l'App GitHub de ce dépôt ([doc repowarden](https://simdevwarden.github.io/repowarden/industrialisation/#github-app-des-workflows)) : [%s](https://github.com/apps/%s)" ;;
+        tk.delivered) _M="Livré sur **%s**, sans nouvelle version (commit %s)." ;;
         # Ticket comment
         tk.comment.adding) _M="Ajout d'un commentaire sur le ticket #%s..." ;;
         tk.comment.added) _M="Commentaire ajouté au ticket #%s." ;;
@@ -680,6 +708,11 @@ _msg_fr() {
         run.listing.workflow) _M="Liste des runs du workflow « %s »..." ;;
         # PR checks
         pr.checks.checking) _M="Vérification des checks de la PR #%s..." ;;
+        pr.checks.failed) _M="En échec : %s  %s" ;;
+        pr.checks.pending) _M="En attente : %s" ;;
+        pr.checks.verdict) _M="PR #%s : %s réussi(s), %s en échec, %s en attente." ;;
+        pr.checks.green) _M="Tous les checks de la PR #%s sont verts." ;;
+        pr.checks.none) _M="Aucun check sur la PR #%s." ;;
         # Garde-fou des agents IA (repowarden garde, repowarden agents)
         garde.format) _M="Format inconnu « %s » : claude ou opencode." ;;
         garde.no_jq) _M="repowarden garde : jq absent, action non vérifiée (installer jq : https://jqlang.org)." ;;

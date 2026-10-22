@@ -12,8 +12,9 @@
 #   ci/tickets.sh push      premier push sur la branche d'un ticket : PR
 #                           brouillon ouverte, ticket en cours
 #   ci/tickets.sh revue     corrections demandées en revue → en cours
-#   ci/tickets.sh release   release publiée : tickets en préprod → done (fermés),
-#                           ou prévenus de la préversion
+#   ci/tickets.sh release   release publiée, ou livraison sur la branche
+#                           principale sans nouvelle version : tickets en
+#                           préprod → done (fermés) ; ou prévenus de la préversion
 #   ci/tickets.sh adopter   mise en route (tickets init) : tickets existants
 #                           rangés, branches des PR inscrites sur leurs tickets
 #
@@ -24,10 +25,10 @@
 # feat/12-sujet. « Closes #12 » fermerait le ticket dès le merge dans develop :
 # c'est la release qui le ferme.
 #
-# Variables : GH_TOKEN, GH_REPO, INTEGRATION ; pr : PR, ACTION, MERGED, DRAFT,
-# HEAD, BASE, HEAD_SHA, AUTHOR ; issue : ISSUE, ACTION, LABEL, STATE_REASON ;
+# Variables : GH_TOKEN, GH_REPO, INTEGRATION, APP_SLUG (pied des commentaires) ;
+# pr : PR, ACTION, MERGED, DRAFT, HEAD, BASE, HEAD_SHA, AUTHOR ; issue : ISSUE, ACTION, LABEL, STATE_REASON ;
 # push : PUSH_BRANCH, DELETED, PUSHER, SHA ; revue : PR, HEAD, REVIEW_STATE ;
-# release : TAG
+# release : TAG, ou DELIVERED_SHA et MAIN (livraison sans nouvelle version)
 set -euo pipefail
 
 REPOWARDEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"

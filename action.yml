@@ -10,8 +10,8 @@ author: SimBienvenueHoulBoumi
 
 inputs:
   checks:
-    description: Vérifications à lancer (commits branch secrets format tests deadcode)
-    default: commits branch secrets format tests deadcode
+    description: Vérifications à lancer (commits branch secrets format tests deadcode comments)
+    default: commits branch secrets format tests deadcode comments
   strict:
     description: "true : un outil de formatage/test manquant fait échouer"
     default: "false"

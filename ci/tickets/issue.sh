@@ -7,17 +7,24 @@
 # Ticket $1 validé : backlog s'il attendait la validation, sa branche, et
 # vérification relancée sur les PR ouvertes qui l'attendaient
 accepter() {
-    local n="$1" pr head sha body base brouillon
-    if grep -qxF "$S_AVALIDER" <<<"$(etiquettes "$n")"; then
+    local n="$1" pr head sha body base brouillon labels
+    labels="$(etiquettes "$n")"
+    if grep -qxF "$S_AVALIDER" <<<"$labels"; then
         statut "$n" "$S_BACKLOG"
     fi
+    # Décision prise : « à décider » n'a plus lieu d'être
+    if grep -qxF "$A_DECIDER" <<<"$labels"; then
+        gh issue edit "$n" --remove-label "$A_DECIDER" >/dev/null
+    fi
     # La branche naît quand le ticket est pris (assigné) : un ticket validé
-    # pour plus tard n'a pas de branche qui vieillit en attendant
-    if [ -n "$(assignes "$n")" ]; then
+    # pour plus tard n'a pas de branche qui vieillit en attendant. Une branche
+    # déjà faite à son nom (avant la validation) est reprise, jamais recréée.
+    branche_du_ticket_r "$n"
+    if [ -n "$REPLY" ] || [ -n "$(assignes "$n")" ]; then
         creer_branche "$n"
     else
         _tr tk.validated_waiting "$n"
-        gh issue comment "$n" --body "$_T" >/dev/null
+        commenter "$n" "$_T"
     fi
     while IFS=$'\t' read -r pr head sha base brouillon; do
         [ -n "$pr" ] || continue
@@ -36,7 +43,8 @@ accepter() {
 # GitHub ne garde qu'un run en attente par groupe de concurrence, le run
 # « opened » peut être annulé par ceux des étiquettes posées à la création.
 # Non si déjà validé, ou (hors ouverture) rangé au-delà de « à valider »
-# (« validé » retiré à la main : décision respectée). Test seul : appelé dans un « if », où set -e
+# (« validé » retiré à la main : décision respectée), ou proposé à décider
+# (étiquette « à décider » : le mainteneur pose « validé »). Test seul : appelé dans un « if », où set -e
 # ne s'applique pas.
 a_valider_d_office() {
     local labels l
@@ -45,6 +53,7 @@ a_valider_d_office() {
     [ "${ISSUE_STATE:-open}" = open ] || return 1
     labels="$(etiquettes "$ISSUE")"
     ! grep -qxF "$VALIDE" <<<"$labels" || return 1
+    ! grep -qxF "$A_DECIDER" <<<"$labels" || return 1
     [ "$ACTION" != opened ] || return 0
     while IFS= read -r l; do
         [[ "$l" == "statut: "* && "$l" != "$S_AVALIDER" ]] && return 1
@@ -110,7 +119,7 @@ cmd_issue() {
                     gh issue reopen "$ISSUE" >/dev/null
                     statut "$ISSUE" "$S_PREPROD"
                     _tr tk.reopened "$fpr" "$fbase"
-                    gh issue comment "$ISSUE" --body "$_T" >/dev/null
+                    commenter "$ISSUE" "$_T"
                     notice "$_T"
                     return 0
                 fi

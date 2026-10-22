@@ -12,6 +12,10 @@ S_ENCOURS="statut: en cours"
 S_RELECTURE="statut: en relecture"
 S_PREPROD="statut: préprod"
 S_DONE="statut: done"
+# Posée à l'ouverture : pas de validation d'office, un mainteneur décide
+A_DECIDER="à décider"
+# Types de ticket (étiquettes « type: … », préfixe de la branche)
+TYPES_TICKET="feat fix docs refactor chore"
 
 # Vrai si les étiquettes $1 (une par ligne) disent le travail terminé : mergé
 # (préprod) ou en production (done). Un tel ticket n'a plus de branche à créer.
@@ -108,6 +112,49 @@ ticket_type_r() {
     done <<<"$1"
 }
 
+# Registre des branches d'un ticket : repère invisible dans les commentaires
+# du bot. GitHub ne lie une branche au ticket qu'à sa création, et une branche
+# liée supprimée y perd son nom : le registre garde le nom de chaque branche.
+REPERE="repowarden:branche"
+
+repere() { printf '<!-- %s %s -->' "$REPERE" "$1"; }
+
+# REPLY = branches inscrites sur le ticket $1 (séparées par des espaces)
+branches_inscrites_r() {
+    local corps
+    corps="$(gh issue view "$1" --json comments -q '.comments[].body' 2>/dev/null || true)"
+    REPLY="$(grep -oE "<!-- $REPERE [^ ]+ -->" <<<"$corps" | awk '{ printf "%s ", $3 }' || true)"
+    REPLY="${REPLY% }"
+}
+
+# REPLY = adresse de la branche $2 si elle n'est pas liée au ticket $1, vide si
+# elle l'est ou si GitHub ne répond pas (dans le doute, on ne signale rien)
+ticket_unlinked_branch_url_r() {
+    local lignes url
+    REPLY=""
+    # shellcheck disable=SC2016 # variables GraphQL, pas du shell
+    lignes="$(gh api graphql -F owner='{owner}' -F repo='{repo}' -F n="$1" -f query='query($owner: String!, $repo: String!, $n: Int!) {
+  repository(owner: $owner, name: $repo) { url issue(number: $n) { linkedBranches(first: 50) { nodes { ref { name } } } } }
+}' -q '.data.repository.url, .data.repository.issue.linkedBranches.nodes[].ref.name' 2>/dev/null)" || return 0
+    url="${lignes%%$'\n'*}"
+    [ -n "$url" ] || return 0
+    grep -qxF "$2" <<<"$lignes" || REPLY="$url/tree/$2"
+}
+
+# Branche $2 du ticket $1 créée avant sa validation : GitHub ne lie pas une
+# branche existante (createLinkedBranch répond null), son lien est donc inscrit
+# sur le ticket, une seule fois. Vrai si le commentaire a été posté.
+ticket_note_unlinked_branch() {
+    local n="$1" b="$2" url
+    ticket_unlinked_branch_url_r "$n" "$b"
+    url="$REPLY"
+    [ -n "$url" ] || return 1
+    branches_inscrites_r "$n"
+    [[ " $REPLY " != *" $b "* ]] || return 1
+    _tr tk.branch_unlinked "$b" "$url"
+    gh issue comment "$n" --body "$_T"$'\n\n'"$(repere "$b")" >/dev/null
+}
+
 # Vrai si la branche $1 est une branche de travail : ni protégée, ni une
 # exception (main, develop, branches des bots…)
 work_branch() {
@@ -164,13 +211,21 @@ ticket_auto_create() {
 # Branche de travail sans ticket : avertissement, jamais bloquant. Création
 # proposée seulement si repowarden gère la vie des tickets du projet (et que
 # gh est là pour la faire) ; sinon, comment faire taire l'avertissement.
+# Projet sans suivi géré : une fois par branche seulement (le répéter à chaque
+# commit n'apprend rien), mémorisé dans la config locale de la branche, que git
+# efface avec elle.
 ticket_hint() {
     local branch="$1"
     skipped tickets && return 0
     work_branch "$branch" || return 0
     branch_ticket_r "$branch"
     [ -z "$REPLY" ] || return 0
+    if ! tickets_managed; then
+        [ "$(git config --get "branch.$branch.repowardenTicketWarned" 2>/dev/null)" != true ] || return 0
+        git config "branch.$branch.repowardenTicketWarned" true 2>/dev/null || true
+    fi
     attention_t tk.cli.no_ticket "$branch"
+    dim_t tk.cli.explain
     if tickets_managed && has gh; then
         # git cc ne propose de créer le ticket qu'avec ticketAutoCreate
         if ticket_auto_create; then dim_t tk.cli.propose_cc; else dim_t tk.cli.propose; fi

@@ -34,6 +34,8 @@ case "$*" in
     "api repos/o/"*"/rulesets --jq "*) n="${2#repos/o/}"; n="${n%%/*}"; jq -r "$4" "$FAKE/rulesets/$n" 2>/dev/null ;;
     "api repos/o/"*"/rulesets/"*) n="${2#repos/o/}"; n="${n%%/*}"; jq -c '.[0]' "$FAKE/rulesets/$n" | jq -r "$4" ;;
     "issue list"*) cat "$FAKE/issues" 2>/dev/null ;;
+    # utilisateur bot de l'App : id dans BOT_ID, introuvable sans
+    "api users/"*) [ -n "${BOT_ID:-}" ] || exit 1; echo "$BOT_ID" ;;
     "issue edit"* | "issue create"*) while [ $# -gt 0 ]; do [ "$1" = --body-file ] && cp "$2" "$FAKE/issue-body"; shift; done ;;
 esac
 exit 0
@@ -52,6 +54,7 @@ SH
 #!/usr/bin/env bash
 n="$(basename "$PWD")"
 echo "migrer $n $* ident=$(git config user.name)" >>"$FAKE/log"
+echo "courriel $n $(git config user.email)" >>"$FAKE/log"
 case " ${MIG_PR:-} " in
     *" $n "*) echo "✔ PR de migration ouverte (chore/migration-repowarden-v4)." ;;
     *) echo "✔ Rien à migrer : le projet utilise déjà les noms de repowarden." ;;
@@ -116,6 +119,26 @@ SH
     [ "$status" -eq 0 ]
     ! grep -q "^proteger o/c checks=repowarden,tests$" "$F/log"
     grep -q '^| `o/c` | auto | à jour |' "$F/rapport.md"
+}
+
+@test "bot : adresse rattachee a l'utilisateur bot de l'App, REPOWARDEN_BOT_EMAIL prioritaire" {
+    BOT_ID=4242 run "$BOT" --repo o/c
+    [ "$status" -eq 0 ]
+    grep -q '^gh api users/repowarden-bot-o\[bot\] --jq .id$' "$F/log"
+    grep -q '^courriel o_c 4242+repowarden-bot-o\[bot\]@users.noreply.github.com$' "$F/log"
+    # variable fournie : utilisée telle quelle, id non cherché
+    : >"$F/log"
+    BOT_ID=4242 REPOWARDEN_BOT_EMAIL="moi@exemple.org" run "$BOT" --repo o/c
+    [ "$status" -eq 0 ]
+    grep -q '^courriel o_c moi@exemple.org$' "$F/log"
+    ! grep -q "api users/" "$F/log"
+}
+
+@test "bot : id du bot introuvable -> adresse de repli, signalee" {
+    run "$BOT" --repo o/c
+    [ "$status" -eq 0 ]
+    grep -q '^courriel o_c repowarden-bot@users.noreply.github.com$' "$F/log"
+    [[ "$output" == *"REPOWARDEN_BOT_EMAIL"* ]] || false
 }
 
 @test "bot rapport : issue unique, creee puis mise a jour" {

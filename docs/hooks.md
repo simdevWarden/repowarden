@@ -5,10 +5,10 @@
 | Hook | Rôle |
 |---|---|
 | `post-checkout` | Avertit dès qu'on arrive sur une branche mal nommée (non bloquant) |
-| `pre-commit` | Refuse les branches mal nommées, bloque les commits directs sur les branches protégées (`main`/`master` par défaut), détecte les secrets, formate **uniquement le contenu stagé** (le travail non stagé est préservé) |
+| `pre-commit` | Refuse les branches mal nommées, bloque les commits directs sur les branches protégées (`main`/`master` par défaut), détecte les secrets, formate **uniquement le contenu stagé** (le travail non stagé est préservé), signale les [fonctions ajoutées sans commentaire](#fonctions-sans-commentaire) |
 | `prepare-commit-msg` | Préfixe le message d'après la branche : sur `feat/bean`, `git commit -m "ajoute X"` → `feat(bean): ajoute X` |
 | `commit-msg` | Impose [Conventional Commits](https://www.conventionalcommits.org), 72 caractères maximum |
-| `pre-push` | Refuse les branches mal nommées et le push direct sur les branches protégées (`protectedBranches`, création initiale permise) ; **lint** (shellcheck pour les scripts shell, actionlint pour les workflows GitHub) puis build et tests **du commit poussé**, seulement pour les projets touchés |
+| `pre-push` | Refuse les branches mal nommées et le push direct sur les branches protégées (`protectedBranches`, création initiale permise), et les **messages des commits poussés** (même règle que la CI, `git rebase -i` proposé pour corriger) ; **lint** (shellcheck pour les scripts shell, actionlint pour les workflows GitHub) puis build et tests **du commit poussé**, seulement pour les projets touchés (succès : une ligne de résumé par projet ; échec : sortie complète) |
 | `post-merge` | Après un `git pull` : supprime les branches locales mergées (classique ou squash) dont la branche distante a été supprimée ; jamais une branche contenant du travail non intégré |
 
 Contournement ponctuel : `git commit --no-verify`, `git push --no-verify` — la [CI](ci.md) refait les vérifications.
@@ -29,7 +29,30 @@ Que faire :
     config/app.ini:github-pat:3
 ```
 
-gitleaks en panne (configuration invalide, version incompatible) refuse aussi le commit, avec son message d'erreur : la détection n'a pas été faite, ce n'est jamais présenté comme une fuite. Sans gitleaks, la détection est ignorée avec la commande d'installation ; la vérification `secrets` de la [CI](ci.md) la refait. Désactiver pour un dépôt : `git config repowarden.skip secrets`.
+gitleaks en panne (configuration invalide, version incompatible) refuse aussi le commit, avec son message d'erreur : la détection n'a pas été faite, ce n'est jamais présenté comme une fuite. Sans gitleaks, le commit passe avec un avertissement : la vérification `secrets` de la [CI](ci.md) fera le contrôle, et la commande d'installation est donnée (aussi proposée en étape suivante par `repowarden statut`). Désactiver pour un dépôt : `git config repowarden.skip secrets`.
+
+### Fichier sensible ni suivi ni ignoré
+
+gitleaks ne lit un fichier qu'une fois indexé. Avant, un fichier non suivi au **nom** sensible, absent de `.gitignore` (et de `.git/info/exclude`), est signalé à chaque commit et par `repowarden statut` : un `git add .` le publierait. Avertissement seulement, le commit passe ; le contenu du fichier n'est **jamais lu**.
+
+```text
+⚠ Fichier sensible ni suivi ni ignoré : un git add . le publierait. Lignes à ajouter à .gitignore :
+    .env
+    outils/set-npm-token.sh
+```
+
+Noms signalés par défaut (sans casse) : `.env`, `.env.*`, `*token*`, `*secret*`, `*.pem`, `*.key`, `id_rsa*` ; `.env.example` jamais. Autres motifs : `sensitiveFiles = .env *.p12` dans `.repowarden.conf` (remplace la liste). Désactiver : `git config repowarden.skip sensitive-files` (`skip secrets` le coupe aussi).
+
+## Fonctions sans commentaire
+
+Consigne pour les agents (et pour tous) : **toute nouvelle fonction** a, juste au-dessus, une à deux lignes qui disent ce qu'elle fait et **pourquoi**, sans paraphraser le code. Le pre-commit et la CI (vérification `comments`) le contrôlent : une fonction **ajoutée** sans commentaire (ni docstring en Python) est signalée avec `fichier:ligne`. Les fonctions existantes ne le sont jamais, même retouchées. Shell (`.sh`, `.bash`, scripts à shebang `sh`/`bash`), Python, JavaScript et TypeScript (`function`, `const f = (…) =>`) ; méthodes de classe non analysées.
+
+```text
+⚠ src/panier.ts:12 : fonction total sans commentaire juste au-dessus
+ℹ 1 fonction(s) ajoutée(s) sans commentaire : une à deux lignes juste au-dessus, qui disent ce qu'elle fait et pourquoi (avertissement, non bloquant).
+```
+
+Avertissement seulement, jamais bloquant. Un décorateur ou une directive d'outil (`# shellcheck disable=…`, `// eslint-disable…`) entre le commentaire et la fonction est sauté ; seul, il ne compte pas comme commentaire. Désactiver : `git config repowarden.skip comments`.
 
 ## Lint au pre-push
 

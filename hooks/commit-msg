@@ -75,13 +75,6 @@ Expected format: <type>(<optional scope>): <description>
 
 Types:
 EOF
-        types_help
-        cat >&2 <<EOF
-
-👉 Tip: name your branch <type>/<topic> (e.g. feat/user) and the prefix
-   is added automatically: git commit -m "add sign-up"  (or use git cc)
-   Your message is not lost: git commit -e -F .git/COMMIT_EDITMSG
-EOF
     else
         cat >&2 <<EOF
 ✖ Message de commit invalide : "$SUBJECT"
@@ -93,9 +86,22 @@ Format attendu : <type>(<scope optionnel>): <description>
 
 Types :
 EOF
-        types_help
+    fi
+    types_help
+    echo >&2
+    # HEAD détachée (bisect, essai, rebase) : pas de branche dont tirer le
+    # préfixe, le conseil de nommage ne s'applique pas
+    if ! git symbolic-ref -q HEAD >/dev/null; then
+        echo_t hook.commit_msg.detached >&2
+        echo_t hook.commit_msg.kept >&2
+    elif [ "${REPOWARDEN_LANG:-}" = en ]; then
         cat >&2 <<EOF
-
+👉 Tip: name your branch <type>/<topic> (e.g. feat/user) and the prefix
+   is added automatically: git commit -m "add sign-up"  (or use git cc)
+   Your message is not lost: git commit -e -F .git/COMMIT_EDITMSG
+EOF
+    else
+        cat >&2 <<EOF
 👉 Astuce : nomme ta branche <type>/<sujet> (ex. feat/user) et le préfixe
    sera ajouté automatiquement : git commit -m "ajoute l'inscription"  (ou git cc)
    Ton message n'est pas perdu : git commit -e -F .git/COMMIT_EDITMSG

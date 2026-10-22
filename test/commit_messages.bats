@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# commit-msg + prepare-commit-msg
+# commit-msg + prepare-commit-msg + messages des commits poussés (pre-push)
 
 load helpers
 
@@ -130,4 +130,66 @@ Co-authored-by: Alice <alice@example.com>"
     [ "$status" -ne 0 ]
     [[ "$output" == *"docs: essai"* ]] || false
     [[ "$output" != *"inconnu"* && "$output" != *"Astuce"* ]] || false
+}
+
+# Commit créé hors hooks (autre outil, rebase avec reword sans hooks…)
+commit_sans_hooks() { git -c core.hooksPath=/dev/null commit -q --allow-empty -m "$1"; }
+
+@test "pre-push : message invalide dans la plage poussee refuse, commit designe" {
+    git switch -q -c feat/x
+    commit_sans_hooks "feat: correct"
+    commit_sans_hooks "mauvais message sans type"
+    bad="$(git rev-parse --short=7 HEAD)"
+    run git push -q origin feat/x
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Push refusé : message de commit non conforme"* ]] || false
+    [[ "$output" == *"$bad « mauvais message sans type » : format attendu"* ]] || false
+    [[ "$output" == *"git rebase -i $bad^"* ]] || false
+    [ -z "$(git ls-remote --heads origin feat/x)" ]
+}
+
+@test "pre-push : commit fixup! pousse refuse, meme regle que la CI" {
+    git switch -q -c feat/x
+    git push -q origin feat/x
+    commit_sans_hooks "fixup! chore: init"
+    run git push -q origin feat/x
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"commit à squasher"* ]] || false
+}
+
+@test "pre-push : commit deja sur le remote non recontrole" {
+    git switch -q -c feat/x
+    commit_sans_hooks "mauvais message"
+    git push -q --no-verify origin feat/x
+    commit_sans_hooks "fix: correct"
+    run git push -q origin feat/x
+    [ "$status" -eq 0 ]
+}
+
+@test "pre-push : repowarden.skip commit-msg laisse passer" {
+    git switch -q -c feat/x
+    commit_sans_hooks "mauvais message"
+    git config repowarden.skip "secrets commit-msg"
+    run git push -q origin feat/x
+    [ "$status" -eq 0 ]
+}
+
+@test "pre-push : rien a pousser, message exact" {
+    git switch -q -c feat/x
+    git push -q origin feat/x
+    run git push origin feat/x
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Rien à pousser"* ]] || false
+    [[ "$output" != *"suppression"* ]] || false
+}
+
+@test "commit-msg : HEAD detachee, aide propre sans conseil de branche" {
+    git switch -q --detach
+    run git commit -q --allow-empty -m "essai"
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"HEAD détachée"* ]] || false
+    [[ "$output" != *"nomme ta branche"* ]] || false
+    REPOWARDEN_LANG=en run git commit -q --allow-empty -m "essai"
+    [[ "$output" == *"Detached HEAD"* ]] || false
+    [[ "$output" != *"name your branch"* ]] || false
 }

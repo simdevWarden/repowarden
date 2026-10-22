@@ -9,6 +9,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # shellcheck source=../hooks/lib/common.sh
 source "$ROOT/hooks/lib/common.sh"
+# shellcheck source=../hooks/lib/secrets.sh
+source "$ROOT/hooks/lib/secrets.sh"
 exec 2>&1 # une seule sortie, dans l'ordre (avertissements compris)
 # shellcheck disable=SC2034 # lu par check_version (common.sh)
 HOOKS_DIR="$ROOT/hooks"
@@ -78,6 +80,42 @@ if [ -n "$GIT_TOPLEVEL" ]; then
         attention_t st.repo_migrate
         suivant="${suivant:-repowarden migrer}"
     fi
+    # Workflows qui appellent repowarden : dépôt officiel et tag vN de la
+    # majeure installée. Autre dépôt (ancien propriétaire, fork), branche
+    # (cassé quand elle disparaît) ou majeure dépassée : la ligne à corriger
+    repowarden_majeure_r "$version"
+    majeure="$REPLY"
+    re_uses='^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]*["'"'"']?([A-Za-z0-9_.-]+)/repowarden(/[^@[:space:]"'"'"']*)?@([^[:space:]"'"'"'#]+)'
+    re_tag='^v([0-9]+)(\.[0-9]+)*(-[0-9A-Za-z.]+)?$'
+    re_sha='^[0-9a-f]{40}$'
+    for wf in "$GIT_TOPLEVEL"/.github/workflows/*.yml "$GIT_TOPLEVEL"/.github/workflows/*.yaml; do
+        [ -f "$wf" ] || continue
+        n=0
+        while IFS= read -r ligne || [ -n "$ligne" ]; do
+            n=$((n + 1))
+            [[ "$ligne" =~ $re_uses ]] || continue
+            proprio="${BASH_REMATCH[2]}" chemin="${BASH_REMATCH[3]}" ref="${BASH_REMATCH[4]}"
+            attendu="simdevWarden/repowarden$chemin@v${majeure:-N}"
+            shopt -s nocasematch
+            officiel=""
+            [[ "$proprio" != simdevwarden ]] || officiel=1
+            shopt -u nocasematch
+            cle=""
+            if [ -z "$officiel" ]; then
+                cle=st.wf_owner arg="$proprio/repowarden"
+            elif [[ "$ref" =~ $re_tag ]]; then
+                if [ -n "$majeure" ] && [ "${BASH_REMATCH[1]}" -lt "$majeure" ]; then
+                    cle=st.wf_old arg="$ref"
+                fi
+            elif ! [[ "$ref" =~ $re_sha ]]; then
+                cle=st.wf_branch arg="$ref"
+            fi
+            [ -n "$cle" ] || continue
+            attention_t "$cle" "${wf#"$GIT_TOPLEVEL"/}" "$n" "$arg" "$attendu"
+            t st.wf_fix
+            suivant="${suivant:-$REPLY}"
+        done <"$wf"
+    done
     # Branche develop présente, flux non déclaré : traité comme « main seule »
     cfg_r integrationBranch ""
     if [ -z "$REPLY" ] && git rev-parse -q --verify refs/remotes/origin/develop >/dev/null; then
@@ -93,6 +131,11 @@ if [ -n "$GIT_TOPLEVEL" ]; then
             ok_t st.repo_version_ok "$attendue"
         fi
     fi
+    # Fichier sensible ni suivi ni ignoré (même avertissement qu'au pre-commit)
+    if ! skipped secrets && ! skipped sensitive-files; then
+        sensitive_files_r
+        [ -z "$REPLY" ] || sensitive_files_warn "$REPLY"
+    fi
     info_t st.repo_forge "$FORGE"
     [ "$FORGE" != github ] || dim_t st.repo_rules
 fi
@@ -103,6 +146,11 @@ for outil in gitleaks ruff vulture staticcheck pmd; do
     if has "$outil"; then presents="$presents $outil"; else absents="$absents $outil"; fi
 done
 info_t st.tools "${presents# }" "${absents# }"
+# Sans gitleaks, les secrets ne sont vérifiés que par la CI
+if ! has gitleaks && ! skipped secrets; then
+    gitleaks_install_r
+    suivant="${suivant:-$REPLY}"
+fi
 
 echo
 if [ -n "$suivant" ]; then

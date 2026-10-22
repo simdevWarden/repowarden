@@ -14,15 +14,17 @@
 #       uses: simdevWarden/repowarden/.github/workflows/tickets.yml@v4
 #       permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
 #
-# et, dans release.yml, après une release ou une préversion :
+# et, dans release.yml, après une release, une préversion ou une livraison
+# sans nouvelle version :
 #
 #     tickets:
 #       needs: release
-#       if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true'
+#       if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true' || needs.release.outputs.delivered_without_version != ''
 #       uses: simdevWarden/repowarden/.github/workflows/tickets.yml@v4
 #       permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
 #       with:
 #         tag: ${{ needs.release.outputs.tag_name || needs.release.outputs.prerelease_tag }}
+#         delivered-sha: ${{ needs.release.outputs.delivered_without_version }}
 #
 # Le ticket d'abord, la branche en découle : à la validation (étiquette
 # « validé »), la branche type/12-titre est créée depuis la branche
@@ -42,6 +44,10 @@ on:
         description: Release ou préversion publiée (vX.Y.Z, vX.Y.Z-next.N) ; vide hors release
         type: string
         default: ""
+      delivered-sha:
+        description: "Commit livré sur la branche principale sans nouvelle version (sortie delivered_without_version de release-auto) : tickets en préprod passés en done et fermés"
+        type: string
+        default: ""
       integration-branch:
         description: Branche d'intégration (ses PR de livraison n'exigent pas de ticket)
         type: string
@@ -51,7 +57,7 @@ on:
         type: string
         default: main
       auto-validate:
-        description: "Ticket ouvert par un mainteneur (droits d'écriture) validé d'office : maintainers, ou never (un mainteneur pose toujours « validé »)"
+        description: "Ticket ouvert par un mainteneur (droits d'écriture) validé d'office, sauf s'il porte « à décider » : maintainers, ou never (un mainteneur pose toujours « validé »)"
         type: string
         default: maintainers
       require-design:
@@ -117,7 +123,7 @@ jobs:
         id: app
         if: inputs.app-client-id != ''
         continue-on-error: true
-        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
           client-id: ${{ inputs.app-client-id }}
           private-key: ${{ secrets.app-key }}
@@ -141,6 +147,7 @@ jobs:
           GH_REPO: ${{ github.repository }}
           EVENT: ${{ github.event_name }}
           TAG: ${{ inputs.tag }}
+          DELIVERED_SHA: ${{ inputs.delivered-sha }}
           INTEGRATION: ${{ inputs.integration-branch }}
           MAIN: ${{ inputs.main-branch }}
           ACTION: ${{ github.event.action }}
@@ -158,6 +165,8 @@ jobs:
           AUTO_MERGE: ${{ inputs.auto-merge }}
           REQUIRE_DESIGN: ${{ inputs.require-design }}
           APP_TOKEN: ${{ steps.app.outputs.token != '' }}
+          # Pied des commentaires du bot : lien vers la page de l'App (son avatar mène à une 404)
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
           LABEL: ${{ github.event.label.name }}
           STATE_REASON: ${{ github.event.issue.state_reason }}
           PUSH_BRANCH: ${{ github.ref_name }}
@@ -168,7 +177,7 @@ jobs:
           AUTO_CREATE: ${{ inputs.auto-create }}
           DELIVERY_WORKFLOW: ${{ inputs.delivery-workflow }}
         run: |
-          if [ -n "$TAG" ]; then
+          if [ -n "$TAG" ] || [ -n "$DELIVERED_SHA" ]; then
             bash .repowarden-ci/ci/tickets.sh release
           elif [ "$EVENT" = issues ]; then
             bash .repowarden-ci/ci/tickets.sh issue

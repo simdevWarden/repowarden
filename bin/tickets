@@ -3,7 +3,7 @@
 #   repowarden tickets init [--repo propriétaire/nom] [--sans-validation-auto]
 #   repowarden tickets sync   branches locales des tickets qui me sont assignés
 #                             (automatique si réglage ticketSync = auto ; défaut manual)
-#   - étiquettes : « validé », les statuts (à valider, backlog, en cours,
+#   - étiquettes : « validé », « à décider » (suspend la validation d'office), les statuts (à valider, backlog, en cours,
 #     en relecture, préprod, done) et les types (type: feat, type: fix…), qui
 #     donnent le préfixe de la branche du ticket ;
 #   - modèle de ticket .github/ISSUE_TEMPLATE/ticket.yml (créé « à valider ») ;
@@ -60,6 +60,7 @@ while IFS='|' read -r nom couleur description; do
 done <<'ETIQUETTES'
 validé|0e8a16|Ticket accepté par un mainteneur (débloque ses PR)
 statut: à valider|fbca04|Ticket créé, en attente de validation
+à décider|d4c5f9|Proposé : pas de validation d'office, un mainteneur décide
 statut: backlog|c5def5|Validé, pas encore commencé
 statut: en cours|1d76db|Travail commencé (PR en brouillon)
 statut: en relecture|5319e7|PR prête, en relecture

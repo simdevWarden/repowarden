@@ -17,8 +17,12 @@ le détail est dans la doc, voir « Où trouver le reste ».
 5. **Seul `develop` entre dans `main`**, par la PR de livraison, **toujours
    avec une approbation humaine**. Le ticket est fermé à la release.
 6. **Ces règles sont des contrôles** : la vérification `ticket` (exigée) refuse une PR sans conception écrite sur son ticket, qui cite plusieurs tickets, dont la branche ne porte pas le numéro du ticket, ou dont un commit cite un autre ticket.
-7. **Création de tickets gelée** tant que le backlog actif n'est pas traité :
-   un défaut découvert est noté sur le ticket existant le plus proche.
+7. **Un défaut, un ticket** : un défaut découvert devient un ticket ; s'il est
+   lié à un ticket ouvert, il y est noté en « Ajout ». Le **gel** de la
+   création de tickets est une décision du mainteneur, notée ici avec sa date
+   et sa condition de levée ; seul le mainteneur le lève, en mettant cette
+   ligne à jour. Pendant un gel, un défaut est noté sur le ticket existant le
+   plus proche. État : **pas de gel** (levé le 21/10/2026 par le mainteneur).
 
 ## Commandes
 
@@ -32,6 +36,9 @@ repowarden cc -m "…" --type … --scope … --body "…" --refs "Ticket : #<n>
 - Messages en **français**, en-tête ≤ 72 caractères, **sans signature ni
   co-auteur d'agent**. Utiliser `repowarden cc` (paquet installé), pas un alias
   local ni `git commit -m`.
+- **Toute nouvelle fonction** a, juste au-dessus, une à deux lignes qui disent
+  ce qu'elle fait et **pourquoi**, sans paraphraser le code (pas de gros bloc).
+  Le pre-commit et la CI signalent une fonction ajoutée sans commentaire.
 - Avant chaque push, les mêmes vérifications que la CI :
 
 ```bash

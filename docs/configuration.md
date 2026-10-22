@@ -19,6 +19,7 @@ Versionné à la racine du projet, au format `git config`, lu **par les hooks et
     exclude = vendor/* generated/*      # chemins ni formatés ni testés
     allowAgentSignatures = false        # agents IA (auteur, Co-Authored-By) refusés ; défaut false
     releaseUpdate = npm update -g mon-outil   # commande « Mettre à jour » des notes de version
+    sensitiveFiles = .env .env.* *.pem  # noms signalés s'ils ne sont ni suivis ni ignorés (voir Hooks)
     # Bot d'organisation (repowarden bot)
     bot = auto                          # auto (défaut) : protection appliquée et PR de migration ; pr : PR seulement ; off : ignoré
     requiredChecks = repowarden,tests   # vérifications exigées posées par le bot ; défaut : celles en ligne
@@ -63,12 +64,21 @@ git config repowarden.skip "protect-branch,format" # désactive des étapes
 git config repowarden.skip "node"                  # désactive un langage
 ```
 
+**Sauter une étape une seule fois**, sans rien changer à la configuration : `git -c repowarden.skip=<valeur> <commande>`.
+
+```bash
+git -c repowarden.skip=tests push                   # ce push sans les tests
+git -c repowarden.skip=protect-branch commit -m "…" # ce commit sur une branche protégée
+```
+
+Les messages de refus donnent la marche à suivre (créer une branche, la renommer…), jamais la commande pour désactiver la règle : sauter une étape reste un choix délibéré, à faire ponctuellement.
+
 ## Ce qui peut être désactivé (`skip`)
 
 | Catégorie          | Valeurs                                                                                          |
 | ------------------ | ------------------------------------------------------------------------------------------------ |
 | Hooks              | `pre-commit`, `prepare-commit-msg`, `commit-msg`, `pre-push`, `post-checkout`, `post-merge`      |
-| Étapes             | `branch-name`, `protect-branch`, `secrets`, `format`, `tests`, `deadcode`, `prune-branches`                  |
+| Étapes             | `branch-name`, `protect-branch`, `secrets`, `sensitive-files`, `format`, `tests`, `deadcode`, `comments`, `prune-branches` |
 | Langages et outils | `maven`, `gradle`, `node`, `python`, `go`, `helm`, `docker`… (nom du fichier dans `hooks/lang/`) |
 | Tout               | `true`                                                                                           |
 

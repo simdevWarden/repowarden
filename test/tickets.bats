@@ -48,7 +48,11 @@ case "$1 $2" in
             *"--auto --squash"*) echo "merge-auto $3" >>"$F/events" ;;
         esac ;;
     "api graphql")
-        case "$*" in *closer*) printf '%s\n' "${FAKE_CLOSER:-}"; exit 0 ;; esac
+        case "$*" in
+            *closer*) printf '%s\n' "${FAKE_CLOSER:-}"; exit 0 ;;
+            # adresse du dépôt, puis les branches liées au ticket
+            *linkedBranches*) printf '%s\n' "${FAKE_LIEES:-}"; exit 0 ;;
+        esac
         for a in "$@"; do case "$a" in name=*) echo "branche-creee ${a#name=}" >>"$F/events" ;; esac; done ;;
     "api -X")
         echo "branche-supprimee ${4#repos/o/r/git/refs/heads/}" >>"$F/events" ;;
@@ -69,8 +73,11 @@ case "$1 $2" in
         case "$*" in
             *"-q .title"*) cat "$F/issues/$3.title" 2>/dev/null || echo "Ajoute le panier" ;;
             *"-q .id"*) echo "I_$3" ;;
-            # conception écrite par un mainteneur (sauf ticket marqué sans)
-            *authorAssociation*) [ -e "$F/issues/$3.sansconception" ] || echo "## Conception retenue (avant code)" ;;
+            # commentaires de mainteneur : fichier <n>.mainteneur (séparateurs \x1e
+            # compris), sinon une conception écrite (sauf ticket marqué sans)
+            *authorAssociation*)
+                if [ -e "$F/issues/$3.mainteneur" ]; then cat "$F/issues/$3.mainteneur"
+                else [ -e "$F/issues/$3.sansconception" ] || echo "## Conception retenue (avant code)"; fi ;;
             *comments*) cat "$F/issues/$3.comments" 2>/dev/null || true ;;
             *assignees*) cat "$F/issues/$3.assignees" 2>/dev/null || true ;;
             *"-q .body"*) cat "$F/issues/$3.body" 2>/dev/null || true ;;
@@ -182,6 +189,30 @@ ticket() { printf '%s\n' "$@" >"$F/issues/$N.labels"; }
     done
 }
 
+@test "tickets : ticket de mainteneur a decider -> reste a valider, sans branche ; valide ensuite -> backlog" {
+    N=80 ticket "à décider" "type: feat"
+    echo moi >"$F/issues/80.assignees"
+    ISSUE=80 ACTION=opened ISSUE_ASSOCIATION=OWNER run "$TICKETS" issue
+    [ "$status" -eq 0 ]
+    [[ "$(labels 80 | grep statut)" = "statut: à valider" ]] || false
+    # ni validation d'office ni branche, y compris aux rattrapages
+    for cas in "ACTION=labeled LABEL=type:feat" "ACTION=assigned"; do
+        env $cas ISSUE=80 ISSUE_ASSOCIATION=OWNER "$TICKETS" issue
+    done
+    run grep -cxF "validé" "$F/issues/80.labels"
+    [[ "$output" = 0 ]] || false
+    run grep -q "branche-creee" "$F/events"
+    [[ "$status" -ne 0 ]] || false
+    # le mainteneur décide : backlog, branche (assigné), « à décider » retirée
+    echo "validé" >>"$F/issues/80.labels"
+    ISSUE=80 ACTION=labeled LABEL="validé" ISSUE_ASSOCIATION=OWNER run "$TICKETS" issue
+    [ "$status" -eq 0 ]
+    [[ "$(labels 80 | grep statut)" = "statut: backlog" ]] || false
+    run grep -cxF "à décider" "$F/issues/80.labels"
+    [[ "$output" = 0 ]] || false
+    grep -q "branche-creee feat/80-" "$F/events"
+}
+
 @test "tickets : run opened annule -> labeled ou assigned rattrape la validation d'office" {
     # Ticket créé avec ses étiquettes : le run « opened » attendait et a été
     # annulé par GitHub (un seul run en attente par groupe de concurrence)
@@ -229,6 +260,41 @@ ticket() { printf '%s\n' "$@" >"$F/issues/$N.labels"; }
     grep -qx "fermé 12" "$F/events"
 }
 
+@test "tickets : pied du bot -> lien vers la page de l'App en fin de commentaire, une seule fois" {
+    N=12 ticket "validé" "statut: préprod"
+    # sans App (jeton des Actions) : aucun pied
+    TAG=v3.6.0-next.1 run "$TICKETS" release
+    ! grep -q "github.com/apps/" "$F/issues/12.comments"
+    # avec l'App : le commentaire se termine par le lien vers sa page
+    : >"$F/issues/12.comments"
+    APP_SLUG=mon-bot TAG=v3.6.0-next.2 run "$TICKETS" release
+    [[ "$(tail -n 1 "$F/issues/12.comments")" == *"(https://github.com/apps/mon-bot)"* ]] || false
+    # texte deja signe (repris, mis a jour) : pas de second pied
+    run bash -c 'source "$1/hooks/lib/common.sh"; source "$1/ci/tickets/commun.sh"
+        APP_SLUG=mon-bot; pied_r "Bonjour"; pied_r "$REPLY"; printf "%s" "$REPLY"' _ "$BATS_TEST_DIRNAME/.."
+    [ "$(grep -c "github.com/apps/mon-bot" <<<"$output")" -eq 1 ]
+    [[ "$output" == "Bonjour"* ]] || false
+}
+
+@test "tickets : livraison sur main sans nouvelle version -> preprod en done, ferme avec le commit" {
+    N=12 ticket "validé" "statut: préprod"
+    N=13 ticket "validé" "statut: en cours"
+    DELIVERED_SHA=0123456789abcdef MAIN=main run "$TICKETS" release
+    [ "$status" -eq 0 ]
+    [ "$(labels 12 | grep statut)" = "statut: done" ]
+    grep -qx "fermé 12" "$F/events"
+    grep -q "issue close 12 --comment .*sans nouvelle version.*0123456" "$F/log"
+    # ticket pas encore livre : intact
+    [ "$(labels 13 | grep statut)" = "statut: en cours" ]
+    ! grep -q "fermé 13" "$F/events"
+    # ni tag ni commit livre : aucun ticket ferme
+    : >"$F/events"
+    N=12 ticket "validé" "statut: préprod"
+    run "$TICKETS" release
+    [ "$status" -ne 0 ]
+    ! grep -q "fermé" "$F/events"
+}
+
 @test "tickets : bots et livraisons sans ticket exige" {
     ACTION=opened AUTHOR='dependabot[bot]' run "$TICKETS" pr
     [ "$status" -eq 0 ]
@@ -272,6 +338,33 @@ ticket() { printf '%s\n' "$@" >"$F/issues/$N.labels"; }
     ! grep -q "branche-creee" "$F/events"
 }
 
+@test "tickets : valide avec branche deja faite a son nom -> reprise, lien inscrit une fois, jamais recreee" {
+    N=12 ticket "statut: à valider" "validé" "type: fix"
+    echo "Corrige le total à payer" >"$F/issues/12.title"
+    echo "refs/heads/fix/12-corrige-le-total-a-payer" >"$F/refs"
+    export FAKE_LIEES="https://github.com/o/r"
+    # personne n'est assigne : la branche existante est reprise quand meme
+    ISSUE=12 ACTION=labeled LABEL=validé run "$TICKETS" issue
+    [ "$status" -eq 0 ]
+    ! grep -q "branche-creee" "$F/events"
+    grep -qF "(https://github.com/o/r/tree/fix/12-corrige-le-total-a-payer)" "$F/issues/12.comments"
+    grep -qF "<!-- repowarden:branche fix/12-corrige-le-total-a-payer -->" "$F/issues/12.comments"
+    ! grep -q "repowarden ticket 12" "$F/issues/12.comments"
+    # assigne ensuite : ni creation, ni second commentaire
+    : >"$F/events"
+    echo moi >"$F/issues/12.assignees"
+    ISSUE=12 ACTION=assigned run "$TICKETS" issue
+    [ "$status" -eq 0 ]
+    ! grep -q "branche-creee" "$F/events"
+    ! grep -q "commentaire 12" "$F/events"
+    # branche liee par GitHub (creee par le ticket) : rien a inscrire
+    : >"$F/events"
+    rm "$F/issues/12.comments"
+    export FAKE_LIEES=$'https://github.com/o/r\nfix/12-corrige-le-total-a-payer'
+    ISSUE=12 ACTION=labeled LABEL=validé run "$TICKETS" issue
+    ! grep -q "commentaire 12" "$F/events"
+}
+
 @test "tickets : premier push sur la branche du ticket -> PR brouillon, en cours" {
     N=12 ticket "validé" "statut: backlog" "type: feat"
     echo "Tickets : ajoute le panier" >"$F/issues/12.title"
@@ -305,6 +398,40 @@ EOF
     PUSH_BRANCH=feat/panier SHA=def run "$TICKETS" push
     FAKE_AHEAD=0 PUSH_BRANCH=feat/12-panier SHA=def run "$TICKETS" push
     ! grep -qE "pr-creee|pr-editee" "$F/events"
+}
+
+@test "tickets : PR brouillon -> ajouts et conception du ticket repris, section Realise gardee, seul le pied cite un ticket" {
+    N=12 ticket "validé" "statut: backlog" "type: feat"
+    printf '## Besoin\nAjouter un panier.\n' >"$F/issues/12.body"
+    printf -- '- abc1234 feat: ajoute le panier\n' >"$F/commits"
+    s=$'\x1e'
+    # commentaires de mainteneur : conception, ajout (CRLF du web, ligne Refs), commentaire ordinaire, constat lie
+    {
+        printf '## Conception retenue\n\n**Ce qui change** : le total compte le panier.\n- arrondi au centime\n\n**Fichiers touchés** : `panier.sh`\n\n**Tests prévus** : total arrondi\n\n**Hors périmètre** : les codes promo.\n%s\n' "$s"
+        printf '## Ajout (21/10)\r\nLe total doit aussi arrondir la TVA.\r\nRefs #99\r\n%s\n' "$s"
+        printf 'Merci, je regarde.\n%s\n' "$s"
+        printf '**Constat lié** : le README cite encore l ancien total.\n%s\n' "$s"
+    } >"$F/issues/12.mainteneur"
+    PUSH_BRANCH=feat/12-panier SHA=def PUSHER=dev run "$TICKETS" push
+    [[ "$status" -eq 0 ]] || false
+    b="$(cat "$F/pr_body")"
+    [[ "$b" == *$'## Ajouts du ticket\n### Ajout (21/10)\nLe total doit aussi arrondir la TVA.\n> Refs #99\n\n**Constat lié** : le README cite encore l ancien total.'* ]] || false
+    [[ "$b" != *"Merci, je regarde"* ]] || false
+    [[ "$b" == *$'## Conception (résumé)\n**Ce qui change** : le total compte le panier.\n- arrondi au centime\n\n**Hors périmètre** : les codes promo.\n\n## Commits'* ]] || false
+    [[ "$b" != *"Tests prévus"* && "$b" != *"panier.sh"* ]] || false
+    # le check ticket ne lit que le pied
+    source "$TICKETS"
+    pr_tickets_r "$b" feat/12-panier
+    [[ "$REPLY" = 12 ]] || false
+    # section Realise ecrite a la main dans la PR : gardee au push suivant
+    printf '%s\n\n## Réalisé\n- total arrondi\r\n- vérifié sous bash 3.2\n\nTicket : #12' "$b" >"$F/pr_body"
+    FAKE_PR_HEAD=9 PUSH_BRANCH=feat/12-panier SHA=def run "$TICKETS" push
+    b="$(cat "$F/pr_body")"
+    [[ "$b" == *$'## Commits\n- abc1234 feat: ajoute le panier\n\n## Réalisé\n- total arrondi\n- vérifié sous bash 3.2\n\nTicket : #12' ]] || false
+    # un troisieme push la garde encore, une seule fois
+    FAKE_PR_HEAD=9 PUSH_BRANCH=feat/12-panier SHA=def run "$TICKETS" push
+    run grep -c "^## Réalisé" "$F/pr_body"
+    [[ "$output" = 1 ]] || false
 }
 
 @test "tickets : nom de branche sans mot vide final, titre de PR type(portee)" {
@@ -434,6 +561,12 @@ EOF
     N=24 ticket "type: feat"
     FAKE_ISSUES=$'24\tOWNER' FAKE_PRS_ALL="" AUTO_VALIDATE=never run "$TICKETS" adopter
     [ "$(labels 24 | grep statut)" = "statut: à valider" ]
+    # ticket d'un mainteneur « à décider » : a valider, pas valide d'office
+    N=25 ticket "à décider"
+    FAKE_ISSUES=$'25\tOWNER' FAKE_PRS_ALL="" run "$TICKETS" adopter
+    [[ "$(labels 25 | grep statut)" = "statut: à valider" ]] || false
+    run grep -cxF "validé" "$F/issues/25.labels"
+    [[ "$output" = 0 ]] || false
 }
 
 @test "tickets : PR sans objet depuis main ou develop -> fermee avec la marche a suivre ; retour utile garde" {

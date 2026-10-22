@@ -247,3 +247,51 @@ YML
     run "$BATS_TEST_DIRNAME/../bin/statut"
     [[ "$output" != *"repowarden migrer"* ]] || false
 }
+
+# Workflows du projet déjà migrés, avec $1 comme lignes uses: (une par job)
+workflows_repowarden() {
+    git rm -q -r .repogarde.conf .repogarde .github
+    mkdir -p .github/workflows
+    printf 'on: [push]\npermissions: {}\njobs:\n' >.github/workflows/ci.yml
+    local u n=0
+    for u in "$@"; do
+        n=$((n + 1))
+        printf '  j%s:\n    uses: %s\n' "$n" "$u" >>.github/workflows/ci.yml
+    done
+}
+
+@test "statut : workflows repowarden d'un autre depot, sur une branche, majeure en retard -> lignes signalees" {
+    workflows_repowarden \
+        autre-compte/repowarden/.github/workflows/release-auto.yml@v4 \
+        simdevWarden/repowarden/.github/workflows/tickets.yml@feat/tickets \
+        "'simdevWarden/repowarden@v3'"
+    run "$BATS_TEST_DIRNAME/../bin/statut"
+    [[ "$output" == *".github/workflows/ci.yml:5 : repowarden appelé depuis un autre dépôt que le dépôt officiel (autre-compte/repowarden) ; attendu : simdevWarden/repowarden/.github/workflows/release-auto.yml@v4"* ]] || false
+    [[ "$output" == *".github/workflows/ci.yml:7 : repowarden appelé sur une branche (@feat/tickets), cassé dès qu'elle disparaît ; attendu : simdevWarden/repowarden/.github/workflows/tickets.yml@v4"* ]] || false
+    [[ "$output" == *".github/workflows/ci.yml:9 : repowarden appelé dans une majeure dépassée (@v3) ; attendu : simdevWarden/repowarden@v4"* ]] || false
+    REPOWARDEN_LANG=en run "$BATS_TEST_DIRNAME/../bin/statut"
+    [[ "$output" == *"ci.yml:7: repowarden called on a branch (@feat/tickets)"* ]] || false
+}
+
+@test "statut : workflows repowarden a jour (vN, vN.x.y, SHA, commentes, locaux) -> rien de signale" {
+    workflows_repowarden \
+        simdevWarden/repowarden/.github/workflows/release-auto.yml@v4 \
+        simdevwarden/repowarden@v4.9.3 \
+        simdevWarden/repowarden@0123456789abcdef0123456789abcdef01234567 \
+        ./.github/workflows/local.yml
+    printf '  # uses: simdevWarden/repowarden@v1\n' >>.github/workflows/ci.yml
+    run "$BATS_TEST_DIRNAME/../bin/statut"
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"repowarden appelé"* ]] || false
+    [[ "$output" != *"corriger les lignes uses:"* ]] || false
+}
+
+@test "statut : ligne uses: a corriger -> etape suivante, pas tout est pret" {
+    workflows_repowarden simdevWarden/repowarden@main
+    run "$BATS_TEST_DIRNAME/../bin/statut"
+    [[ "$output" == *".github/workflows/ci.yml:5 : repowarden appelé sur une branche (@main)"* ]] || false
+    # Étape suivante : celle-ci, ou une étape prioritaire selon le poste
+    # (hooks ou git cc d'une autre installation)
+    [[ "$output" == *"Étape suivante :"* ]] || false
+    [[ "$output" != *"Tout est prêt"* ]] || false
+}
