@@ -41,6 +41,7 @@ theme:
 
 nav:
   - Accueil: index.md
+  - Pourquoi repowarden: pourquoi.md
   - Démarrage rapide: demarrage.md
   - Hooks et règles: hooks.md
   - Technologies: technologies.md
@@ -79,6 +80,7 @@ plugins:
           site_description: Multi-language git hooks and CI — commit messages, branch naming, secrets, formatting, targeted tests, releases.
           nav_translations:
             Accueil: Home
+            Pourquoi repowarden: Why repowarden
             Passer à la v4: Moving to v4
             Démarrage rapide: Quick start
             Hooks et règles: Hooks and rules

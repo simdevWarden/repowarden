@@ -1,6 +1,6 @@
 # repowarden
 
-**repowarden** garde l'entrée de vos dépôts Git : messages de commit, nommage des branches, secrets, formatage et tests, **quel que soit le langage**. Les mêmes règles s'appliquent sur les postes (hooks) et en CI, et `main` est protégée côté serveur.
+**repowarden** garde l'entrée de vos dépôts Git : messages de commit, nommage des branches, secrets, formatage et tests, **quel que soit le langage**. Les mêmes règles s'appliquent sur les postes (hooks) et en CI, et `main` est protégée côté serveur. Un doute face à pre-commit, commitlint, gitleaks ou Danger ? [Comparatif et mesures](pourquoi.md).
 
 ```mermaid
 flowchart LR
