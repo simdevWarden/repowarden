@@ -724,6 +724,7 @@ _msg_fr() {
         garde.branche) _M="commande refusée : « %s » crée une branche ; ici, la branche naît du ticket.\n  → repowarden ticket <n>" ;;
         garde.commit) _M="commande refusée : « %s » ; les commits passent par l'assistant (seul --amend --no-edit est permis).\n  → repowarden cc -m \"<description>\" --refs \"Ticket : #<n>\"" ;;
         garde.no_verify) _M="commande refusée : « %s » contourne les hooks repowarden.\n  → Relancer sans --no-verify et corriger ce que les hooks signalent." ;;
+        garde.force_push) _M="commande refusée : « %s » force le push et réécrit l'historique déjà poussé.\n  → Corriger par un nouveau commit (repowarden cc …), puis git push sans forcer." ;;
         garde.add_tout) _M="commande refusée : « %s » ajoute tout le dépôt.\n  → Ajouter les fichiers un par un : git add <fichiers>" ;;
         garde.sans_hooks) _M="commande refusée : « %s » ; les hooks repowarden ne sont pas actifs dans ce dépôt (messages, secrets et formatage ne seraient pas vérifiés).\n  → Les activer : repowarden install (ou repowarden install --global), puis relancer." ;;
         garde.commit_protegee) _M="commande refusée : « %s » ; « %s » est une branche protégée, le commit y serait refusé.\n  → Travailler sur la branche d'un ticket : repowarden ticket <n>, puis relancer." ;;

@@ -723,6 +723,7 @@ _msg_en() {
         garde.branche) _M="command refused: \"%s\" creates a branch; here, branches come from tickets.\n  → repowarden ticket <n>" ;;
         garde.commit) _M="command refused: \"%s\"; commits go through the assistant (only --amend --no-edit is allowed).\n  → repowarden cc -m \"<description>\" --refs \"Ticket : #<n>\"" ;;
         garde.no_verify) _M="command refused: \"%s\" bypasses the repowarden hooks.\n  → Run it again without --no-verify and fix what the hooks report." ;;
+        garde.force_push) _M="command refused: \"%s\" forces the push and rewrites the history already pushed.\n  → Fix it with a new commit (repowarden cc …), then git push without forcing." ;;
         garde.add_tout) _M="command refused: \"%s\" adds the whole repository.\n  → Add files one by one: git add <files>" ;;
         garde.sans_hooks) _M="command refused: \"%s\"; the repowarden hooks are not active in this repository (messages, secrets and formatting would not be checked).\n  → Activate them: repowarden install (or repowarden install --global), then run it again." ;;
         garde.commit_protegee) _M="command refused: \"%s\"; \"%s\" is a protected branch, the commit would be refused there.\n  → Work on a ticket's branch: repowarden ticket <n>, then run it again." ;;
