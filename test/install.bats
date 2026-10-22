@@ -192,3 +192,28 @@ faux_repowarden() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"HOOK-PROJET-LANCE"* ]] || false
 }
+
+@test "install : agent IA sans garde-fou -> branchement propose (question), sinon une ligne" {
+    require jq
+    agent_sans_garde
+    git config --unset core.hooksPath
+    run "$INSTALL" --lang fr
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Agent IA sans garde-fou"*"repowarden agents init"* ]] || false
+    [ ! -e .claude/settings.json ]
+    # Question : refus, rien n'est écrit ; accord, le garde-fou est branché
+    REPOWARDEN_INTERACTIF=1 run "$INSTALL" <<<"n"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Brancher le garde-fou"* ]] || false
+    [ ! -e .claude/settings.json ]
+    REPOWARDEN_INTERACTIF=1 run "$INSTALL" <<<"o"
+    [ "$status" -eq 0 ]
+    grep -q "repowarden garde" .claude/settings.json
+    [ -f .opencode/plugins/repowarden-garde.js ]
+    run "$INSTALL"
+    [[ "$output" != *"sans garde-fou"* ]] || false
+    # --global : configuration de l'utilisateur
+    rm -rf .claude .opencode
+    run "$INSTALL" --global
+    [[ "$output" == *"repowarden agents init --global"* ]] || false
+}
