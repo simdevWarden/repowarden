@@ -20,6 +20,7 @@ Only in a repowarden repository (`.repowarden.conf`, a `repowarden.*` setting or
 | any commit (`git commit --amend --no-edit` included) | repowarden hooks inactive in the repository (no `core.hooksPath` to the repowarden hooks): messages, secrets and formatting would not be checked | `repowarden install` (or `--global`) |
 | `--no-verify` (and `git commit -n`) | always | run it again without, fix what the hooks report |
 | `git add .`, `-A`, `--all` | always | `git add <files>` |
+| forced `git push`: `--force`, `-f` (`-uf`…), `--force-with-lease[=…]`, `--force-if-includes`, `+branch` refspec | always: it rewrites the history already pushed | fix it with a new commit (`repowarden cc …`), then `git push` without forcing |
 
 Help and preview (`--help`, `-h`, `--dry-run` of `repowarden cc`, `git cc`, `git commit`) are always allowed: nothing is committed. Each command of a shell line is checked (`&&`, `;`, `|`…), in the right repository (`cd`, `git -C`). A refusal applies to **the whole line**: none of it runs, not even the other commands (`git add a.txt && git commit …` adds nothing), and the message says so. A refusal gives the reason and the command:
 

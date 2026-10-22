@@ -199,6 +199,27 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     done
 }
 
+@test "garde : force push refuse, git push simple permis" {
+    git switch -q -c feat/essai
+    for c in 'git push --force' 'git push -f' 'git push -uf origin feat/essai' 'git push --force-with-lease' \
+        'git push --force-with-lease=feat/essai origin feat/essai' 'git push --force-if-includes' \
+        'git push origin +feat/essai' 'git -C . push -f' 'git add README.md && git push -f'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"réécrit l'historique"* ]] || false
+        [[ "$output" == *"nouveau commit"* ]] || false
+    done
+    run claude Bash '{"command": "git push --force origin main"}'
+    [ "$status" -eq 2 ]
+    for c in 'git push' 'git push -u origin HEAD' 'git push origin feat/essai'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refuse"; return 1; }
+    done
+    REPOWARDEN_LANG=en run shell 'git push -f'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"rewrites the history"* ]] || false
+}
+
 @test "garde : git add . / -A / --all refuses, fichiers nommes permis" {
     for c in 'git add .' 'git add -A' 'git add --all' 'git add -Av'; do
         run shell "$c"
