@@ -260,7 +260,7 @@ ticket() { printf '%s\n' "$@" >"$F/issues/$N.labels"; }
     grep -qx "fermé 12" "$F/events"
 }
 
-@test "tickets : pied du bot -> lien vers la page de l'App en fin de commentaire, une seule fois" {
+@test "tickets : pied du bot -> liens Markdown vers l'App et la doc apres ---, une seule fois" {
     N=12 ticket "validé" "statut: préprod"
     # sans App (jeton des Actions) : aucun pied
     TAG=v3.6.0-next.1 run "$TICKETS" release
@@ -274,6 +274,13 @@ ticket() { printf '%s\n' "$@" >"$F/issues/$N.labels"; }
         APP_SLUG=mon-bot; pied_r "Bonjour"; pied_r "$REPLY"; printf "%s" "$REPLY"' _ "$BATS_TEST_DIRNAME/.."
     [ "$(grep -c "github.com/apps/mon-bot" <<<"$output")" -eq 1 ]
     [[ "$output" == "Bonjour"* ]] || false
+    # Markdown normal (pas de <sub>, qui affiche les liens en brut), separe du
+    # texte par --- sur sa propre ligne ; liens vers l'App et vers la doc
+    [[ "$output" != *"<sub>"* && "$output" != *"</sub>"* ]] || false
+    [[ "$output" == *$'\n\n---\n\n'* ]] || false
+    [[ "$output" == *"[repowarden](https://github.com/apps/mon-bot)"* ]] || false
+    [[ "$output" == *"](https://simdevwarden.github.io/repowarden/tickets/)"* ]] || false
+    [ "$(grep -c "repowarden:pied" <<<"$output")" -eq 1 ]
 }
 
 @test "tickets : livraison sur main sans nouvelle version -> preprod en done, ferme avec le commit" {

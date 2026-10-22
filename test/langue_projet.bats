@@ -70,13 +70,13 @@ GH
     # hors de tout dépôt, sans config git globale : comme le job tickets en CI
     cd "$BATS_TEST_TMPDIR"
     run env CI=true GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 REPOWARDEN_LANG="$(bash "$LANGUE")" bash -c \
-        'source "$1/hooks/lib/common.sh"; t tk.footer x x; echo "$REPLY"' _ "$BATS_TEST_DIRNAME/.."
-    [[ "$output" == *"Message de l'App GitHub"* ]] || false
-    [[ "$output" != *"Posted by"* ]] || false
+        'source "$1/hooks/lib/common.sh"; t tk.footer x; echo "$REPLY"' _ "$BATS_TEST_DIRNAME/.."
+    [[ "$output" == *"Commentaire automatique de"* ]] || false
+    [[ "$output" != *"Automated comment from"* ]] || false
     rm "$F/.repowarden.conf"
     run env CI=true GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 REPOWARDEN_LANG="$(bash "$LANGUE")" bash -c \
-        'source "$1/hooks/lib/common.sh"; t tk.footer x x; echo "$REPLY"' _ "$BATS_TEST_DIRNAME/.."
-    [[ "$output" == *"Posted by"* ]] || false
+        'source "$1/hooks/lib/common.sh"; t tk.footer x; echo "$REPLY"' _ "$BATS_TEST_DIRNAME/.."
+    [[ "$output" == *"Automated comment from"* ]] || false
 }
 
 @test "langue projet : tickets.yml passe la langue du projet a l'etape Tickets" {
