@@ -89,6 +89,7 @@ setup() {
     [[ "$output" == *"Hooks git non activés"* ]] || false
     [[ "$output" == *"Étape suivante : repowarden install --global"* ]] || false
     "$PKG/bin/repowarden" install --global --lang fr >/dev/null
+    garde_branche
     run "$PKG/bin/repowarden" statut
     [[ "$output" == *"Hooks git actifs pour tous les dépôts"* ]] || false
     [[ "$output" == *"Assistant de commit : git cc"* ]] || false
@@ -106,12 +107,38 @@ setup() {
 @test "statut : installation locale (sans --global) -> hooks et git cc reconnus" {
     git config --unset core.hooksPath
     "$PKG/install.sh" --lang fr >/dev/null
+    garde_branche
     run "$PKG/bin/repowarden" statut
     [ "$status" -eq 0 ]
     [[ "$output" == *"Hooks git actifs dans ce dépôt seulement"* ]] || false
     [[ "$output" == *"Assistant de commit : git cc"* ]] || false
     [[ "$output" != *"non activés"* ]] || false
     [[ "$output" == *"Tout est prêt"* ]] || false
+}
+
+@test "statut : agent IA sans garde-fou -> avertissement, repowarden agents init en etape suivante" {
+    agent_sans_garde
+    "$PKG/bin/repowarden" install --global --lang fr >/dev/null
+    run "$PKG/bin/repowarden" statut
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Agent IA sans garde-fou"* ]] || false
+    [[ "$output" == *"Étape suivante : repowarden agents init"* ]] || false
+    [[ "$output" != *"Tout est prêt"* ]] || false
+    # Garde-fou de l'utilisateur, puis celui du dépôt : plus rien à signaler
+    printf '{"hooks":{"PreToolUse":[{"hooks":[{"command":"repowarden garde --format claude"}]}]}}\n' >"$HOME/.claude/settings.json"
+    run "$PKG/bin/repowarden" statut
+    [[ "$output" != *"sans garde-fou"* ]] || false
+    [[ "$output" == *"Tout est prêt"* ]] || false
+    rm "$HOME/.claude/settings.json"
+    mkdir -p .opencode/plugins
+    cp "$PKG/hooks/agents/repowarden-garde.js" .opencode/plugins/
+    run "$PKG/bin/repowarden" statut
+    [[ "$output" != *"sans garde-fou"* ]] || false
+    # Hors dépôt : branchement pour l'utilisateur
+    cd "$BATS_TEST_TMPDIR"
+    REPOWARDEN_LANG=en run "$PKG/bin/repowarden" statut
+    [[ "$output" == *"AI agent without the guard"* ]] || false
+    [[ "$output" == *"repowarden agents init --global"* ]] || false
 }
 
 @test "statut : autre installation de repowarden -> signalee, reinstallation proposee" {

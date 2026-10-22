@@ -246,10 +246,89 @@ verifier_git() {
     ) || exit $?
 }
 
+# Vrai si le ticket $1 (dépôt -R $2, sinon le dépôt courant) est ouvert et
+# validé : preuve qu'une écriture GitHub hors du circuit des PR a été décidée
+ticket_valide() {
+    local lu r=()
+    [ -z "$2" ] || r=(-R "$2")
+    lu="$(gh issue view "$1" ${r[@]+"${r[@]}"} --json state,labels -q '.state, .labels[].name' 2>/dev/null)" || return 2
+    [ -n "$lu" ] || return 2
+    [ "$(head -n 1 <<<"$lu")" = OPEN ] && grep -qxF "$VALIDE" <<<"$lu"
+}
+
+# Commande gh (mots $@, sans « gh ») lancée depuis $dir, préfixe
+# REPOWARDEN_TICKET=$ticket_gh : lectures connues permises, écritures du circuit
+# par repowarden, décisions au mainteneur, tout le reste avec un ticket validé
+verifier_gh() {
+    local ligne="gh $*" pos=() depot="" methode="" champs="" approuve="" mutation="" ecriture="" hors="" rc
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -R | --repo) shift; depot="${1:-}" ;;
+            --repo=*) depot="${1#--repo=}" ;;
+            -X | --method) shift; methode="${1:-}" ;;
+            -X?*) methode="${1#-X}" ;;
+            --method=*) methode="${1#--method=}" ;;
+            -f | -F | --field | --raw-field | --input | -f?* | -F?* | --field=* | --raw-field=* | --input=*) champs=1 ;;
+            -a | --approve) approuve=1 ;;
+            -h | --help) return 0 ;;
+            -*) ;;
+            *)
+                pos+=("$1")
+                [[ "$1" != *mutation* ]] || mutation=1
+                ;;
+        esac
+        shift
+    done
+    [ -n "${pos[0]:-}" ] || return 0
+    (
+        cd "$dir" 2>/dev/null || exit 0
+        depot_repowarden || exit 0
+        # gh api : écriture si méthode autre que GET, ou champs sans -X GET
+        # (POST par défaut) ; graphql : seulement une mutation
+        methode="$(tr '[:lower:]' '[:upper:]' <<<"$methode")"
+        if [ "${pos[1]:-}" = graphql ]; then
+            ecriture="$mutation"
+        elif [ -n "$methode" ]; then
+            [ "$methode" = GET ] || ecriture=1
+        else
+            ecriture="$champs"
+        fi
+        case "${pos[0]} ${pos[1]:-}" in
+            "issue create") refuser garde.gh_ticket_nouveau "$ligne" ;;
+            "issue comment" | "issue edit") refuser garde.gh_ticket_comment "$ligne" ;;
+            "pr create") refuser garde.gh_pr_create "$ligne" ;;
+            "run rerun") refuser garde.gh_rerun "$ligne" ;;
+            "pr ready" | "pr merge") refuser garde.gh_mainteneur "$ligne" ;;
+            "pr review") [ -z "$approuve" ] || refuser garde.gh_mainteneur "$ligne"; hors=1 ;;
+            "api "*)
+                [ -n "$ecriture" ] || exit 0
+                [[ "${pos[1]:-}" != *pending_deployments* ]] || refuser garde.gh_mainteneur "$ligne"
+                hors=1
+                ;;
+            # Lectures connues et description de la PR : permises ; tout le
+            # reste (sous-commande oubliée ou future comprise) demande un ticket
+            "auth status" | "pr edit" | "search "* | "browse "* | "status "* | "version "* | "help "*) exit 0 ;;
+            *)
+                case "${pos[1]:-}" in view | list | status | checks | diff | watch) exit 0 ;; esac
+                hors=1
+                ;;
+        esac
+        [ -n "$hors" ] || exit 0
+        [ -n "$ticket_gh" ] || refuser garde.gh_sans_ticket "$ligne" "$ligne"
+        [[ "$ticket_gh" =~ ^[0-9]+$ ]] || refuser garde.gh_ticket_illisible "$ligne" "$ticket_gh"
+        rc=0
+        ticket_valide "$ticket_gh" "$depot" || rc=$?
+        [ "$rc" -ne 2 ] || refuser garde.gh_ticket_illisible "$ligne" "$ticket_gh"
+        [ "$rc" -eq 0 ] || refuser garde.gh_ticket_non_valide "$ligne" "$ticket_gh" "$VALIDE"
+        exit 0
+    ) || exit $?
+}
+
 # Ligne de commande shell : chaque commande (&&, ||, ;, |, retour à la ligne),
-# « cd » suivi, variables d'environnement en tête ignorées
+# « cd » suivi, variables d'environnement en tête ignorées (sauf
+# REPOWARDEN_TICKET, le ticket d'une écriture gh hors du circuit des PR)
 verifier_shell() {
-    local commande="$1" segment mots m cmd_cc nl=$'\n' lignes
+    local commande="$1" segment mots m cmd_cc nl=$'\n' lignes ticket_gh
     dir="$cwd"
     # Une commande par ligne. Découpage hors de <( … ) : bash 3.2 (macOS) y
     # lit mal ces motifs (« bad substitution ») et ne vérifierait plus rien
@@ -264,8 +343,10 @@ verifier_shell() {
         # shellcheck disable=SC2162 # les antislashs restent tels quels, comme dans la commande
         read -a mots <<<"$segment" || true
         set -- ${mots[@]+"${mots[@]}"}
+        ticket_gh=""
         while [ $# -gt 0 ]; do
             case "$1" in
+                REPOWARDEN_TICKET=*) m="${1#REPOWARDEN_TICKET=}"; ticket_gh="${m//[\"\']/}"; shift ;;
                 [A-Za-z_]*=* | '(' | '{' | '!' | command | exec | env | sudo | time | nohup) shift ;;
                 *) break ;;
             esac
@@ -284,6 +365,10 @@ verifier_shell() {
             git | */git)
                 shift
                 verifier_git "${@//[\"\']/}"
+                ;;
+            gh | */gh)
+                shift
+                verifier_gh "${@//[\"\']/}"
                 ;;
             repowarden | */repowarden)
                 case "${2//[\"\']/}" in

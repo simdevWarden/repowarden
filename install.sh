@@ -20,6 +20,8 @@ HOOKS="$ROOT/hooks"
 source "$HOOKS/lib/ui.sh"
 # shellcheck source=hooks/lib/i18n.sh
 source "$HOOKS/lib/i18n.sh"
+# shellcheck source=hooks/lib/agents.sh
+source "$HOOKS/lib/agents.sh"
 SCOPE="--local"
 ACTION="install"
 PURGE=""
@@ -249,6 +251,29 @@ install_alias "$SCOPE"
 if [ "$SCOPE" = --global ]; then
     t install.local_wins
     info "$REPLY"
+fi
+
+# Agent IA sans garde-fou (Claude Code, opencode) : branchement proposé dans un
+# terminal, jamais fait sans accord ; sinon, la commande sur une ligne
+RACINE="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+if agents_sans_garde "$RACINE"; then
+    AGENTS_PORTEE=--projet
+    [ "$SCOPE" = --local ] || AGENTS_PORTEE=--global
+    CMD_AGENTS="repowarden agents init"
+    [ "$AGENTS_PORTEE" = --projet ] || CMD_AGENTS="$CMD_AGENTS --global"
+    REPONSE=n
+    if [ -t 0 ] || [ -n "${REPOWARDEN_INTERACTIF:-}" ]; then
+        t install.agents_ask "$CMD_AGENTS"
+        printf '%s [O/n] ' "$REPLY" >&2
+        IFS= read -r REPONSE || REPONSE=n
+        case "$REPONSE" in "" | [oOyY]*) REPONSE=o ;; esac
+    fi
+    if [ "$REPONSE" = o ]; then
+        bash "$ROOT/bin/agents" init "$AGENTS_PORTEE" || true
+    else
+        t install.agents_later "$CMD_AGENTS"
+        info "$REPLY"
+    fi
 fi
 
 # Bots du dépôt GitHub courant (CI, releases, tickets, protection…) : proposés,

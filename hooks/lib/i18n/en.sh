@@ -104,6 +104,8 @@ _msg_en() {
         install.purge_needs_uninstall) _M="--purge and --scan go with --uninstall." ;;
         install.replaced) _M="core.hooksPath (%s) was '%s', replaced." ;;
         install.enabled) _M="Hooks enabled (%s) → %s" ;;
+        install.agents_ask) _M="AI agent without the guard (Claude Code, opencode). Wire the guard (%s)?" ;;
+        install.agents_later) _M="AI agent without the guard (Claude Code, opencode): wire it with %s" ;;
         install.local_wins) _M="A local core.hooksPath (e.g. husky) still takes precedence in that repository." ;;
         install.bots_never) _M="Repository bots will no longer be offered (repowarden.bots = off); on demand: repowarden bots" ;;
         install.lang_set) _M="Message language: English (change: %s --global --lang fr)" ;;
@@ -509,6 +511,7 @@ _msg_en() {
         st.wf_old) _M="%s:%s: repowarden called in an outdated major version (@%s); expected: %s" ;;
         st.wf_fix) _M="fix the uses: lines reported above" ;;
         st.tools) _M="Tools present: %s · missing: %s (depending on the projects' languages)" ;;
+        st.agents_sans_garde) _M="AI agent without the guard (Claude Code, opencode): its actions are only checked at commit time. → %s" ;;
         st.next) _M="Next step:" ;;
         st.ready) _M="All set: git cc to commit, repowarden code-mort on a branch." ;;
         st.help) _M="Every command: repowarden --help" ;;
@@ -680,7 +683,7 @@ _msg_en() {
         tk.init_next_wired) _M="Next: commit these files; require the \"ticket\" check (repowarden proteger --checks \"…,ticket\"). The tickets job of release.yml is already wired." ;;
         tk.prerelease) _M="Available in pre-release **%s**: to be tested before production." ;;
         tk.released) _M="Released in **%s**." ;;
-        tk.footer) _M="Posted by this repository's GitHub App ([repowarden docs](https://simdevwarden.github.io/repowarden/en/industrialisation/#github-app-for-workflows)): [%s](https://github.com/apps/%s)" ;;
+        tk.footer) _M="Automated comment from [repowarden](https://github.com/apps/%s), this repository's ticket tracking. [Learn more](https://simdevwarden.github.io/repowarden/en/tickets/)" ;;
         tk.delivered) _M="Delivered to **%s**, without a new version (commit %s)." ;;
         # Ticket comment
         tk.comment.adding) _M="Adding comment to ticket #%s..." ;;
@@ -729,6 +732,14 @@ _msg_en() {
         garde.commit_protegee) _M="command refused: \"%s\"; \"%s\" is a protected branch, the commit would be refused there.\n  → Work on a ticket's branch: repowarden ticket <n>, then run it again." ;;
         garde.commit_protegee_libre) _M="command refused: \"%s\"; \"%s\" is a protected branch, the commit would be refused there.\n  → Create a work branch (your changes follow): git switch -c <type>/<topic>, then run it again." ;;
         garde.ligne_entiere) _M="  Nothing on this line was run, not even the other commands: run them separately." ;;
+        garde.gh_ticket_nouveau) _M="command refused: \"%s\"; tickets are created through repowarden (status, type, validation).\n  → repowarden ticket nouveau \"<title>\" [--type fix] [--description \"…\"]" ;;
+        garde.gh_ticket_comment) _M="command refused: \"%s\"; tickets are commented on and labelled through repowarden.\n  → repowarden ticket comment <n> \"<text>\"; repowarden ticket label <n> <label> [--remove]" ;;
+        garde.gh_pr_create) _M="command refused: \"%s\"; the draft PR is opened by the bot on the first push of the ticket's branch.\n  → git push -u origin HEAD" ;;
+        garde.gh_rerun) _M="command refused: \"%s\"; workflows are re-run through repowarden.\n  → repowarden run rerun <run-id|--failed>" ;;
+        garde.gh_mainteneur) _M="command refused: \"%s\"; this is the maintainer's decision (leaving draft, merge, approval, deployment).\n  → Say the PR is ready (CI green) and let the maintainer decide." ;;
+        garde.gh_sans_ticket) _M="command refused: \"%s\" changes GitHub outside the PR flow, without a ticket.\n  → Create the ticket (repowarden ticket nouveau), get it validated, then run again: REPOWARDEN_TICKET=<n> %s" ;;
+        garde.gh_ticket_illisible) _M="command refused: \"%s\"; ticket #%s unreadable (gh issue view): a write without proof of a ticket.\n  → Check the number and gh auth status, then run again: REPOWARDEN_TICKET=<n> gh …" ;;
+        garde.gh_ticket_non_valide) _M="command refused: \"%s\"; ticket #%s is not open and validated (label \"%s\").\n  → Get the ticket validated by the maintainer, then run again." ;;
         agents.added) _M="%s: guard added (%s)." ;;
         agents.present) _M="%s: guard already in place (%s)." ;;
         agents.kept) _M="%s: %s exists and differs from the template; kept as is (template: %s)." ;;

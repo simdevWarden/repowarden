@@ -1,6 +1,6 @@
 # repowarden
 
-**repowarden** guards the entrance to your Git repositories: commit messages, branch naming, secrets, formatting and tests, **whatever the language**. The same rules apply on developer machines (hooks) and in CI, and `main` is protected on the server side.
+**repowarden** guards the entrance to your Git repositories: commit messages, branch naming, secrets, formatting and tests, **whatever the language**. The same rules apply on developer machines (hooks) and in CI, and `main` is protected on the server side. Unsure how it compares with pre-commit, commitlint, gitleaks or Danger? [Comparison and measurements](pourquoi.md).
 
 ```mermaid
 flowchart LR

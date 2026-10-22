@@ -181,6 +181,7 @@ sans_gitleaks() {
     export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global.gitconfig"
     git config --global alias.cc "!bash \"$(cd "$BATS_TEST_DIRNAME/.." && pwd -P)/bin/commit\""
     echo "API_KEY=valeur-tres-secrete" >.env
+    garde_branche
     sans_gitleaks
     PATH="$SANS_GITLEAKS" run "$statut"
     [ "$status" -eq 0 ]
