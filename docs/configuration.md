@@ -100,6 +100,7 @@ Français ou anglais, choisi **une fois à l'installation** (question posée, ou
 |---|---|
 | Poste | `REPOWARDEN_LANG`, sinon `repowarden.lang` (installation), sinon `lang` de `.repowarden.conf`, sinon la langue du système |
 | CI | `REPOWARDEN_LANG`, sinon `lang` de `.repowarden.conf` (langue de l'équipe), sinon anglais |
+| Bot des tickets (`tickets.yml`) | entrée `lang` du workflow, sinon `lang` du `.repowarden.conf` de la branche par défaut (lu par l'API), sinon anglais |
 
 ## Plateforme (GitHub, GitLab, Bitbucket, Gitea)
 

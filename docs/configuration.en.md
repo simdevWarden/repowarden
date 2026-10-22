@@ -101,6 +101,7 @@ French or English, chosen **once at installation** (prompted, or `./install.sh -
 |---|---|
 | Developer machine | `REPOWARDEN_LANG`, otherwise `repowarden.lang` (installation), otherwise `lang` from `.repowarden.conf`, otherwise the system language |
 | CI | `REPOWARDEN_LANG`, otherwise `lang` from `.repowarden.conf` (team language), otherwise English |
+| Ticket bot (`tickets.yml`) | `lang` workflow input, otherwise `lang` from `.repowarden.conf` on the default branch (read through the API), otherwise English |
 
 ## Platform (GitHub, GitLab, Bitbucket, Gitea)
 
