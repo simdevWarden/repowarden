@@ -63,13 +63,14 @@ statut() {
 PIED="<!-- repowarden:pied -->"
 
 # REPLY = texte $1 terminé par le pied (---, puis une phrase en Markdown
-# normal : <sub> affiche les liens en brut) ; sans slug (jeton des Actions,
-# github-actions[bot]) ou déjà signé, texte inchangé
+# normal : <sub> affiche les liens en brut). Le repère est seul sur sa ligne
+# pour que GitHub rende les liens du pied en HTML (bloc HTML brut sinon) ;
+# sans slug (jeton des Actions, github-actions[bot]) ou déjà signé, texte inchangé
 pied_r() {
     REPLY="$1"
     [ -n "${APP_SLUG:-}" ] && [[ "$REPLY" != *"$PIED"* ]] || return 0
     _tr tk.footer "$APP_SLUG"
-    REPLY="$REPLY"$'\n\n---\n\n'"$PIED$_T"
+    REPLY="$REPLY"$'\n\n---\n\n'"$PIED"$'\n\n'"$_T"
 }
 
 # Commentaire $2 du bot sur le ticket $1, avec son pied

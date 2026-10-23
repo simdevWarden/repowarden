@@ -324,6 +324,49 @@ verifier_gh() {
     ) || exit $?
 }
 
+# Découpe $1 en une commande par ligne (REPLY) : seul le « & » d'une vraie
+# redirection (N>&M, >&2, >&-, &>, &>>, non échappée) reste dans la commande,
+# citée entière ; partout ailleurs il sépare. Dans le doute couper : au pire une
+# commande de trop, jamais une masquée (true \>&git push -f lance git).
+decouper_lignes() {
+    local s="$1" out="" c i j prec avant nl=$'\n'
+    for ((i = 0; i < ${#s}; i++)); do
+        c="${s:i:1}"
+        if [ "$c" != "&" ]; then
+            out="$out$c"
+            continue
+        fi
+        prec="" avant=""
+        [ "$i" -lt 1 ] || prec="${s:i-1:1}"
+        [ "$i" -lt 2 ] || avant="${s:i-2:1}"
+        # &> et &>> : le « & » lui-même non échappé
+        if [ "${s:i+1:1}" = ">" ] && [ "$prec" != "\\" ]; then
+            out="$out&"
+            continue
+        fi
+        # >&N, <&N, >&- : « > » ou « < » non échappé avant, un descripteur ou
+        # « - » après, puis une fin de mot
+        if { [ "$prec" = ">" ] || [ "$prec" = "<" ]; } && [ "$avant" != "\\" ]; then
+            j=$((i + 1))
+            if [ "${s:j:1}" = "-" ]; then
+                j=$((j + 1))
+            else
+                while [[ "${s:j:1}" == [0-9] ]]; do j=$((j + 1)); done
+            fi
+            if [ "$j" -gt $((i + 1)) ]; then
+                case "${s:j:1}" in
+                    "" | " " | $'\t' | "$nl" | "&" | ";" | "|" | ")")
+                        out="$out&"
+                        continue
+                        ;;
+                esac
+            fi
+        fi
+        out="$out$nl"
+    done
+    REPLY="$out"
+}
+
 # Ligne de commande shell : chaque commande (&&, ||, ;, |, retour à la ligne),
 # « cd » suivi, variables d'environnement en tête ignorées (sauf
 # REPOWARDEN_TICKET, le ticket d'une écriture gh hors du circuit des PR)
@@ -336,7 +379,10 @@ verifier_shell() {
     lignes="${lignes//||/$nl}"
     lignes="${lignes//;/$nl}"
     lignes="${lignes//|/$nl}"
-    lignes="${lignes//&/$nl}"
+    # Un « & » de redirection (2>&1, >&2, &>log…) n'est pas un séparateur : la
+    # commande citée dans le refus et celle proposée restent entières
+    decouper_lignes "$lignes"
+    lignes="$REPLY"
     # Plusieurs commandes : un refus vaut pour toute la ligne (dit à l'agent)
     [ "$(grep -c '[^[:space:]]' <<<"$lignes")" -le 1 ] || LIGNE_MULTIPLE=1
     while IFS= read -r segment; do

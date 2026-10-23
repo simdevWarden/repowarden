@@ -7,19 +7,22 @@
 # Sans --claude ni --opencode : les deux. --projet (défaut) : fichiers du dépôt,
 # à versionner ; --global : configuration de l'utilisateur, là où chaque outil
 # la lit (CLAUDE_CONFIG_DIR ; OPENCODE_CONFIG_DIR, sinon XDG_CONFIG_HOME).
-# Relançable : fichiers existants complétés, jamais écrasés ; retirer n'enlève
-# que ce qu'init a écrit.
+# Relançable : fichiers existants complétés ; un garde-fou posé par une version
+# antérieure de repowarden est mis à jour, un fichier personnel jamais écrasé ;
+# retirer n'enlève que ce qu'init a écrit.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # shellcheck source=../hooks/lib/common.sh
 source "$ROOT/hooks/lib/common.sh"
+# shellcheck source=../hooks/lib/agents.sh
+source "$ROOT/hooks/lib/agents.sh"
 
 aide() { _tr help.agents; printf '%b\n' "$_T"; }
 
-MODELE_OPENCODE="$ROOT/hooks/agents/repowarden-garde.js"
-COMMANDE_CLAUDE="repowarden garde --format claude"
-MATCHER_CLAUDE="Edit|Write|MultiEdit|NotebookEdit|Bash"
+MODELE_OPENCODE="$AGENTS_MODELE_OPENCODE"
+COMMANDE_CLAUDE="$AGENTS_COMMANDE_CLAUDE"
+MATCHER_CLAUDE="$AGENTS_MATCHER_CLAUDE"
 
 action=""
 case "${1:-}" in
@@ -59,7 +62,8 @@ fi
 ecrits=()
 
 # Hook PreToolUse de Claude Code : ajouté au settings.json (créé au besoin),
-# rien si une commande « repowarden garde » y est déjà
+# rien si une commande « repowarden garde » y est déjà ; d'une ancienne forme,
+# remplacé (les autres hooks restent)
 init_claude() {
     local f="$fichier_claude" entree tmp
     has jq || { err_t agents.no_jq "$f"; return 1; }
@@ -67,6 +71,18 @@ init_claude() {
         '{matcher: $m, hooks: [{type: "command", command: $c}]}')"
     if [ -f "$f" ]; then
         jq -e . "$f" >/dev/null 2>&1 || { err_t agents.bad_json "Claude Code" "$f"; return 1; }
+        if agents_claude_perime "$f"; then
+            tmp="$(mktemp)"
+            jq --argjson e "$entree" 'def rw: (.command // "") | startswith("repowarden garde");
+                .hooks.PreToolUse = ([.hooks.PreToolUse[]
+                    | if any(.hooks[]?; rw) then (.hooks |= map(select(rw | not))) | select(.hooks | length > 0) else . end]
+                    + [$e])' "$f" >"$tmp"
+            cat "$tmp" >"$f"
+            rm -f "$tmp"
+            ecrits+=("$f")
+            ok_t agents.updated "Claude Code" "$f"
+            return 0
+        fi
         if jq -e '[.hooks.PreToolUse[]?.hooks[]?.command // empty | select(test("repowarden garde"))] | length > 0' "$f" >/dev/null; then
             ok_t agents.present "Claude Code" "$f"
             return 0
@@ -83,12 +99,17 @@ init_claude() {
     ok_t agents.added "Claude Code" "$f"
 }
 
-# Plugin opencode : copie du modèle ; un fichier différent est gardé et signalé
+# Plugin opencode : copie du modèle ; celui d'une version antérieure de
+# repowarden est remplacé, un fichier personnel gardé et signalé
 init_opencode() {
     local f="$fichier_opencode"
     if [ -f "$f" ]; then
         if cmp -s "$f" "$MODELE_OPENCODE"; then
             ok_t agents.present opencode "$f"
+        elif agents_plugin_repowarden "$f"; then
+            cp "$MODELE_OPENCODE" "$f"
+            ecrits+=("$f")
+            ok_t agents.updated opencode "$f"
         else
             attention_t agents.kept opencode "$f" "$MODELE_OPENCODE"
         fi

@@ -281,6 +281,21 @@ ticket() { printf '%s\n' "$@" >"$F/issues/$N.labels"; }
     [[ "$output" == *"[repowarden](https://github.com/apps/mon-bot)"* ]] || false
     [[ "$output" == *"](https://simdevwarden.github.io/repowarden/tickets/)"* ]] || false
     [ "$(grep -c "repowarden:pied" <<<"$output")" -eq 1 ]
+    # repere seul sur sa ligne, suivi d'une ligne vide ; aucune ligne qui commence par <!-- ne contient de texte apres -->
+    grep -qxF '<!-- repowarden:pied -->' <<<"$output"
+    local line
+    while IFS= read -r line; do
+        case "$line" in
+            "<!-- repowarden:pied -->") continue ;;
+            "<!--"*) [[ "$line" != *"-->"* ]] || [[ "${line#*-->}" == "" ]] || false ;;
+        esac
+    done <<<"$output"
+    local idx
+    idx="$(grep -nF '<!-- repowarden:pied -->' <<<"$output" | head -n1 | cut -d: -f1)"
+    [ -n "$idx" ]
+    local next
+    next="$(awk -v i=$((idx+1)) 'NR==i{print}' <<<"$output")"
+    [ -z "$next" ]
 }
 
 @test "tickets : livraison sur main sans nouvelle version -> preprod en done, ferme avec le commit" {
