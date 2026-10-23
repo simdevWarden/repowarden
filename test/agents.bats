@@ -181,3 +181,48 @@ JS
     [ ! -e "$CLAUDE_CONFIG_DIR/settings.json" ]
     [ -f "$HOME/.config/opencode/plugins/repowarden-garde.js" ]
 }
+
+# Ticket #470 : un garde-fou posé par une version antérieure de repowarden suit
+# les mises à jour ; un fichier personnel n'est jamais écrasé
+ANCIEN_PLUGIN="$BATS_TEST_DIRNAME/fixtures/agents/ancien-plugin-opencode-autonome.js"
+
+@test "agents init : ancien plugin opencode de repowarden remplace par le modele" {
+    mkdir -p .opencode/plugins
+    cp "$ANCIEN_PLUGIN" .opencode/plugins/repowarden-garde.js
+    run "$RW" agents init --opencode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"opencode : garde-fou mis à jour"* ]] || false
+    [[ "$output" == *"À versionner : git add .opencode/plugins/repowarden-garde.js"* ]] || false
+    cmp -s .opencode/plugins/repowarden-garde.js "$MODELE"
+    # Relance : déjà à jour
+    run "$RW" agents init --opencode
+    [[ "$output" == *"opencode : garde-fou déjà en place"* ]] || false
+}
+
+@test "agents init : plugin personnalise (sans en-tete repowarden) garde et signale" {
+    mkdir -p .opencode/plugins
+    printf '// Mon garde-fou\nimport { spawnSync } from "node:child_process"\n// repowarden garde\n' >.opencode/plugins/repowarden-garde.js
+    cp .opencode/plugins/repowarden-garde.js "$BATS_TEST_TMPDIR/perso.js"
+    run "$RW" agents init --opencode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"diffère du modèle ; gardé tel quel"* ]] || false
+    [[ "$output" != *"mis à jour"* ]] || false
+    cmp -s .opencode/plugins/repowarden-garde.js "$BATS_TEST_TMPDIR/perso.js"
+}
+
+@test "agents init : ancien hook Claude remplace, autres hooks et reglages intacts" {
+    mkdir -p .claude
+    printf '%s\n' '{"model":"x","hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"./mon-hook.sh"}]},{"matcher":"Edit|Write|Bash","hooks":[{"type":"command","command":"repowarden garde"}]},{"matcher":"Write","hooks":[{"type":"command","command":"repowarden garde --format claude"},{"type":"command","command":"autre-hook"}]}],"Stop":[{"hooks":[{"type":"command","command":"fin"}]}]}}' >.claude/settings.json
+    run "$RW" agents init --claude
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Claude Code : garde-fou mis à jour"* ]] || false
+    # Une seule entrée repowarden, sous la forme actuelle
+    jq -e '[.hooks.PreToolUse[].hooks[] | select(.command | startswith("repowarden garde"))] | length == 1' .claude/settings.json
+    jq -e '.hooks.PreToolUse[-1] == {matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash", hooks: [{type: "command", command: "repowarden garde --format claude"}]}' .claude/settings.json
+    # Hooks et réglages de l'utilisateur intacts
+    jq -e '.hooks.PreToolUse[0] == {matcher: "Bash", hooks: [{type: "command", command: "./mon-hook.sh"}]}' .claude/settings.json
+    jq -e '.hooks.PreToolUse[1] == {matcher: "Write", hooks: [{type: "command", command: "autre-hook"}]}' .claude/settings.json
+    jq -e '.model == "x" and .hooks.Stop[0].hooks[0].command == "fin" and (.hooks.PreToolUse | length) == 3' .claude/settings.json
+    run "$RW" agents init --claude
+    [[ "$output" == *"Claude Code : garde-fou déjà en place"* ]] || false
+}

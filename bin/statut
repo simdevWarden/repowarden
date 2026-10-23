@@ -150,6 +150,13 @@ if agents_sans_garde "$GIT_TOPLEVEL"; then
     attention_t st.agents_sans_garde "$cmd_agents"
     suivant="${suivant:-$cmd_agents}"
 fi
+# Garde-fou posé par une version antérieure de repowarden : init le met à jour
+while read -r portee _agent fichier; do
+    cmd_agents="repowarden agents init"
+    [ "$portee" = projet ] || cmd_agents="$cmd_agents --global"
+    attention_t st.agents_stale "$fichier" "$cmd_agents"
+    suivant="${suivant:-$cmd_agents}"
+done < <(agents_perimes "$GIT_TOPLEVEL")
 
 # Outils : secrets, code mort (selon les langages)
 presents="" absents=""

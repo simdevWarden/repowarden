@@ -253,6 +253,17 @@ if [ "$SCOPE" = --global ]; then
     info "$REPLY"
 fi
 
+# Garde-fou de l'utilisateur posé par une version antérieure : mis à jour sans
+# question (déjà branché par lui), une ligne par agent
+while read -r portee agent fichier; do
+    [ "$portee" = global ] || continue
+    bash "$ROOT/bin/agents" init --global "--$agent" >/dev/null 2>&1 || continue
+    nom=opencode
+    [ "$agent" != claude ] || nom="Claude Code"
+    t agents.updated "$nom" "$fichier"
+    ok "$REPLY"
+done < <(agents_perimes "")
+
 # Agent IA sans garde-fou (Claude Code, opencode) : branchement proposé dans un
 # terminal, jamais fait sans accord ; sinon, la commande sur une ligne
 RACINE="$(git rev-parse --show-toplevel 2>/dev/null || true)"

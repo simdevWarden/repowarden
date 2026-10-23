@@ -512,6 +512,7 @@ _msg_en() {
         st.wf_fix) _M="fix the uses: lines reported above" ;;
         st.tools) _M="Tools present: %s · missing: %s (depending on the projects' languages)" ;;
         st.agents_sans_garde) _M="AI agent without the guard (Claude Code, opencode): its actions are only checked at commit time. → %s" ;;
+        st.agents_stale) _M="Outdated repowarden guard (%s): wired by an earlier version of repowarden. → %s" ;;
         st.next) _M="Next step:" ;;
         st.ready) _M="All set: git cc to commit, repowarden code-mort on a branch." ;;
         st.help) _M="Every command: repowarden --help" ;;
@@ -742,6 +743,7 @@ _msg_en() {
         garde.gh_ticket_non_valide) _M="command refused: \"%s\"; ticket #%s is not open and validated (label \"%s\").\n  → Get the ticket validated by the maintainer, then run again." ;;
         agents.added) _M="%s: guard added (%s)." ;;
         agents.present) _M="%s: guard already in place (%s)." ;;
+        agents.updated) _M="%s: guard updated (%s)." ;;
         agents.kept) _M="%s: %s exists and differs from the template; kept as is (template: %s)." ;;
         agents.bad_json) _M="%s: %s is not valid JSON; nothing was changed." ;;
         agents.no_jq) _M="jq is required to update %s (https://jqlang.org)." ;;

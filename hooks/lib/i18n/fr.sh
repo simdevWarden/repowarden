@@ -513,6 +513,7 @@ _msg_fr() {
         st.wf_fix) _M="corriger les lignes uses: signalées ci-dessus" ;;
         st.tools) _M="Outils présents : %s · absents : %s (selon les langages des projets)" ;;
         st.agents_sans_garde) _M="Agent IA sans garde-fou (Claude Code, opencode) : ses actions ne sont vérifiées qu'au commit. → %s" ;;
+        st.agents_stale) _M="Garde-fou repowarden périmé (%s) : posé par une version antérieure de repowarden. → %s" ;;
         st.next) _M="Étape suivante :" ;;
         st.ready) _M="Tout est prêt : git cc pour commiter, repowarden code-mort sur une branche." ;;
         st.help) _M="Toutes les commandes : repowarden --help" ;;
@@ -743,6 +744,7 @@ _msg_fr() {
         garde.gh_ticket_non_valide) _M="commande refusée : « %s » ; le ticket #%s n'est pas ouvert et validé (étiquette « %s »).\n  → Faire valider le ticket par le mainteneur, puis relancer." ;;
         agents.added) _M="%s : garde-fou ajouté (%s)." ;;
         agents.present) _M="%s : garde-fou déjà en place (%s)." ;;
+        agents.updated) _M="%s : garde-fou mis à jour (%s)." ;;
         agents.kept) _M="%s : %s existe et diffère du modèle ; gardé tel quel (modèle : %s)." ;;
         agents.bad_json) _M="%s : %s n'est pas un JSON valide ; rien n'a été modifié." ;;
         agents.no_jq) _M="jq est requis pour compléter %s (https://jqlang.org)." ;;
