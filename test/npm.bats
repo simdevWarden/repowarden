@@ -125,7 +125,7 @@ setup() {
     [[ "$output" == *"Étape suivante : repowarden agents init"* ]] || false
     [[ "$output" != *"Tout est prêt"* ]] || false
     # Garde-fou de l'utilisateur, puis celui du dépôt : plus rien à signaler
-    printf '{"hooks":{"PreToolUse":[{"hooks":[{"command":"repowarden garde --format claude"}]}]}}\n' >"$HOME/.claude/settings.json"
+    printf '{"hooks":{"PreToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit|Bash","hooks":[{"type":"command","command":"repowarden garde --format claude"}]}]}}\n' >"$HOME/.claude/settings.json"
     run "$PKG/bin/repowarden" statut
     [[ "$output" != *"sans garde-fou"* ]] || false
     [[ "$output" == *"Tout est prêt"* ]] || false
@@ -139,6 +139,33 @@ setup() {
     REPOWARDEN_LANG=en run "$PKG/bin/repowarden" statut
     [[ "$output" == *"AI agent without the guard"* ]] || false
     [[ "$output" == *"repowarden agents init --global"* ]] || false
+}
+
+@test "statut : garde-fou perime (version anterieure de repowarden) -> signale, agents init en etape suivante" {
+    require jq
+    agent_sans_garde
+    "$PKG/bin/repowarden" install --global --lang fr >/dev/null
+    # Ancien plugin autonome pour l'utilisateur : branché, mais périmé
+    mkdir -p "$HOME/.config/opencode/plugins"
+    cp "$BATS_TEST_DIRNAME/fixtures/agents/ancien-plugin-opencode-autonome.js" "$HOME/.config/opencode/plugins/repowarden-garde.js"
+    run "$PKG/bin/repowarden" statut
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"sans garde-fou"* ]] || false
+    [[ "$output" == *"Garde-fou repowarden périmé"*"repowarden-garde.js"* ]] || false
+    [[ "$output" == *"Étape suivante : repowarden agents init --global"* ]] || false
+    [[ "$output" != *"Tout est prêt"* ]] || false
+    # À jour pour l'utilisateur ; hook Claude d'une ancienne forme dans le dépôt
+    cp "$PKG/hooks/agents/repowarden-garde.js" "$HOME/.config/opencode/plugins/repowarden-garde.js"
+    mkdir -p .claude
+    printf '{"hooks":{"PreToolUse":[{"matcher":"Edit|Write|Bash","hooks":[{"type":"command","command":"repowarden garde"}]}]}}\n' >.claude/settings.json
+    REPOWARDEN_LANG=en run "$PKG/bin/repowarden" statut
+    [[ "$output" == *"Outdated repowarden guard"*".claude/settings.json"* ]] || false
+    [[ "$output" == *"repowarden agents init"* ]] || false
+    [[ "$output" != *"repowarden agents init --global"* ]] || false
+    "$PKG/bin/repowarden" agents init --claude >/dev/null
+    run "$PKG/bin/repowarden" statut
+    [[ "$output" != *"périmé"* ]] || false
+    [[ "$output" == *"Tout est prêt"* ]] || false
 }
 
 @test "statut : autre installation de repowarden -> signalee, reinstallation proposee" {

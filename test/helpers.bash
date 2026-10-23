@@ -53,7 +53,7 @@ require() {
 # Claude Code ou opencode est installé, statut ne le réclame plus
 garde_branche() {
     mkdir -p .claude
-    printf '{"hooks":{"PreToolUse":[{"hooks":[{"type":"command","command":"repowarden garde --format claude"}]}]}}\n' >.claude/settings.json
+    printf '{"hooks":{"PreToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit|Bash","hooks":[{"type":"command","command":"repowarden garde --format claude"}]}]}}\n' >.claude/settings.json
 }
 
 # Poste de test avec Claude Code (~/.claude), garde-fou branché nulle part
