@@ -324,6 +324,27 @@ verifier_gh() {
     ) || exit $?
 }
 
+# Découpe $1 en une commande par ligne : un « & » de redirection (2>&1, >&2,
+# &>log…) reste dans la commande, citée et proposée entière. REPLY reçoit le texte.
+decouper_lignes() {
+    local s="$1" out="" c i prec suiv nl=$'\n'
+    for ((i = 0; i < ${#s}; i++)); do
+        c="${s:i:1}"
+        if [ "$c" != "&" ]; then
+            out="$out$c"
+            continue
+        fi
+        prec="${out: -1}"
+        suiv="${s:i+1:1}"
+        if [ "$prec" = ">" ] || [ "$prec" = "<" ] || [ "$suiv" = ">" ]; then
+            out="$out&"
+        else
+            out="$out$nl"
+        fi
+    done
+    REPLY="$out"
+}
+
 # Ligne de commande shell : chaque commande (&&, ||, ;, |, retour à la ligne),
 # « cd » suivi, variables d'environnement en tête ignorées (sauf
 # REPOWARDEN_TICKET, le ticket d'une écriture gh hors du circuit des PR)
@@ -336,7 +357,10 @@ verifier_shell() {
     lignes="${lignes//||/$nl}"
     lignes="${lignes//;/$nl}"
     lignes="${lignes//|/$nl}"
-    lignes="${lignes//&/$nl}"
+    # Un « & » de redirection (2>&1, >&2, &>log…) n'est pas un séparateur : la
+    # commande citée dans le refus et celle proposée restent entières
+    decouper_lignes "$lignes"
+    lignes="$REPLY"
     # Plusieurs commandes : un refus vaut pour toute la ligne (dit à l'agent)
     [ "$(grep -c '[^[:space:]]' <<<"$lignes")" -le 1 ] || LIGNE_MULTIPLE=1
     while IFS= read -r segment; do

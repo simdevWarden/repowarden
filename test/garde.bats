@@ -230,6 +230,36 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     [ "$status" -eq 0 ]
 }
 
+@test "garde : redirection 2>&1 gardee dans la commande citee et proposee" {
+    gh_simule
+    run shell 'gh issue close 1 2>&1 | head'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"« gh issue close 1 2>&1 »"* ]] || false
+    [[ "$output" == *"REPOWARDEN_TICKET=<n> gh issue close 1 2>&1"* ]] || false
+}
+
+@test "garde : redirections 2>&1, >&2 et &>log ne coupent pas la commande" {
+    for c in 'git status 2>&1' 'git status >&2' 'git status &>log'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refuse : $output"; return 1; }
+    done
+    # La redirection ne masque pas la commande : refus entier, pas une ligne
+    # de plusieurs commandes
+    for c in 'git add . 2>&1' 'git add . >&2' 'git add . &>log'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"« $c »"* ]] || false
+        [[ "$output" != *"Rien de cette ligne"* ]] || false
+    done
+}
+
+@test "garde : & seul separe toujours deux commandes" {
+    run shell 'true & git add .'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"« git add . »"* ]] || false
+    [[ "$output" == *"Rien de cette ligne"* ]] || false
+}
+
 @test "garde : chaque commande d'une ligne, cd et git -C suivis" {
     run shell 'echo ok && ls | grep x; git add -A'
     [ "$status" -eq 2 ]
