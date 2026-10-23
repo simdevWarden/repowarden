@@ -253,6 +253,16 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     done
 }
 
+@test "garde : un faux & de redirection ne masque jamais une commande" {
+    # bash lance chaque fois une seconde commande git : refus obligatoire
+    for c in 'true \>&git push -f' 'echo >&git push -f' 'true 2>&git add .' \
+        'echo x >& git push --force'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis : $output"; return 1; }
+        [[ "$output" == *"Rien de cette ligne"* ]] || false
+    done
+}
+
 @test "garde : & seul separe toujours deux commandes" {
     run shell 'true & git add .'
     [ "$status" -eq 2 ]
