@@ -113,4 +113,7 @@ notice() { echo "::notice title=repowarden::$*"; }
 
 notice_t() { _tr "$@"; notice "$_T"; }
 
+# Avertissement traduit dans le journal du run : signale sans faire échouer
+avertir_t() { _tr "$@"; echo "::warning title=repowarden::$_T"; }
+
 # Chargé par les tests (source) : fonctions seulement

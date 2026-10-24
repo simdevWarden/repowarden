@@ -18,6 +18,16 @@ test/e2e/run.sh python go       # real-world tests (languages whose tooling is i
 
 The CI re-runs everything on Linux, macOS and Windows, plus one e2e job per language with its real tooling.
 
+Touched tests also run under **bash 3.2** (macOS `/bin/bash` first in `PATH`). Without bash 3.2 on the machine (Linux, devzone container), the CI's macOS jobs cover it: watch them (`repowarden pr checks <n>`) and only call the work done once they are green. Optional, to try before the CI, bash 3.2 built locally (checked on Ubuntu 24.04, gcc 13; `bison` required, the shipped parser is outdated):
+
+```bash
+curl -fsSLO https://ftp.gnu.org/gnu/bash/bash-3.2.57.tar.gz && tar xzf bash-3.2.57.tar.gz && cd bash-3.2.57
+./configure --build="$(uname -m)-unknown-linux-gnu" --without-bash-malloc \
+  CFLAGS="-O2 -std=gnu89 -Wno-implicit-function-declaration -Wno-implicit-int -Wno-incompatible-pointer-types -Wno-int-conversion"
+make && mkdir -p ~/bash32 && cp bash ~/bash32/
+PATH="$HOME/bash32:$PATH" bats test/<file>.bats   # bats follows the bash in PATH
+```
+
 ## Conventions
 
 - **Branches**: `<type>/<topic>` (`feat/helm-unittest`, `fix/windows-paths`).

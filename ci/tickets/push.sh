@@ -215,15 +215,28 @@ description_pr_brouillon_r() {
     REPLY="$corps"$'\n\nTicket : #'"$n"
 }
 
+# REPLY = compte à assigner à la PR brouillon du ticket $1 : l'auteur du push
+# s'il est une personne (GitHub refuse d'assigner un bot avec un jeton d'App),
+# sinon le premier assigné du ticket, sinon vide
+assigne_pr_r() {
+    REPLY=""
+    case "${PUSHER:-}" in
+        "" | *"[bot]") ;;
+        *) REPLY="$PUSHER"; return 0 ;;
+    esac
+    REPLY="$(assignes "$1")"
+    REPLY="${REPLY%%$'\n'*}"
+}
+
 # Premier push sur la branche d'un ticket : PR brouillon vers la branche
 # d'intégration, titrée par le premier commit (repli : le ticket), à la
-# description reprise du ticket, citant le
-# ticket, assignée à l'auteur du push ; ticket en cours. Ouverte par le jeton
-# des Actions, elle ne lance pas la CI : elle tourne au push suivant, ou au
+# description reprise du ticket, citant le ticket, assignée à l'auteur du
+# push (une personne, jamais un bot ; repli : l'assigné du ticket ; un refus
+# n'est qu'un avertissement) ; ticket en cours. Ouverte par le jeton des Actions, elle ne lance pas la CI : elle tourne au push suivant, ou au
 # passage « prête pour revue ». Tant qu'elle est en brouillon, chaque push met
 # à jour son titre et sa description ; une PR prête n'est plus touchée.
 cmd_push() {
-    local n pr titre corps url
+    local n pr titre corps url qui
     : "${PUSH_BRANCH:?}" "${SHA:?}"
     [ "${DELETED:-false}" != true ] || return 0
     branch_ticket_r "$PUSH_BRANCH"
@@ -245,8 +258,15 @@ cmd_push() {
         return 0
     fi
     url="$(gh pr create --draft --base "$INTEGRATION" --head "$PUSH_BRANCH" --title "$titre" \
-        --body "$corps" ${PUSHER:+--assignee "$PUSHER"})"
-    [ -z "${PUSHER:-}" ] || gh issue edit "$n" --add-assignee "$PUSHER" >/dev/null || true
+        --body "$corps")"
+    # assignation à part : un refus de GitHub ne doit pas faire échouer le suivi
+    assigne_pr_r "$n"
+    qui="$REPLY"
+    if [ -n "$qui" ]; then
+        gh pr edit "${url##*/}" --add-assignee "$qui" >/dev/null 2>&1 ||
+            avertir_t tk.assign_failed "${url##*/}" "$qui"
+        [ "$qui" != "${PUSHER:-}" ] || gh issue edit "$n" --add-assignee "$qui" >/dev/null 2>&1 || true
+    fi
     est_valide "$n" && statut "$n" "$S_ENCOURS"
     notice_t tk.draft_opened "${url##*/}" "$n"
     verifier "${url##*/}" "$SHA" "$n" "$PUSH_BRANCH" || true
