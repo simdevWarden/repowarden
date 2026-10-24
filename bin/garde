@@ -137,7 +137,8 @@ protegee() {
 # si le dépôt suit ses tickets)
 verifier_fichier() {
     dossier_r "$1"
-    local d="$REPLY" f="$1"
+    # Sous Windows, jq finit le chemin lu par un CR : retiré pour tester le fichier
+    local d="$REPLY" f="${1%$'\r'}"
     case "$f" in /*) ;; *) f="$cwd/$f" ;; esac
     (
         cd "$d" 2>/dev/null || exit 0

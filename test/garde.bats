@@ -463,6 +463,10 @@ GH
     run edit lib/outil.sh
     [ "$status" -eq 2 ]
     [[ "$output" == *"repowarden carte lib/outil.sh"* ]] || false
+    # Chemin lu par jq sous Windows : CR final
+    run claude Edit "$(jq -n --arg f "$PWD/lib/outil.sh"$'\r' '{file_path: $f, old_string: "a", new_string: "b"}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"repowarden carte lib/outil.sh"* ]] || false
     run claude Write "$(jq -n --arg f "$PWD/nouveau.sh" '{file_path: $f, content: "x"}')"
     [ "$status" -eq 2 ]
     [[ "$output" != *"repowarden carte"* ]] || false
