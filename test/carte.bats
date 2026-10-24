@@ -195,3 +195,39 @@ projet_garde() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"neuve  lib/outil.sh:15"* ]] || false
 }
+
+@test "carte : fichier -> ses tests (nommage) et la commande pour les lancer" {
+    projet_garde
+    mkdir -p test
+    printf '#!/usr/bin/env bats\n@test "x" { true; }\n' >test/garde.bats
+    git add test/garde.bats
+    git commit -q --no-verify -m "test: garde"
+    run "$RW" carte bin/garde
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Tests : test/garde.bats"* ]] || false
+    [[ "$output" == *"bats test/garde.bats"* ]] || false
+}
+
+@test "carte : tests lies par chemin cite et par commande repowarden, noms voisins ignores" {
+    projet_shell
+    printf '#!/bin/sh\n# Variante\nv() { :; }\n' >bin/outil2
+    printf '# Copie\nb() { :; }\n' >lib/outil.sh.bak
+    mkdir -p test
+    printf '#!/usr/bin/env bats\nS="$BATS_TEST_DIRNAME/../lib/outil.sh"\n@test "a" { true; }\n' >test/chemins.bats
+    printf '#!/usr/bin/env bats\n@test "b" { run repowarden outil --help; }\n' >test/commande.bats
+    git add -A
+    git commit -q --no-verify -m "test: liens"
+    "$RW" carte >/dev/null
+    [ "$(jq -c '.fichiers["lib/outil.sh"].tests' "$CARTE")" = '["test/chemins.bats"]' ]
+    [ "$(jq -c '.fichiers["bin/outil"].tests' "$CARTE")" = '["test/commande.bats"]' ]
+    [ "$(jq -c '.fichiers["bin/outil2"].tests' "$CARTE")" = '[]' ]
+}
+
+@test "carte : fichier sans test signale, --json avec tests vides" {
+    projet_shell
+    run "$RW" carte lib/outil.sh
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Aucun test trouvé pour lib/outil.sh"* ]] || false
+    run "$RW" carte lib/outil.sh --json
+    [ "$(jq -c '.tests' <<<"$output")" = '[]' ]
+}

@@ -18,7 +18,8 @@ Pour chaque fichier du dépôt (suivi, ou nouveau et non ignoré, hors `repoward
 {
   "fichiers": {
     "bin/outil": {
-      "fonctions": [{ "ligne": 3, "nom": "main", "pourquoi": "Point d'entrée : lit les options" }]
+      "fonctions": [{ "ligne": 3, "nom": "main", "pourquoi": "Point d'entrée : lit les options" }],
+      "tests": ["test/outil.bats"]
     }
   },
   "version": 1
@@ -47,3 +48,20 @@ verifier_gh  bin/garde:262
 ```
 
 Un chemin est lu depuis le dossier courant (`repowarden carte outil.sh` dans `lib/`) ; un nom qui n'est ni un fichier ni une fonction de la carte : message et code 1. **Carte absente ou périmée** (un fichier du dépôt ou l'index git plus récent qu'elle) : régénérée avant de répondre.
+
+## Tests liés
+
+Avant de modifier un fichier, savoir quels tests le couvrent, pour les écrire d'abord puis les relancer. `repowarden carte <fichier>` les donne après ses fonctions, avec la commande :
+
+```text
+Tests : test/garde.bats
+  → bats test/garde.bats
+```
+
+Un test (`*.bats`, premier lot) est relié à un fichier cartographié par :
+
+- **nommage** : même nom sans extension (`bin/garde` ↔ `test/garde.bats`) ;
+- **chemin cité** dans le test (`$BATS_TEST_DIRNAME/../ci/check.sh` cite `ci/check.sh`), sans autre caractère de nom collé ;
+- **commande** `repowarden <sous-commande>` citée dans le test → `bin/<sous-commande>`.
+
+Un fichier sans test est signalé (« Aucun test trouvé ») ; dans le JSON, `"tests": []`. Les tests sont lus même s'ils sont dans `repowarden.exclude`.
