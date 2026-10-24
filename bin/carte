@@ -30,6 +30,7 @@ if ! has jq; then
 fi
 cd "$GIT_TOPLEVEL"
 carte_generer
+# shellcheck disable=SC2016 # programme jq, rien à développer
 read -r fichiers fonctions sans < <(cjq -r '[.fichiers[].fonctions[]] as $f
     | "\(.fichiers | length) \($f | length) \([$f[] | select(.pourquoi == "")] | length)"' "$CARTE_JSON")
 ok_t carte.done "$fichiers" "$fonctions" "$sans" "$CARTE_JSON"
