@@ -15,6 +15,8 @@ Chaque changement part d'un **ticket** (issue GitHub) : **la branche découle du
 
 Un ticket **livré** (`préprod`, `done`) ne recule jamais : un événement de PR traité en retard (PR éditée après son merge), une branche réapparue ou une réassignation ne le ramènent pas en cours ou en relecture ; le suivi le signale par une notice.
 
+**Une seule PR par branche** : les runs `push` d'une même branche passent l'un après l'autre (groupe de `concurrency` propre au dépôt et à la branche, le run en cours n'est jamais annulé), et la PR ouverte est recherchée à nouveau juste avant d'en créer une : deux push rapprochés n'ouvrent qu'une PR.
+
 Ticket fermé comme **abandonné** (*not planned*) : sa PR est fermée et sa branche supprimée.
 
 Ticket **terminé** (passé en `done` à la release, ou fermé à la main) dont la branche existe encore, parce que le travail est passé par une autre branche : elle est supprimée si elle n'a aucun commit absent de `develop` et qu'aucune PR ouverte n'en part. Sinon elle est gardée et le ticket le signale : rien n'est jamais perdu.
