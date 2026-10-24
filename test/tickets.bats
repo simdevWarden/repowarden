@@ -29,7 +29,10 @@ case "$1 $2" in
         while [ $# -gt 0 ]; do [ "$1" = --body ] && printf '%s' "$2" >"$F/pr_body"; shift; done ;;
     "pr list")
         case "$*" in
-            *--head*) printf '%s\n' "${FAKE_PR_HEAD:-}" ;;
+            # FAKE_PR_HEAD_APRES : PR ouverte par un autre run après la 1re lecture
+            *--head*)
+                if [ -n "${FAKE_PR_HEAD_APRES:-}" ] && [ -e "$F/pr_lue" ]; then printf '%s\n' "$FAKE_PR_HEAD_APRES"
+                else : >"$F/pr_lue"; printf '%s\n' "${FAKE_PR_HEAD:-}"; fi ;;
             *"--state all"*) printf '%s\n' "${FAKE_PRS_ALL:-}" ;;
             *) printf '%s\n' "${FAKE_PRS:-}" ;;
         esac ;;
@@ -420,6 +423,22 @@ EOF
     PUSH_BRANCH=feat/panier SHA=def run "$TICKETS" push
     FAKE_AHEAD=0 PUSH_BRANCH=feat/12-panier SHA=def run "$TICKETS" push
     ! grep -qE "pr-creee|pr-editee" "$F/events"
+}
+
+@test "tickets : PR ouverte entre-temps pour la branche -> aucune seconde PR" {
+    N=12 ticket "validé" "statut: backlog" "type: feat"
+    FAKE_PR_HEAD_APRES=9 PUSH_BRANCH=feat/12-panier SHA=def PUSHER=dev run "$TICKETS" push
+    [[ "$status" -eq 0 ]] || false
+    ! grep -q "pr-creee" "$F/events" || false
+    [[ "$output" == *"#9"* ]] || false
+}
+
+@test "tickets : runs push d'une meme branche serialises, par depot, sans annulation" {
+    w="$BATS_TEST_DIRNAME/../.github/workflows/tickets.yml"
+    g="$(grep -A1 "^    concurrency:" "$w" | sed -n 's/^ *group: //p')"
+    [[ "$g" == *"github.event_name == 'push'"* ]] || false
+    [[ "$g" == *"github.repository"*"github.ref"* ]] || false
+    grep -A2 "^    concurrency:" "$w" | grep -qx "      cancel-in-progress: false"
 }
 
 @test "tickets : PR brouillon -> ajouts et conception du ticket repris, section Realise gardee, seul le pied cite un ticket" {
