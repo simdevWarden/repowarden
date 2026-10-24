@@ -670,6 +670,7 @@ _msg_fr() {
         tk.branch_kept) _M="Branche \`%s\` gardée : %s commit(s) absent(s) de la branche d'intégration, PR ouverte(s) : %s. À supprimer à la main si le travail est ailleurs." ;;
         tk.draft_opened) _M="PR #%s ouverte en brouillon pour le ticket #%s" ;;
         tk.draft_updated) _M="PR #%s (ticket #%s) : titre et description repris du ticket" ;;
+        tk.assign_failed) _M="PR #%s : assignation de %s refusée par GitHub, PR laissée sans assigné" ;;
         tk.pr_additions) _M="Ajouts du ticket" ;;
         tk.pr_design) _M="Conception (résumé)" ;;
         tk.created_body) _M="Ticket créé automatiquement pour la PR #%s, qui n'en citait aucun. À valider par un mainteneur (étiquette « validé »)." ;;
