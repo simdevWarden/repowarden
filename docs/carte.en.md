@@ -30,3 +30,20 @@ For each file of the repository (tracked, or new and not ignored, outside `repow
 - **Deterministic**: sorted keys, no date nor absolute path; two runs on the same repository give the same file.
 - **Never versioned**: the `.repowarden/carte/` folder holds a `.gitignore` (`*`) that ignores the folder itself; nothing to add to the project's `.gitignore`.
 - Requires `jq`.
+
+## Querying
+
+Read only the useful excerpt, without loading the whole JSON:
+
+```bash
+repowarden carte bin/garde          # the file's functions and their why
+repowarden carte verifier_gh        # file, line, why of the function
+repowarden carte bin/garde --json   # same excerpt, for tools (also: repowarden carte --json)
+```
+
+```text
+verifier_gh  bin/garde:262
+  Commande gh (mots $@, sans « gh ») lancée depuis $dir, …
+```
+
+A path is read from the current folder (`repowarden carte outil.sh` in `lib/`); a name that is neither a file nor a function of the map: message and exit code 1. **Missing or stale map** (a repository file or the git index newer than it): regenerated before answering.
