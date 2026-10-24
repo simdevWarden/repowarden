@@ -155,7 +155,7 @@ setup() {
     [[ "$output" == *"Tout est prêt"* ]] || false
     rm "$HOME/.claude/settings.json"
     mkdir -p .opencode/plugins
-    cp "$PKG/hooks/agents/repowarden-garde.js" .opencode/plugins/
+    cp "$PKG/hooks/agents/repowarden-garde.js" "$PKG/hooks/agents/repowarden-garde-v2.js" .opencode/plugins/
     run "$PKG/bin/repowarden" statut
     [[ "$output" != *"sans garde-fou"* ]] || false
     # Hors dépôt : branchement pour l'utilisateur
@@ -179,7 +179,7 @@ setup() {
     [[ "$output" == *"Étape suivante : repowarden agents init --global"* ]] || false
     [[ "$output" != *"Tout est prêt"* ]] || false
     # À jour pour l'utilisateur ; hook Claude d'une ancienne forme dans le dépôt
-    cp "$PKG/hooks/agents/repowarden-garde.js" "$HOME/.config/opencode/plugins/repowarden-garde.js"
+    cp "$PKG/hooks/agents/repowarden-garde.js" "$PKG/hooks/agents/repowarden-garde-v2.js" "$HOME/.config/opencode/plugins/"
     mkdir -p .claude
     printf '{"hooks":{"PreToolUse":[{"matcher":"Edit|Write|Bash","hooks":[{"type":"command","command":"repowarden garde"}]}]}}\n' >.claude/settings.json
     REPOWARDEN_LANG=en run "$PKG/bin/repowarden" statut
