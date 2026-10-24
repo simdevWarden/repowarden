@@ -18,9 +18,12 @@ For each file of the repository (tracked, or new and not ignored, outside `repow
 {
   "fichiers": {
     "bin/outil": {
-      "fonctions": [{ "ligne": 3, "nom": "main", "pourquoi": "Point d'entrée : lit les options" }]
+      "fonctions": [{ "ligne": 3, "nom": "main", "pourquoi": "Point d'entrée : lit les options" }],
+      "tests": ["test/outil.bats"],
+      "tickets": [12]
     }
   },
+  "tickets": { "12": { "fichiers": ["bin/outil"] } },
   "version": 1
 }
 ```
@@ -30,3 +33,48 @@ For each file of the repository (tracked, or new and not ignored, outside `repow
 - **Deterministic**: sorted keys, no date nor absolute path; two runs on the same repository give the same file.
 - **Never versioned**: the `.repowarden/carte/` folder holds a `.gitignore` (`*`) that ignores the folder itself; nothing to add to the project's `.gitignore`.
 - Requires `jq`.
+
+## Querying
+
+Read only the useful excerpt, without loading the whole JSON:
+
+```bash
+repowarden carte bin/garde          # the file's functions and their why
+repowarden carte verifier_gh        # file, line, why of the function
+repowarden carte bin/garde --json   # same excerpt, for tools (also: repowarden carte --json)
+```
+
+```text
+verifier_gh  bin/garde:262
+  Commande gh (mots $@, sans « gh ») lancée depuis $dir, …
+```
+
+A path is read from the current folder (`repowarden carte outil.sh` in `lib/`); a name that is neither a file nor a function of the map: message and exit code 1. **Missing or stale map** (a repository file or the git index newer than it): regenerated before answering.
+
+## Linked tests
+
+Before changing a file, know which tests cover it, to write them first then run them again. `repowarden carte <file>` gives them after its functions, with the command:
+
+```text
+Tests: test/garde.bats
+  → bats test/garde.bats
+```
+
+A test (`*.bats`, first batch) is linked to a mapped file by:
+
+- **naming**: same name without extension (`bin/garde` ↔ `test/garde.bats`);
+- **cited path** in the test (`$BATS_TEST_DIRNAME/../ci/check.sh` cites `ci/check.sh`), with no other name character attached;
+- **command** `repowarden <subcommand>` cited in the test → `bin/<subcommand>`.
+
+A file without a test is reported ("No test found"); in the JSON, `"tests": []`. Tests are read even when they are in `repowarden.exclude`.
+
+## Tickets
+
+A file's why is also in its history: the tickets that changed it. The map reads them from **git only** (offline, never `gh`): `Ticket : #<n>` commit footers (squash headers included) and, for a merge, the merged `type/<n>-topic` branch (`Merge branch 'fix/40-x'`, `Merge pull request #5 from o/feat/12-x`). The `(#471)` number of a squash header is the PR's: it is not read.
+
+```bash
+repowarden carte '#12'          # files changed by ticket 12 (--json: {"ticket", "fichiers"})
+repowarden carte bin/garde      # … then "Tickets: #317 #407 …"
+```
+
+Any file still present (outside `repowarden.exclude`) touched by a ticket enters the map, even without functions (doc, workflow); the root `tickets` key gives each ticket's files.

@@ -18,9 +18,12 @@ Pour chaque fichier du dépôt (suivi, ou nouveau et non ignoré, hors `repoward
 {
   "fichiers": {
     "bin/outil": {
-      "fonctions": [{ "ligne": 3, "nom": "main", "pourquoi": "Point d'entrée : lit les options" }]
+      "fonctions": [{ "ligne": 3, "nom": "main", "pourquoi": "Point d'entrée : lit les options" }],
+      "tests": ["test/outil.bats"],
+      "tickets": [12]
     }
   },
+  "tickets": { "12": { "fichiers": ["bin/outil"] } },
   "version": 1
 }
 ```
@@ -30,3 +33,48 @@ Pour chaque fichier du dépôt (suivi, ou nouveau et non ignoré, hors `repoward
 - **Déterministe** : clés triées, ni date ni chemin absolu ; deux lancements sur le même dépôt donnent le même fichier.
 - **Jamais versionnée** : le dossier `.repowarden/carte/` contient un `.gitignore` (`*`) qui l'ignore lui-même ; rien à ajouter au `.gitignore` du projet.
 - Demande `jq`.
+
+## Interroger
+
+Lire seulement l'extrait utile, sans charger tout le JSON :
+
+```bash
+repowarden carte bin/garde          # fonctions du fichier et leur pourquoi
+repowarden carte verifier_gh        # fichier, ligne, pourquoi de la fonction
+repowarden carte bin/garde --json   # même extrait, pour les outils (aussi : repowarden carte --json)
+```
+
+```text
+verifier_gh  bin/garde:262
+  Commande gh (mots $@, sans « gh ») lancée depuis $dir, …
+```
+
+Un chemin est lu depuis le dossier courant (`repowarden carte outil.sh` dans `lib/`) ; un nom qui n'est ni un fichier ni une fonction de la carte : message et code 1. **Carte absente ou périmée** (un fichier du dépôt ou l'index git plus récent qu'elle) : régénérée avant de répondre.
+
+## Tests liés
+
+Avant de modifier un fichier, savoir quels tests le couvrent, pour les écrire d'abord puis les relancer. `repowarden carte <fichier>` les donne après ses fonctions, avec la commande :
+
+```text
+Tests : test/garde.bats
+  → bats test/garde.bats
+```
+
+Un test (`*.bats`, premier lot) est relié à un fichier cartographié par :
+
+- **nommage** : même nom sans extension (`bin/garde` ↔ `test/garde.bats`) ;
+- **chemin cité** dans le test (`$BATS_TEST_DIRNAME/../ci/check.sh` cite `ci/check.sh`), sans autre caractère de nom collé ;
+- **commande** `repowarden <sous-commande>` citée dans le test → `bin/<sous-commande>`.
+
+Un fichier sans test est signalé (« Aucun test trouvé ») ; dans le JSON, `"tests": []`. Les tests sont lus même s'ils sont dans `repowarden.exclude`.
+
+## Tickets
+
+Le pourquoi d'un fichier est aussi dans son histoire : les tickets qui l'ont modifié. La carte les lit dans **git seulement** (hors ligne, jamais `gh`) : pieds `Ticket : #<n>` des commits (en-tête de squash compris), et, pour une fusion, la branche `type/<n>-sujet` fusionnée (`Merge branch 'fix/40-x'`, `Merge pull request #5 from o/feat/12-x`). Le numéro `(#471)` d'un en-tête de squash est celui de la PR : il n'est pas lu.
+
+```bash
+repowarden carte '#12'          # fichiers modifiés par le ticket 12 (--json : {"ticket", "fichiers"})
+repowarden carte bin/garde      # … puis « Tickets : #317 #407 … »
+```
+
+Tout fichier encore présent (hors `repowarden.exclude`) touché par un ticket entre dans la carte, même sans fonction (doc, workflow) ; la racine `tickets` donne les fichiers de chaque ticket.
