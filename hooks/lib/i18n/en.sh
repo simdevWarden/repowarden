@@ -678,6 +678,8 @@ _msg_en() {
         tk.assign_failed) _M="PR #%s: GitHub refused to assign %s, PR left unassigned" ;;
         tk.pr_additions) _M="Ticket additions" ;;
         tk.pr_design) _M="Design (summary)" ;;
+        tk.pr_does) _M="What this PR does" ;;
+        tk.pr_ticket) _M="Ticket #%s" ;;
         tk.created_body) _M="Ticket created automatically for PR #%s, which cited none. To be validated by a maintainer (\"validé\" label)." ;;
         tk.created) _M="Ticket #%s created for PR #%s and linked in its description: to be validated by a maintainer." ;;
         tk.init_labels) _M="Labels (statuses and validation)" ;;

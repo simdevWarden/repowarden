@@ -679,6 +679,8 @@ _msg_fr() {
         tk.assign_failed) _M="PR #%s : assignation de %s refusée par GitHub, PR laissée sans assigné" ;;
         tk.pr_additions) _M="Ajouts du ticket" ;;
         tk.pr_design) _M="Conception (résumé)" ;;
+        tk.pr_does) _M="Ce que fait cette PR" ;;
+        tk.pr_ticket) _M="Ticket #%s" ;;
         tk.created_body) _M="Ticket créé automatiquement pour la PR #%s, qui n'en citait aucun. À valider par un mainteneur (étiquette « validé »)." ;;
         tk.created) _M="Ticket #%s créé pour la PR #%s et relié à sa description : à valider par un mainteneur." ;;
         tk.init_labels) _M="Étiquettes (statuts et validation)" ;;

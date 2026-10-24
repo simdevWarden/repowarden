@@ -403,15 +403,15 @@ Ajouter un panier.
 - le panier s'ajoute au total
 - un code promo s'applique
 EOF
-    printf -- '- abc1234 feat: ajoute le panier\n' >"$F/commits"
+    printf '1 abc1234 feat: ajoute le panier\n\x1e\n' >"$F/commits"
     PUSH_BRANCH=feat/12-panier SHA=def PUSHER=dev run "$TICKETS" push
     [ "$status" -eq 0 ]
     grep -q "pr-creee pr create --draft --base develop --head feat/12-panier --title feat(tickets): ajoute le panier" "$F/events"
     [ "$(cat "$F/pr_title")" = "feat(tickets): ajoute le panier" ]
     grep -q -- "- \[ \] le panier s'ajoute au total" "$F/pr_body"
     grep -q -- "- \[ \] un code promo s'applique" "$F/pr_body"
-    grep -q -- "## Commits" "$F/pr_body"
-    grep -q -- "abc1234 feat: ajoute le panier" "$F/pr_body"
+    grep -q -- "## Ce que fait cette PR" "$F/pr_body"
+    grep -q -- "### feat: ajoute le panier (abc1234)" "$F/pr_body"
     grep -q -- "Ticket : #12" "$F/pr_body"
     [ "$(labels 12 | grep statut)" = "statut: en cours" ]
     grep -qx "statut-pr success" "$F/events"
@@ -460,7 +460,7 @@ EOF
 @test "tickets : PR brouillon -> ajouts et conception du ticket repris, section Realise gardee, seul le pied cite un ticket" {
     N=12 ticket "validé" "statut: backlog" "type: feat"
     printf '## Besoin\nAjouter un panier.\n' >"$F/issues/12.body"
-    printf -- '- abc1234 feat: ajoute le panier\n' >"$F/commits"
+    printf '1 abc1234 feat: ajoute le panier\n\x1e\n' >"$F/commits"
     s=$'\x1e'
     # commentaires de mainteneur : conception, ajout (CRLF du web, ligne Refs), commentaire ordinaire, constat lie
     {
@@ -474,7 +474,7 @@ EOF
     b="$(cat "$F/pr_body")"
     [[ "$b" == *$'## Ajouts du ticket\n### Ajout (21/10)\nLe total doit aussi arrondir la TVA.\n> Refs #99\n\n**Constat lié** : le README cite encore l ancien total.'* ]] || false
     [[ "$b" != *"Merci, je regarde"* ]] || false
-    [[ "$b" == *$'## Conception (résumé)\n**Ce qui change** : le total compte le panier.\n- arrondi au centime\n\n**Hors périmètre** : les codes promo.\n\n## Commits'* ]] || false
+    [[ "$b" == *$'## Conception (résumé)\n**Ce qui change** : le total compte le panier.\n- arrondi au centime\n\n**Hors périmètre** : les codes promo.\n\n<details>'* ]] || false
     [[ "$b" != *"Tests prévus"* && "$b" != *"panier.sh"* ]] || false
     # le check ticket ne lit que le pied
     source "$TICKETS"
@@ -484,11 +484,39 @@ EOF
     printf '%s\n\n## Réalisé\n- total arrondi\r\n- vérifié sous bash 3.2\n\nTicket : #12' "$b" >"$F/pr_body"
     FAKE_PR_HEAD=9 PUSH_BRANCH=feat/12-panier SHA=def run "$TICKETS" push
     b="$(cat "$F/pr_body")"
-    [[ "$b" == *$'## Commits\n- abc1234 feat: ajoute le panier\n\n## Réalisé\n- total arrondi\n- vérifié sous bash 3.2\n\nTicket : #12' ]] || false
+    [[ "$b" == *$'Ajouter un panier.\n\n</details>\n\n## Réalisé\n- total arrondi\n- vérifié sous bash 3.2\n\nTicket : #12' ]] || false
     # un troisieme push la garde encore, une seule fois
     FAKE_PR_HEAD=9 PUSH_BRANCH=feat/12-panier SHA=def run "$TICKETS" push
     run grep -c "^## Réalisé" "$F/pr_body"
     [[ "$output" = 1 ]] || false
+}
+
+@test "tickets : PR brouillon -> ce que fait la PR d'abord (corps des commits, fusions ignorees), ticket replie, criteres visibles" {
+    N=12 ticket "validé" "statut: backlog" "type: feat"
+    printf '## Constat\r\nLe total ignore le panier.\r\n\r\n## Critères d acceptation\r\n- le total compte le panier\r\n- [x] deja coche\r\n\r\n## Proposition\r\nAjouter le panier.\r\n' >"$F/issues/12.body"
+    s=$'\x1e'
+    # commits lus par l'API : « parents sha message », chacun suivi du separateur
+    {
+        printf '1 abc1234 feat(panier): ajoute le panier\n\nLe total oubliait le panier : il est compté.\n## Détail\nTickets liés au total.\n\nTicket : #12\n%s\n' "$s"
+        printf '2 def5678 Merge branch develop into feat/12-panier\n\nConflit résolu.\n%s\n' "$s"
+        printf '1 0123abc fix(panier): arrondi au centime\n%s\n' "$s"
+    } >"$F/commits"
+    printf '## Conception retenue\n\n**Ce qui change** : le total.\n%s\n' "$s" >"$F/issues/12.mainteneur"
+    PUSH_BRANCH=feat/12-panier SHA=def PUSHER=dev run "$TICKETS" push
+    [[ "$status" -eq 0 ]] || false
+    b="$(cat "$F/pr_body")"
+    attendu=$'## Ce que fait cette PR\n### feat(panier): ajoute le panier (abc1234)\nLe total oubliait le panier : il est compté.\n### Détail\n> Tickets liés au total.\n\n### fix(panier): arrondi au centime (0123abc)\n\n## Critères d acceptation\n- [ ] le total compte le panier\n- [ ] deja coche\n\n## Conception (résumé)\n**Ce qui change** : le total.\n\n<details>\n<summary>Ticket #12</summary>\n\n## Constat\nLe total ignore le panier.\n\n## Proposition\nAjouter le panier.\n\n</details>\n\nTicket : #12'
+    [[ "$b" == "$attendu" ]] || false
+    # le check ticket ne lit que le pied ; la section Realise survit
+    source "$TICKETS"
+    pr_tickets_r "$b" feat/12-panier
+    [[ "$REPLY" = 12 ]] || false
+    printf '%s\n\n## Réalisé\n- vérifié\n\nTicket : #12' "${b%$'\n\nTicket : #12'}" >"$F/pr_body"
+    FAKE_PR_HEAD=9 PUSH_BRANCH=feat/12-panier SHA=def run "$TICKETS" push
+    [[ "$(cat "$F/pr_body")" == "${attendu%$'\n\nTicket : #12'}"$'\n\n## Réalisé\n- vérifié\n\nTicket : #12' ]] || false
+    # langue anglaise : titres traduits
+    REPOWARDEN_LANG=en PUSH_BRANCH=feat/12-panier SHA=def run "$TICKETS" push
+    [[ "$(cat "$F/pr_body")" == "## What this PR does"$'\n'* ]] || false
 }
 
 @test "tickets : nom de branche sans mot vide final, titre de PR type(portee)" {
