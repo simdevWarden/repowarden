@@ -14,6 +14,7 @@ setup() {
 # gh simulé : tickets dans $F/issues/<n>.labels, journal dans $F/log
 F="$FAKE"
 echo "$*" >>"$F/log"
+ARGS="$*"
 etiquettes() { cat "$F/issues/$1.labels" 2>/dev/null || true; }
 case "$1 $2" in
     "pr view")
@@ -25,6 +26,8 @@ case "$1 $2" in
             *commits*) cat "$F/pr_commits" 2>/dev/null || true ;;
         esac ;;
     "pr edit")
+        # assignation refusée (bot, jeton d'App) : simulée par FAKE_ASSIGN_FAIL
+        case "$*" in *--add-assignee*) [ -z "${FAKE_ASSIGN_FAIL:-}" ] || { echo "GraphQL: Assigning agents is not supported" >&2; exit 1; } ;; esac
         echo "pr-editee $3" >>"$F/events"
         while [ $# -gt 0 ]; do [ "$1" = --body ] && printf '%s' "$2" >"$F/pr_body"; shift; done ;;
     "pr list")
@@ -43,7 +46,9 @@ case "$1 $2" in
             [ "$1" = --body ] && printf '%s' "$2" >"$F/pr_body"
             shift
         done
-        echo "https://github.com/o/r/pull/9" ;;
+        echo "https://github.com/o/r/pull/9"
+        # un bot n'est pas assignable avec un jeton d'App : PR créée, puis échec
+        case "$ARGS" in *"--assignee "*"[bot]"*) exit 1 ;; esac ;;
     "pr close") [ -z "${FAKE_CLOSE_FAIL:-}" ] || exit 1; echo "pr-fermee $3" >>"$F/events" ;;
     "pr merge")
         case "$*" in
@@ -439,6 +444,36 @@ EOF
     [[ "$g" == *"github.event_name == 'push'"* ]] || false
     [[ "$g" == *"github.repository"*"github.ref"* ]] || false
     grep -A2 "^    concurrency:" "$w" | grep -qx "      cancel-in-progress: false"
+}
+
+@test "tickets : PR brouillon poussee par un bot -> creee, run vert, bot jamais assigne" {
+    N=12 ticket "validé" "statut: backlog" "type: feat"
+    # push par une GitHub App, ticket assigne a une personne : la PR lui revient
+    echo moi >"$F/issues/12.assignees"
+    PUSH_BRANCH=feat/12-panier SHA=def PUSHER='repowarden-devzone[bot]' run "$TICKETS" push
+    [[ "$status" -eq 0 ]] || false
+    grep -q "pr-creee pr create --draft" "$F/events"
+    ! grep -qF "[bot]" "$F/log" || false
+    grep -qxF "pr edit 9 --add-assignee moi" "$F/log"
+    # ticket sans assigne : personne
+    rm "$F/issues/12.assignees"
+    : >"$F/log"
+    PUSH_BRANCH=feat/12-panier SHA=def PUSHER='repowarden-devzone[bot]' run "$TICKETS" push
+    [[ "$status" -eq 0 ]] || false
+    grep -q "^pr create --draft" "$F/log"
+    ! grep -q -- "--add-assignee\|--assignee" "$F/log" || false
+}
+
+@test "tickets : PR brouillon poussee par une personne -> elle est assignee ; refus d'assigner = avertissement" {
+    N=12 ticket "validé" "statut: backlog" "type: feat"
+    PUSH_BRANCH=feat/12-panier SHA=def PUSHER=dev run "$TICKETS" push
+    [[ "$status" -eq 0 ]] || false
+    grep -qxF "pr edit 9 --add-assignee dev" "$F/log"
+    grep -qxF "issue edit 12 --add-assignee dev" "$F/log"
+    # assignation refusee par GitHub : le run reste vert, avec un avertissement
+    FAKE_ASSIGN_FAIL=1 PUSH_BRANCH=feat/12-panier SHA=def PUSHER=dev run "$TICKETS" push
+    [[ "$status" -eq 0 ]] || false
+    [[ "$output" == *"::warning"*"#9"*"dev"* ]] || false
 }
 
 @test "tickets : PR brouillon -> ajouts et conception du ticket repris, section Realise gardee, seul le pied cite un ticket" {

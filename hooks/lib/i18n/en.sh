@@ -670,6 +670,7 @@ _msg_en() {
         tk.draft_opened) _M="Draft PR #%s opened for ticket #%s" ;;
         tk.draft_updated) _M="PR #%s (ticket #%s): title and description taken from the ticket" ;;
         tk.draft_exists) _M="PR #%s already open for ticket #%s (close pushes): no other PR created" ;;
+        tk.assign_failed) _M="PR #%s: GitHub refused to assign %s, PR left unassigned" ;;
         tk.pr_additions) _M="Ticket additions" ;;
         tk.pr_design) _M="Design (summary)" ;;
         tk.created_body) _M="Ticket created automatically for PR #%s, which cited none. To be validated by a maintainer (\"validé\" label)." ;;
