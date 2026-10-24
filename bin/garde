@@ -133,12 +133,14 @@ protegee() {
 # dossier existant le plus proche), est ignoré par git : jamais versionné.
 # Un fichier suivi n'est jamais ignoré (git check-ignore sans --no-index)
 fichier_ignore() {
-    local top reel
-    top="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
-    # Chemin physique (/tmp → /private/tmp), relatif à la racine du dépôt
-    reel="$(pwd -P)${1#"$2"}"
-    case "$reel" in "$top"/*) ;; *) return 1 ;; esac
-    git -C "$top" check-ignore -q -- "${reel#"$top"/}" 2>/dev/null
+    local reste="${1#"$2"}" prefixe cdup
+    reste="${reste#/}"
+    [ -n "$reste" ] || return 1
+    # Relatif à la racine par --show-prefix/--show-cdup : ni lien symbolique
+    # (/tmp → /private/tmp) ni forme Windows (C:/… contre /c/…) à comparer
+    prefixe="$(git rev-parse --show-prefix 2>/dev/null)" || return 1
+    cdup="$(git rev-parse --show-cdup 2>/dev/null)" || return 1
+    git -C "./$cdup" check-ignore -q -- "$prefixe$reste" 2>/dev/null
 }
 
 # Modification du fichier $1 : seulement sur une branche de travail (de ticket,

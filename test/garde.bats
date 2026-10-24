@@ -71,7 +71,8 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     patch='*** Begin Patch\n*** Add File: notes/p.md\n+x\n*** Update File: sortie.log\n+x\n*** End Patch'
     for b in main develop; do
         git switch -q "$b" 2>/dev/null || git switch -q -c "$b"
-        for f in notes/a/x.md sortie.log; do
+        mkdir -p src/sous
+        for f in notes/a/x.md sortie.log src/sous/y.log; do
             run edit "$f"
             [ "$status" -eq 0 ] || { echo "$b : $f refusé : $output"; return 1; }
         done
