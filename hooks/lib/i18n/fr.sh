@@ -514,6 +514,7 @@ _msg_fr() {
         st.repo) _M="Dépôt : %s" ;;
         st.repo_local) _M="Hooks propres à ce dépôt (core.hooksPath local = %s), prioritaires" ;;
         st.repo_lefthook) _M="%s présent : lefthook n'est plus pris en charge depuis repowarden 4, ses commandes ne sont pas lancées. Les déplacer dans .repowarden/<hook>, la version attendue dans .repowarden.conf (version)" ;;
+        st.repo_precommit) _M=".pre-commit-config.yaml présent : ses hooks ne sont pas lancés (pre-commit refuse de s'installer avec core.hooksPath). Les installer dans .git/hooks, que repowarden lance à chaque commit : %s" ;;
         st.repo_version_old) _M="Le projet demande repowarden %s ; installé : %s" ;;
         st.repo_version_ok) _M="Version demandée par le projet (%s) : respectée" ;;
         st.repo_forge) _M="Plateforme : %s" ;;
@@ -681,6 +682,7 @@ _msg_fr() {
         tk.branch_kept) _M="Branche \`%s\` gardée : %s commit(s) absent(s) de la branche d'intégration, PR ouverte(s) : %s. À supprimer à la main si le travail est ailleurs." ;;
         tk.draft_opened) _M="PR #%s ouverte en brouillon pour le ticket #%s" ;;
         tk.draft_updated) _M="PR #%s (ticket #%s) : titre et description repris du ticket" ;;
+        tk.assign_failed) _M="PR #%s : assignation de %s refusée par GitHub, PR laissée sans assigné" ;;
         tk.pr_additions) _M="Ajouts du ticket" ;;
         tk.pr_design) _M="Conception (résumé)" ;;
         tk.created_body) _M="Ticket créé automatiquement pour la PR #%s, qui n'en citait aucun. À valider par un mainteneur (étiquette « validé »)." ;;
