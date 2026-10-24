@@ -11,15 +11,19 @@ CARTE_DIR=.repowarden/carte
 CARTE_JSON="$CARTE_DIR/carte.json"
 
 # Fichiers lus par la carte, dans le dossier $1 : « shell » (fichiers
-# cartographiés, hors repowarden.exclude) et « tests » (*.bats, tous)
+# cartographiés), « tous » (fichiers du dépôt, rattachables à des tickets),
+# tous deux hors repowarden.exclude, et « tests » (*.bats, tous)
 carte_fichiers() {
     local f
     : >"$1/shell"
     : >"$1/tests"
+    : >"$1/tous"
     while IFS= read -r -d '' f; do
         [ -f "$f" ] || continue
-        case "$f" in *.bats) printf '%s\n' "$f" >>"$1/tests"; continue ;; esac
+        case "$f" in *.bats) printf '%s\n' "$f" >>"$1/tests" ;; esac
         is_excluded "$f" && continue
+        printf '%s\n' "$f" >>"$1/tous"
+        case "$f" in *.bats) continue ;; esac
         comments_lang_r "$f" "$f"
         [ "$REPLY" != shell ] || printf '%s\n' "$f" >>"$1/shell"
     done < <(git ls-files -z -co --exclude-standard)
@@ -38,6 +42,10 @@ carte_generer() {
     while IFS= read -r f; do tests+=("$f"); done <"$d/tests"
     : >"$d/fonctions"
     : >"$d/liens"
+    # « fichier<TAB>ticket » par fichier modifié par un ticket (git seul)
+    git -c core.quotePath=false log --no-color --diff-merges=first-parent --name-only \
+        --format='%x1e%s%n%b%x1f' 2>/dev/null |
+        awk -v D=$'\x1e' -v F=$'\x1f' "$CARTE_HIST_AWK" >"$d/historique" || true
     if [ ${#shell[@]} -gt 0 ]; then
         # « fichier<TAB>ligne<TAB>nom<TAB>pourquoi » par fonction
         awk -v lang=shell -v q="'" "$COMMENTS_AWK_LIB$CARTE_AWK" "${shell[@]}" >"$d/fonctions"
@@ -45,16 +53,25 @@ carte_generer() {
         [ ${#tests[@]} -eq 0 ] ||
             awk "$CARTE_TESTS_AWK" "$d/shell" "${tests[@]}" >"$d/liens"
     fi
-    jq -n -S --rawfile s "$d/shell" --rawfile fo "$d/fonctions" --rawfile li "$d/liens" '
+    jq -n -S --rawfile s "$d/shell" --rawfile fo "$d/fonctions" --rawfile li "$d/liens" \
+        --rawfile to "$d/tous" --rawfile hi "$d/historique" '
         def lignes($x): $x | split("\n") | map(select(length > 0) | split("\t"));
         (lignes($fo) | group_by(.[0]) | map({key: .[0][0], value:
             map({nom: .[2], ligne: (.[1] | tonumber), pourquoi: (.[3] // "")})
             | sort_by(.ligne)}) | from_entries) as $fn
         | (lignes($li) | group_by(.[0])
             | map({key: .[0][0], value: (map(.[1]) | unique)}) | from_entries) as $te
-        | {version: 1, fichiers: (lignes($s) | map(.[0])
-            | map({key: ., value: {fonctions: ($fn[.] // []), tests: ($te[.] // [])}})
-            | from_entries)}' >"$d/carte.json"
+        | (lignes($to) | map({key: .[0], value: 1}) | from_entries) as $ok
+        | (lignes($hi) | map(select($ok[.[0]] != null))) as $h
+        | ($h | group_by(.[0])
+            | map({key: .[0][0], value: (map(.[1] | tonumber) | unique)}) | from_entries) as $tf
+        | {version: 1,
+           fichiers: (($tf | map_values({tickets: .})) + (lignes($s) | map(.[0])
+            | map({key: ., value: {fonctions: ($fn[.] // []), tests: ($te[.] // []),
+                tickets: ($tf[.] // [])}})
+            | from_entries)),
+           tickets: ($h | group_by(.[1])
+            | map({key: .[0][1], value: {fichiers: (map(.[0]) | unique)}}) | from_entries)}' >"$d/carte.json"
     mv -f "$d/carte.json" "$CARTE_JSON"
     rm -rf "$d"
 }
@@ -73,9 +90,9 @@ carte_a_jour() {
 }
 
 # Fonctions du fichier $1 (chemin depuis la racine) : une ligne chacune,
-# « ligne  nom — pourquoi », puis ses tests ; JSON de son entrée si $2 = json
+# « ligne  nom — pourquoi », puis ses tests et tickets ; JSON si $2 = json
 carte_fichier() {
-    local f="$1" ligne nom pourquoi tests n=0
+    local f="$1" ligne nom pourquoi tests tickets n=0
     if [ "${2:-}" = json ]; then
         jq --arg f "$f" '{fichier: $f} + (.fichiers[$f] // {fonctions: []})' "$CARTE_JSON"
         return 0
@@ -91,15 +108,38 @@ carte_fichier() {
         fi
     done < <(jq -r --arg f "$f" '(.fichiers[$f].fonctions // [])[] | "\(.ligne)\t\(.nom)\t\(.pourquoi)"' "$CARTE_JSON")
     [ "$n" -gt 0 ] || info_t carte.file_empty "$f"
-    # Tests liés : ceux à écrire d'abord, puis à relancer
-    jq -e --arg f "$f" '.fichiers | has($f)' "$CARTE_JSON" >/dev/null || return 0
-    tests="$(jq -r --arg f "$f" '.fichiers[$f].tests // [] | join(" ")' "$CARTE_JSON")"
-    if [ -n "$tests" ]; then
-        echo_t carte.tests "$tests"
-        echo_t carte.tests_run "bats $tests"
-    else
-        info_t carte.no_tests "$f"
+    # Tests liés (fichiers cartographiés) : ceux à écrire d'abord, puis à relancer
+    if jq -e --arg f "$f" '.fichiers[$f] | has("tests")' "$CARTE_JSON" >/dev/null 2>&1; then
+        tests="$(jq -r --arg f "$f" '.fichiers[$f].tests | join(" ")' "$CARTE_JSON")"
+        if [ -n "$tests" ]; then
+            echo_t carte.tests "$tests"
+            echo_t carte.tests_run "bats $tests"
+        else
+            info_t carte.no_tests "$f"
+        fi
     fi
+    # Tickets qui l'ont modifié : le pourquoi de son histoire
+    tickets="$(jq -r --arg f "$f" '(.fichiers[$f].tickets // []) | map("#\(.)") | join(" ")' "$CARTE_JSON")"
+    [ -z "$tickets" ] || echo_t carte.tickets "$tickets"
+}
+
+# Fichiers modifiés par le ticket $1 (numéro, sans #) ; JSON si $2 = json.
+# Code 1 si l'historique git ne le cite pas
+carte_ticket() {
+    local n="$1" f c=0
+    if [ "${2:-}" = json ]; then
+        jq -e -S --arg n "$n" '.tickets[$n] // empty | {ticket: ($n | tonumber)} + .' "$CARTE_JSON" && return 0
+        err_t carte.ticket_unknown "$n" "$n" "$n"
+        return 1
+    fi
+    while IFS= read -r f; do
+        c=$((c + 1))
+        [ "$c" -gt 1 ] || { t carte.ticket_title "$n"; printf '%s%s%s\n' "$UI_B" "$REPLY" "$UI_N"; }
+        printf '  %s\n' "$f"
+    done < <(jq -r --arg n "$n" '(.tickets[$n].fichiers // [])[]' "$CARTE_JSON")
+    [ "$c" -gt 0 ] && return 0
+    err_t carte.ticket_unknown "$n" "$n" "$n"
+    return 1
 }
 
 # Définitions de la fonction $1 : « nom  fichier:ligne » puis son pourquoi ;
@@ -179,3 +219,30 @@ FILENAME == ARGV[1] { F[++nf] = $0; next }
 FNR == 1 { if (t != "") liens(); t = FILENAME; x = "" }
 { x = x "\n" $0 }
 END { if (t != "") liens() }'
+
+# Programme awk de l'historique : lit « git log --name-only » (en-tête de
+# commit précédé de D, fin du message marquée par F) et écrit
+# « fichier<TAB>ticket » pour chaque ticket du commit (pieds « Ticket : #n »,
+# branche type/<n>-sujet d'une fusion) et chaque fichier modifié
+# shellcheck disable=SC2016 # programme awk, rien à développer
+CARTE_HIST_AWK='
+# Tickets cités par la ligne l, si c est un pied « Ticket(s) : #n »
+function pied(l) {
+    if (l !~ /^[ \t]*[Tt][Ii][Cc][Kk][Ee][Tt][Ss]?[ \t]*:[ \t]*#[0-9]/) return
+    while (match(l, /#[0-9]+/)) {
+        T[substr(l, RSTART + 1, RLENGTH - 1) + 0] = 1
+        l = substr(l, RSTART + RLENGTH)
+    }
+}
+index($0, D) == 1 {
+    split("", T); msg = 1; $0 = substr($0, 2)
+    if ($0 ~ /^Merge / && match($0, /[A-Za-z]+\/[0-9]+-/)) {
+        b = substr($0, RSTART, RLENGTH); sub(/^[A-Za-z]+\//, "", b); T[b + 0] = 1
+    }
+}
+msg {
+    k = index($0, F)
+    if (k > 0) { pied(substr($0, 1, k - 1)); msg = 0 } else pied($0)
+    next
+}
+$0 != "" { for (n in T) print $0 "\t" n }'

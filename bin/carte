@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Usage : repowarden carte                       (re)génère la carte
-#         repowarden carte <fichier|fonction> [--json]   extrait utile
+#         repowarden carte <fichier|fonction|'#n'> [--json]   extrait utile
 #
 # Carte du projet, sans LLM ni réseau : chaque fonction des scripts shell,
 # son fichier, sa ligne et son « pourquoi » (le commentaire juste au-dessus),
@@ -59,6 +59,8 @@ fi
 carte_a_jour || carte_generer
 if [ -z "$cible" ]; then
     cat "$CARTE_JSON"
+elif [[ "$cible" =~ ^#([0-9]+)$ ]]; then
+    carte_ticket "${BASH_REMATCH[1]}" "$json"
 elif [ -n "$chemin" ] || jq -e --arg f "$cible" '.fichiers | has($f)' "$CARTE_JSON" >/dev/null; then
     carte_fichier "${chemin:-$cible}" "$json"
 else

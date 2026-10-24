@@ -19,9 +19,11 @@ For each file of the repository (tracked, or new and not ignored, outside `repow
   "fichiers": {
     "bin/outil": {
       "fonctions": [{ "ligne": 3, "nom": "main", "pourquoi": "Point d'entrée : lit les options" }],
-      "tests": ["test/outil.bats"]
+      "tests": ["test/outil.bats"],
+      "tickets": [12]
     }
   },
+  "tickets": { "12": { "fichiers": ["bin/outil"] } },
   "version": 1
 }
 ```
@@ -65,3 +67,14 @@ A test (`*.bats`, first batch) is linked to a mapped file by:
 - **command** `repowarden <subcommand>` cited in the test → `bin/<subcommand>`.
 
 A file without a test is reported ("No test found"); in the JSON, `"tests": []`. Tests are read even when they are in `repowarden.exclude`.
+
+## Tickets
+
+A file's why is also in its history: the tickets that changed it. The map reads them from **git only** (offline, never `gh`): `Ticket : #<n>` commit footers (squash headers included) and, for a merge, the merged `type/<n>-topic` branch (`Merge branch 'fix/40-x'`, `Merge pull request #5 from o/feat/12-x`). The `(#471)` number of a squash header is the PR's: it is not read.
+
+```bash
+repowarden carte '#12'          # files changed by ticket 12 (--json: {"ticket", "fichiers"})
+repowarden carte bin/garde      # … then "Tickets: #317 #407 …"
+```
+
+Any file still present (outside `repowarden.exclude`) touched by a ticket enters the map, even without functions (doc, workflow); the root `tickets` key gives each ticket's files.

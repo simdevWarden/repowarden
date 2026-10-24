@@ -231,3 +231,58 @@ projet_garde() {
     run "$RW" carte lib/outil.sh --json
     [ "$(jq -c '.tests' <<<"$output")" = '[]' ]
 }
+
+# Historique avec tickets : pieds « Ticket : #n », fusion d'une branche fix/40-x
+projet_tickets() {
+    mkdir -p lib
+    printf '#!/usr/bin/env bash\n# Somme\na() { :; }\n' >lib/a.sh
+    echo doc >>README.md
+    git add -A
+    git commit -q --no-verify -m "feat: a" -m "Ticket : #12"
+    printf '# Produit\nb() { :; }\n' >>lib/a.sh
+    printf '#!/usr/bin/env bash\n# Autre\nc() { :; }\n' >lib/c.sh
+    git add -A
+    git commit -q --no-verify -m "feat: b" -m "Corps." -m "Ticket : #30"
+    git switch -q -c fix/40-x
+    echo fusion >fusion.txt
+    git add fusion.txt
+    git commit -q --no-verify -m "fix: sans pied"
+    git switch -q feat/1-carte
+    git merge -q --no-ff --no-verify -m "Merge branch 'fix/40-x'" fix/40-x
+}
+
+@test "carte : ticket -> fichiers modifies ; fichier -> ses tickets (git seul)" {
+    projet_tickets
+    run "$RW" carte '#12'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"lib/a.sh"* ]] || false
+    [[ "$output" == *"README.md"* ]] || false
+    [[ "$output" != *"lib/c.sh"* ]] || false
+    run "$RW" carte lib/a.sh
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Tickets : #12 #30"* ]] || false
+    run "$RW" carte README.md
+    [[ "$output" == *"Tickets : #12"* ]] || false
+    run "$RW" carte fusion.txt
+    [[ "$output" == *"Tickets : #40"* ]] || false
+    run "$RW" carte '#40' --json
+    [ "$status" -eq 0 ]
+    [ "$(jq -c . <<<"$output")" = '{"fichiers":["fusion.txt"],"ticket":40}' ]
+    run "$RW" carte '#99'
+    [ "$status" -eq 1 ]
+    [[ "$output" == *"#99"* ]] || false
+}
+
+@test "carte : tickets sans appel reseau (gh jamais appele)" {
+    projet_tickets
+    mkdir -p "$BATS_TEST_TMPDIR/faux"
+    printf '#!/bin/sh\ntouch "%s/gh-appele"\nexit 1\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/faux/gh"
+    chmod +x "$BATS_TEST_TMPDIR/faux/gh"
+    PATH="$BATS_TEST_TMPDIR/faux:$PATH" "$RW" carte >/dev/null
+    [ ! -e "$BATS_TEST_TMPDIR/gh-appele" ]
+    cp "$CARTE" "$BATS_TEST_TMPDIR/avec.json"
+    rm "$BATS_TEST_TMPDIR/faux/gh"
+    "$RW" carte >/dev/null
+    cmp "$BATS_TEST_TMPDIR/avec.json" "$CARTE"
+    [ "$(jq -c '.tickets["12"].fichiers' "$CARTE")" = '["README.md","lib/a.sh"]' ]
+}
