@@ -92,3 +92,10 @@ repowarden carte lib/a.sh       # … « #12 — <première ligne de la concepti
 - **Lu par `gh`, mis en cache** dans `.repowarden/carte/conception/<n>.md` (vide pour un ticket sans conception) : un seul appel (`gh issue list --state all`, lecture), et seulement s'il manque des tickets au cache ; ensuite, plus aucun appel. Pour rafraîchir : supprimer ce dossier.
 - **`gh` absent ou non connecté** : avertissement, carte sans conception, code 0.
 - JSON : `"tickets": {"12": {"fichiers": [...], "conception": "…"}}`.
+
+## Fraîcheur
+
+- **Après une fusion locale** (hook `post-merge`, `git pull` compris) : une carte déjà générée est recalculée **hors ligne** (sans `gh` ; les conceptions en cache restent), en silence ; sans carte, rien n'est créé. Mesuré sur repowarden (186 fichiers) : environ 0,2 s de plus pour le hook.
+- **`repowarden statut`** : carte périmée → avertissement et étape suivante `repowarden carte` ; absente → simple information (la carte est facultative).
+- **À la demande** : `repowarden carte` ; une interrogation régénère d'abord une carte périmée.
+- **Agents** : `AGENTS.md` et la page [Agents IA](agents.md) disent « avant de modifier X : `repowarden carte X` » ; un refus du garde-fou sur un fichier existant le rappelle.

@@ -531,6 +531,9 @@ _msg_fr() {
         st.agents_sans_garde) _M="Agent IA sans garde-fou (Claude Code, opencode) : ses actions ne sont vérifiées qu'au commit. → %s" ;;
         st.agents_stale) _M="Garde-fou repowarden périmé (%s) : posé par une version antérieure de repowarden. → %s" ;;
         st.next) _M="Étape suivante :" ;;
+        st.carte_absente) _M="Carte du projet absente (facultative, lue par les agents avant de modifier un fichier) : repowarden carte" ;;
+        st.carte_ok) _M="Carte du projet à jour (repowarden carte <fichier>)" ;;
+        st.carte_perimee) _M="Carte du projet périmée : des fichiers ont changé depuis, elle ne dit plus ce que fait le code." ;;
         st.ready) _M="Tout est prêt : git cc pour commiter, repowarden code-mort sur une branche." ;;
         st.help) _M="Toutes les commandes : repowarden --help" ;;
         # Tickets
@@ -740,6 +743,7 @@ _msg_fr() {
         garde.detache) _M="modification refusée : HEAD détaché dans %s.\n  → Se placer sur la branche d'un ticket : repowarden ticket <n>" ;;
         garde.protegee) _M="modification refusée : « %s » est une branche protégée.\n  → Travailler sur la branche d'un ticket : repowarden ticket <n>" ;;
         garde.protegee_libre) _M="modification refusée : « %s » est une branche protégée.\n  → Créer une branche de travail : git switch -c <type>/<sujet>" ;;
+        garde.carte) _M="  → Avant de modifier %s, une fois sur la bonne branche : repowarden carte %s (fonctions, tests, tickets)" ;;
         garde.hors_ticket) _M="modification refusée : la branche « %s » n'est pas celle d'un ticket (<type>/<n>-<sujet>).\n  → Prendre le ticket : repowarden ticket <n>" ;;
         garde.branche) _M="commande refusée : « %s » crée une branche ; ici, la branche naît du ticket.\n  → repowarden ticket <n>" ;;
         garde.commit) _M="commande refusée : « %s » ; les commits passent par l'assistant (seul --amend --no-edit est permis).\n  → repowarden cc -m \"<description>\" --refs \"Ticket : #<n>\"" ;;

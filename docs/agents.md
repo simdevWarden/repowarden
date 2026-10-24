@@ -70,6 +70,16 @@ Formats : `--format claude` (`tool_name`, `tool_input`, `cwd` : entrée du hook 
 
 Toute nouvelle fonction a, juste au-dessus, une à deux lignes qui disent ce qu'elle fait et **pourquoi**, sans paraphraser le code : des fonctionnalités documentées dans le code, sans gros blocs de commentaires. À reprendre dans les consignes du projet (`AGENTS.md`, `CLAUDE.md`…) ; le pre-commit et la CI signalent les oublis ([fonctions sans commentaire](hooks.md#fonctions-sans-commentaire)).
 
+## Carte du projet
+
+**Avant de modifier un fichier X : `repowarden carte X`.** L'agent lit l'extrait utile au lieu d'explorer le dépôt : les fonctions de X et leur pourquoi, les tests qui le couvrent (à écrire d'abord, puis à relancer, avec la commande), les tickets qui l'ont modifié et leur conception ([carte du projet](carte.md)). `repowarden carte <fonction>` et `repowarden carte '#<n>'` aussi. À reprendre dans les consignes du projet (`AGENTS.md`, `CLAUDE.md`…). Un refus de modification du garde-fou le rappelle :
+
+```text
+✖ repowarden : modification refusée : « main » est une branche protégée.
+  → Travailler sur la branche d'un ticket : repowarden ticket <n>
+  → Avant de modifier bin/garde, une fois sur la bonne branche : repowarden carte bin/garde (fonctions, tests, tickets)
+```
+
 ## Limites
 
 - **Filet, pas mur** : les hooks git et la vérification `ticket` en CI restent la protection. Une modification faite par le shell (`sed -i`, redirection `>`, script) n'est pas vue avant le commit, où les hooks la vérifient.

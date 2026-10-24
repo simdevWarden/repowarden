@@ -59,7 +59,8 @@ carte_generer() {
         --format='%x1e%s%n%b%x1f' 2>/dev/null |
         awk -v D=$'\x1e' -v F=$'\x1f' "$CARTE_HIST_AWK" >"$d/historique" || true
     # Conceptions en cache, « \x1d<n> » puis le résumé, ticket par ticket
-    carte_conceptions "$d/historique"
+    # Hors ligne (post-merge) : seules les conceptions déjà en cache servent
+    [ -n "${REPOWARDEN_CARTE_HORS_LIGNE:-}" ] || carte_conceptions "$d/historique"
     : >"$d/conceptions"
     for f in $(cut -f2 "$d/historique" | sort -un); do
         [ -s "$CARTE_DIR/conception/$f.md" ] || continue

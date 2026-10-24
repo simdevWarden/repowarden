@@ -365,3 +365,65 @@ JSON
     touch lib/a.sh
     "$RW" carte '#12' --json 2>/dev/null | jq -e '.fichiers' >/dev/null
 }
+
+# Poste prêt (hooks et git cc du dépôt, garde-fou branché) : seule la carte
+# peut donner l'étape suivante de statut
+poste_pret() {
+    export HOME="$BATS_TEST_TMPDIR/home"
+    mkdir -p "$HOME"
+    git config --unset core.hooksPath
+    "$BATS_TEST_DIRNAME/../install.sh" --lang fr >/dev/null
+    garde_branche
+}
+
+@test "carte : statut -> perimee signalee, etape suivante repowarden carte" {
+    poste_pret
+    projet_shell
+    run "$RW" statut
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Carte du projet absente"*"repowarden carte"* ]] || false
+    [[ "$output" != *"Étape suivante : repowarden carte"* ]] || false
+    "$RW" carte >/dev/null
+    run "$RW" statut
+    [[ "$output" == *"Carte du projet à jour"* ]] || false
+    printf '# Nouvelle\nneuve() { :; }\n' >>lib/outil.sh
+    touch -t 202001010000 "$CARTE"
+    run "$RW" statut
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Carte du projet périmée"* ]] || false
+    [[ "$output" == *"Étape suivante : repowarden carte"* ]] || false
+}
+
+@test "carte : post-merge -> carte existante recalculee hors ligne, sinon rien" {
+    projet_shell
+    git switch -q -c feat/2-autre
+    printf '# Fusionnee\nfusion() { :; }\n' >>lib/outil.sh
+    git commit -q --no-verify -am "feat: fusion" -m "Ticket : #2"
+    git switch -q feat/1-carte
+    # Sans carte : rien n'est créé
+    git merge -q --no-ff --no-verify -m "Merge branch 'feat/2-autre'" feat/2-autre
+    [ ! -e "$CARTE" ]
+    git reset -q --hard HEAD~1
+    "$RW" carte >/dev/null
+    touch -t 202001010000 "$CARTE"
+    export GH_CONNECTE=1
+    : >"$GH_LOG"
+    git merge -q --no-ff --no-verify -m "Merge branch 'feat/2-autre'" feat/2-autre
+    jq -e '.fichiers["lib/outil.sh"].fonctions[] | select(.nom == "fusion")' "$CARTE" >/dev/null
+    [ -z "$(find "$CARTE" -mmin +60)" ]
+    [[ "$(cat "$GH_LOG")" != *"issue"* ]] || false
+}
+
+@test "carte : post-merge sur une copie de repowarden, duree mesuree" {
+    git clone -q "$BATS_TEST_DIRNAME/.." "$BATS_TEST_TMPDIR/copie"
+    cd "$BATS_TEST_TMPDIR/copie"
+    TIMEFORMAT=%R
+    sans="$({ time "$HOOKS/post-merge" >/dev/null 2>&1; } 2>&1)"
+    "$RW" carte >/dev/null
+    touch -t 202001010000 "$CARTE"
+    avec="$({ time "$HOOKS/post-merge" >/dev/null 2>&1; } 2>&1)"
+    echo "post-merge : ${sans}s sans carte, ${avec}s avec carte" >&3
+    [ -z "$(find "$CARTE" -mmin +60)" ]
+    # Seuil large (CI lentes, Windows) : le recalcul reste de l'ordre de la seconde
+    awk -v a="$avec" -v s="$sans" 'BEGIN { exit !(a - s < 15) }'
+}

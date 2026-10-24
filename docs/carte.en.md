@@ -92,3 +92,10 @@ repowarden carte lib/a.sh       # … "#12 — <first line of the design>" per t
 - **Read with `gh`, cached** in `.repowarden/carte/conception/<n>.md` (empty for a ticket without design): a single call (`gh issue list --state all`, read-only), and only when tickets are missing from the cache; then no call at all. To refresh: delete that folder.
 - **`gh` missing or not logged in**: warning, map without design, exit code 0.
 - JSON: `"tickets": {"12": {"fichiers": [...], "conception": "…"}}`.
+
+## Freshness
+
+- **After a local merge** (`post-merge` hook, `git pull` included): an existing map is recomputed **offline** (no `gh`; cached designs stay), silently; without a map, nothing is created. Measured on repowarden (186 files): about 0.2 s more for the hook.
+- **`repowarden statut`**: stale map → warning and next step `repowarden carte`; missing → plain information (the map is optional).
+- **On demand**: `repowarden carte`; a query first regenerates a stale map.
+- **Agents**: `AGENTS.md` and the [AI agents](agents.md) page say "before changing X: `repowarden carte X`"; a guard refusal on an existing file reminds it.

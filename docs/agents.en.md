@@ -70,6 +70,16 @@ Formats: `--format claude` (`tool_name`, `tool_input`, `cwd`: the `PreToolUse` h
 
 Every new function has, right above it, one or two lines saying what it does and **why**, without paraphrasing the code: features documented in the code, without big comment blocks. Copy it into the project instructions (`AGENTS.md`, `CLAUDE.md`…); the pre-commit hook and the CI report omissions ([functions without a comment](hooks.md#functions-without-a-comment)).
 
+## Project map
+
+**Before changing a file X: `repowarden carte X`.** The agent reads the useful excerpt instead of exploring the repository: X's functions and their why, the tests covering it (to write first, then run again, with the command), the tickets that changed it and their design ([project map](carte.md)). `repowarden carte <function>` and `repowarden carte '#<n>'` too. Copy it into the project instructions (`AGENTS.md`, `CLAUDE.md`…). A modification refused by the guard reminds it:
+
+```text
+✖ repowarden: change refused: "main" is a protected branch.
+  → Work on a ticket's branch: repowarden ticket <n>
+  → Before changing bin/garde, once on the right branch: repowarden carte bin/garde (functions, tests, tickets)
+```
+
 ## Limitations
 
 - **Safety net, not a wall**: git hooks and the `ticket` check in CI remain the protection. A change made through the shell (`sed -i`, `>` redirection, script) is not seen before the commit, where the hooks check it.

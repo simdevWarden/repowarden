@@ -530,6 +530,9 @@ _msg_en() {
         st.agents_sans_garde) _M="AI agent without the guard (Claude Code, opencode): its actions are only checked at commit time. → %s" ;;
         st.agents_stale) _M="Outdated repowarden guard (%s): wired by an earlier version of repowarden. → %s" ;;
         st.next) _M="Next step:" ;;
+        st.carte_absente) _M="No project map (optional, read by agents before changing a file): repowarden carte" ;;
+        st.carte_ok) _M="Project map up to date (repowarden carte <file>)" ;;
+        st.carte_perimee) _M="Project map is stale: files changed since, it no longer tells what the code does." ;;
         st.ready) _M="All set: git cc to commit, repowarden code-mort on a branch." ;;
         st.help) _M="Every command: repowarden --help" ;;
         # Tickets
@@ -739,6 +742,7 @@ _msg_en() {
         garde.detache) _M="change refused: detached HEAD in %s.\n  → Switch to a ticket's branch: repowarden ticket <n>" ;;
         garde.protegee) _M="change refused: \"%s\" is a protected branch.\n  → Work on a ticket's branch: repowarden ticket <n>" ;;
         garde.protegee_libre) _M="change refused: \"%s\" is a protected branch.\n  → Create a work branch: git switch -c <type>/<topic>" ;;
+        garde.carte) _M="  → Before changing %s, once on the right branch: repowarden carte %s (functions, tests, tickets)" ;;
         garde.hors_ticket) _M="change refused: branch \"%s\" is not a ticket's branch (<type>/<n>-<topic>).\n  → Take the ticket: repowarden ticket <n>" ;;
         garde.branche) _M="command refused: \"%s\" creates a branch; here, branches come from tickets.\n  → repowarden ticket <n>" ;;
         garde.commit) _M="command refused: \"%s\"; commits go through the assistant (only --amend --no-edit is allowed).\n  → repowarden cc -m \"<description>\" --refs \"Ticket : #<n>\"" ;;

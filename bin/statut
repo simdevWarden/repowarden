@@ -13,6 +13,8 @@ source "$ROOT/hooks/lib/common.sh"
 source "$ROOT/hooks/lib/secrets.sh"
 # shellcheck source=../hooks/lib/agents.sh
 source "$ROOT/hooks/lib/agents.sh"
+# shellcheck source=../hooks/lib/carte.sh
+source "$ROOT/hooks/lib/carte.sh"
 exec 2>&1 # une seule sortie, dans l'ordre (avertissements compris)
 # shellcheck disable=SC2034 # lu par check_version (common.sh)
 HOOKS_DIR="$ROOT/hooks"
@@ -137,6 +139,16 @@ if [ -n "$GIT_TOPLEVEL" ]; then
     if ! skipped secrets && ! skipped sensitive-files; then
         sensitive_files_r
         [ -z "$REPLY" ] || sensitive_files_warn "$REPLY"
+    fi
+    # Carte du projet (repowarden carte) : facultative ; périmée, elle ne dit
+    # plus ce que fait le code, et les agents la lisent avant de modifier
+    if [ ! -f "$GIT_TOPLEVEL/$CARTE_JSON" ]; then
+        info_t st.carte_absente
+    elif (cd "$GIT_TOPLEVEL" && carte_a_jour); then
+        ok_t st.carte_ok
+    else
+        attention_t st.carte_perimee
+        suivant="${suivant:-repowarden carte}"
     fi
     info_t st.repo_forge "$FORGE"
     [ "$FORGE" != github ] || dim_t st.repo_rules
