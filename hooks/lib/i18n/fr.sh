@@ -508,6 +508,7 @@ _msg_fr() {
         st.repo) _M="Dépôt : %s" ;;
         st.repo_local) _M="Hooks propres à ce dépôt (core.hooksPath local = %s), prioritaires" ;;
         st.repo_lefthook) _M="%s présent : lefthook n'est plus pris en charge depuis repowarden 4, ses commandes ne sont pas lancées. Les déplacer dans .repowarden/<hook>, la version attendue dans .repowarden.conf (version)" ;;
+        st.repo_precommit) _M=".pre-commit-config.yaml présent : ses hooks ne sont pas lancés (pre-commit refuse de s'installer avec core.hooksPath). Les installer dans .git/hooks, que repowarden lance à chaque commit : %s" ;;
         st.repo_version_old) _M="Le projet demande repowarden %s ; installé : %s" ;;
         st.repo_version_ok) _M="Version demandée par le projet (%s) : respectée" ;;
         st.repo_forge) _M="Plateforme : %s" ;;
