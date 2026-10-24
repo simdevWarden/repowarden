@@ -137,16 +137,17 @@ protegee() {
 # si le dépôt suit ses tickets)
 verifier_fichier() {
     dossier_r "$1"
-    # Sous Windows, jq finit le chemin lu par un CR : retiré pour tester le fichier
+    # Sous Windows, jq finit le chemin lu par un CR (retiré) et le chemin peut
+    # être en forme Windows (D:/…), absolu lui aussi
     local d="$REPLY" f="${1%$'\r'}"
-    case "$f" in /*) ;; *) f="$cwd/$f" ;; esac
+    case "$f" in /* | [A-Za-z]:[/\\]*) ;; *) f="$cwd/$f" ;; esac
     (
         cd "$d" 2>/dev/null || exit 0
         depot_repowarden || exit 0
         # Fichiers internes de git (.git/…) : hors du travail de l'agent
         case "$(pwd -P)/" in "$(cd "$(git rev-parse --git-dir)" && pwd -P)"/*) exit 0 ;; esac
         if [ -f "$f" ]; then
-            FICHIER_CARTE="$(pwd -P)/${f##*/}"
+            FICHIER_CARTE="$(cd "$(dirname "$f")" && pwd -P)/${f##*/}"
             FICHIER_CARTE="${FICHIER_CARTE#"$(cd "$(git rev-parse --show-toplevel)" && pwd -P)"/}"
         fi
         branche="$(git symbolic-ref -q --short HEAD 2>/dev/null || true)"
