@@ -129,16 +129,31 @@ protegee() {
     [ -n "$REPLY" ] && [ "$REPLY" = "$1" ]
 }
 
+# Vrai si le chemin $1 (absolu), dans le dépôt du dossier courant $2 (son
+# dossier existant le plus proche), est ignoré par git : jamais versionné.
+# Un fichier suivi n'est jamais ignoré (git check-ignore sans --no-index)
+fichier_ignore() {
+    local top reel
+    top="$(git rev-parse --show-toplevel 2>/dev/null)" || return 1
+    # Chemin physique (/tmp → /private/tmp), relatif à la racine du dépôt
+    reel="$(pwd -P)${1#"$2"}"
+    case "$reel" in "$top"/*) ;; *) return 1 ;; esac
+    git -C "$top" check-ignore -q -- "${reel#"$top"/}" 2>/dev/null
+}
+
 # Modification du fichier $1 : seulement sur une branche de travail (de ticket,
-# si le dépôt suit ses tickets)
+# si le dépôt suit ses tickets) ; un fichier ignoré par git l'est partout
 verifier_fichier() {
-    dossier_r "$1"
+    local p="$1"
+    case "$p" in /*) ;; *) p="$cwd/$p" ;; esac
+    dossier_r "$p"
     local d="$REPLY"
     (
         cd "$d" 2>/dev/null || exit 0
         depot_repowarden || exit 0
         # Fichiers internes de git (.git/…) : hors du travail de l'agent
         case "$(pwd -P)/" in "$(cd "$(git rev-parse --git-dir)" && pwd -P)"/*) exit 0 ;; esac
+        ! fichier_ignore "$p" "$d" || exit 0
         branche="$(git symbolic-ref -q --short HEAD 2>/dev/null || true)"
         [ -n "$branche" ] || refuser garde.detache "$GIT_TOPLEVEL"
         if protegee "$branche"; then
