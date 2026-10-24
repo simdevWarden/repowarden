@@ -30,3 +30,20 @@ Pour chaque fichier du dépôt (suivi, ou nouveau et non ignoré, hors `repoward
 - **Déterministe** : clés triées, ni date ni chemin absolu ; deux lancements sur le même dépôt donnent le même fichier.
 - **Jamais versionnée** : le dossier `.repowarden/carte/` contient un `.gitignore` (`*`) qui l'ignore lui-même ; rien à ajouter au `.gitignore` du projet.
 - Demande `jq`.
+
+## Interroger
+
+Lire seulement l'extrait utile, sans charger tout le JSON :
+
+```bash
+repowarden carte bin/garde          # fonctions du fichier et leur pourquoi
+repowarden carte verifier_gh        # fichier, ligne, pourquoi de la fonction
+repowarden carte bin/garde --json   # même extrait, pour les outils (aussi : repowarden carte --json)
+```
+
+```text
+verifier_gh  bin/garde:262
+  Commande gh (mots $@, sans « gh ») lancée depuis $dir, …
+```
+
+Un chemin est lu depuis le dossier courant (`repowarden carte outil.sh` dans `lib/`) ; un nom qui n'est ni un fichier ni une fonction de la carte : message et code 1. **Carte absente ou périmée** (un fichier du dépôt ou l'index git plus récent qu'elle) : régénérée avant de répondre.
