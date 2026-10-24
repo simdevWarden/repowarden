@@ -431,7 +431,8 @@ verifier_shell() {
 
 case "$outil" in
     Edit | Write | MultiEdit | NotebookEdit | edit | write | multiedit)
-        chemin="$(jq -r '.file_path // .filePath // .notebook_path // empty' <<<"$args" 2>/dev/null)"
+        # path : outils edit et write d'opencode 2.x
+        chemin="$(jq -r '.file_path // .filePath // .notebook_path // .path // empty' <<<"$args" 2>/dev/null)"
         [ -z "$chemin" ] || verifier_fichier "$chemin"
         ;;
     apply_patch)
@@ -440,7 +441,8 @@ case "$outil" in
         done < <(jq -r '.patchText // empty' <<<"$args" 2>/dev/null |
             sed -nE -e 's/^\*\*\* (Add|Update|Delete) File: //p' -e 's/^\*\*\* Move to: //p')
         ;;
-    Bash | bash)
+    # shell : nom de l'outil bash dans opencode 2.x
+    Bash | bash | shell)
         verifier_shell "$(jq -r '.command // empty' <<<"$args" 2>/dev/null)"
         ;;
 esac

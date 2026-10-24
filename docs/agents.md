@@ -4,7 +4,7 @@ Un agent IA (Claude Code, opencode…) peut modifier une branche protégée, tra
 
 ```bash
 repowarden agents init        # Claude Code et opencode, dans le dépôt (à versionner)
-git add .claude/settings.json .opencode/plugins/repowarden-garde.js
+git add .claude/settings.json .opencode/plugins/repowarden-garde.js .opencode/plugins/repowarden-garde-v2.js
 ```
 
 ## Ce qui est refusé
@@ -42,7 +42,10 @@ L'aide et l'aperçu (`--help`, `-h`, `--dry-run` de `repowarden cc`, `git cc`, `
 | Outil | Branchement | Projet (`--projet`, défaut) | Utilisateur (`--global`) |
 |---|---|---|---|
 | [Claude Code](https://code.claude.com/docs/en/hooks) | hook `PreToolUse` (outils `Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `Bash`) : `repowarden garde --format claude` | `.claude/settings.json` | `$CLAUDE_CONFIG_DIR/settings.json` ([défini](https://code.claude.com/docs/en/settings)), sinon `~/.claude/settings.json` |
-| [opencode](https://opencode.ai/docs/plugins/) | plugin, crochet `tool.execute.before` (outils `edit`, `write`, `apply_patch`, `bash`) | `.opencode/plugins/repowarden-garde.js` | `$OPENCODE_CONFIG_DIR/plugins/` ([défini](https://opencode.ai/docs/config/)), sinon `${XDG_CONFIG_HOME:-~/.config}/opencode/plugins/` |
+| [opencode](https://opencode.ai/docs/plugins/) 1.x | plugin, crochet `tool.execute.before` (outils `edit`, `write`, `apply_patch`, `bash`) | `.opencode/plugins/repowarden-garde.js` | `$OPENCODE_CONFIG_DIR/plugins/` ([défini](https://opencode.ai/docs/config/)), sinon `${XDG_CONFIG_HOME:-~/.config}/opencode/plugins/` |
+| opencode 2.x (`@opencode/cli`) | plugin `{ id, setup }`, crochet `ctx.tool.hook("execute.before")` (outils `edit`, `write`, `shell`) | `.opencode/plugins/repowarden-garde-v2.js` | même dossier |
+
+Deux fichiers, un par version d'opencode : opencode 1.x prend un module qui a un export par défaut `{ id, setup }` pour un plugin 2.x et n'appelle plus son export 1.x. Chaque version charge les deux ; celui de l'autre version ne fait rien. Essayé avec opencode 1.18.34, 1.19.4 et 2.1.4.
 
 `repowarden agents init --claude` ou `--opencode` pour un seul outil. Relançable : un `settings.json` existant est complété (rien si le hook y est déjà), un plugin modifié est gardé tel quel et signalé. **Le garde-fou suit les mises à jour de repowarden** : un plugin posé par repowarden (première ligne `// Garde-fou repowarden pour opencode…`, l'ancien plugin autonome compris) ou un hook `repowarden garde…` d'une autre forme que l'actuelle est remplacé par le modèle, les autres hooks restant intacts (« garde-fou mis à jour »). Un fichier personnel (sans cet en-tête) n'est jamais écrasé. `repowarden statut` signale un garde-fou périmé, du dépôt ou de l'utilisateur, avec `repowarden agents init` (`--global` pour l'utilisateur) ; `repowarden install` met à jour, sans question, le garde-fou de l'utilisateur déjà branché. Hooks repowarden inactifs (dépôt, ou `--global` sans `repowarden install --global`) : signalé, avec la commande, puisque le garde-fou refusera alors les commits. `repowarden statut` et `repowarden install` signalent un agent présent (`claude` ou `opencode` dans le `PATH`, ou leur dossier de configuration) sans garde-fou branché, ni dans le dépôt ni pour l'utilisateur, avec `repowarden agents init` ; `install` le propose dans un terminal.
 
@@ -52,7 +55,7 @@ L'aide et l'aperçu (`--help`, `-h`, `--dry-run` de `repowarden cc`, `git cc`, `
 repowarden agents retirer             # dépôt ; --global : configuration de l'utilisateur
 ```
 
-Mêmes options qu'`init` (`--claude`, `--opencode`, `--projet`, `--global`). Seul ce qu'`init` a écrit part : dans `settings.json`, les commandes `repowarden garde` (les autres hooks et réglages restent ; le fichier est supprimé s'il ne contient plus rien) ; le plugin opencode s'il est identique au modèle (modifié, il est gardé et signalé). Relancé, rien à retirer, sans erreur.
+Mêmes options qu'`init` (`--claude`, `--opencode`, `--projet`, `--global`). Seul ce qu'`init` a écrit part : dans `settings.json`, les commandes `repowarden garde` (les autres hooks et réglages restent ; le fichier est supprimé s'il ne contient plus rien) ; chaque plugin opencode s'il est identique à son modèle (modifié, il est gardé et signalé). Relancé, rien à retirer, sans erreur.
 
 ## Vérificateur : `repowarden garde`
 
@@ -76,5 +79,5 @@ Toute nouvelle fonction a, juste au-dessus, une à deux lignes qui disent ce qu'
 - **Écritures GitHub** : seules celles de `gh` sont vues, et seulement depuis un dépôt repowarden : `gh -R …` lancé hors d'un tel dépôt n'est pas vu ; l'interface web et `curl` vers l'API non plus.
 - **Lecture d'une ligne shell** : découpage simple (sans interpréter les guillemets ni les sous-shells) ; une commande cachée dans `bash -c "…"` ou une variable n'est pas vue.
 - **Prérequis** : `repowarden` dans le `PATH` (`npm install -g repowarden`) et [jq](https://jqlang.org). Sinon, rien n'est bloqué (le garde-fou ne bloque jamais un agent par une panne).
-- **opencode** : l'API des plugins évolue ; le garde-fou utilise le crochet documenté `tool.execute.before`. La nouvelle API `{ id, setup }` (paquet `@opencode-ai/plugin`, v2) n'expose pas encore les outils.
+- **opencode** : l'API des plugins évolue. En 1.x, le crochet documenté `tool.execute.before` ; en 2.x, `ctx.tool.hook("execute.before")`, établi par essai (pas encore documenté). Un plugin repowarden posé avant le plugin 2.x est signalé périmé par `repowarden statut` et complété par `repowarden agents init`.
 - **Autres outils** (Cursor, Gemini CLI…) : pas encore pris en charge ; seuls les hooks et la CI s'appliquent.
