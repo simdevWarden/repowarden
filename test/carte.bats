@@ -286,3 +286,11 @@ projet_tickets() {
     cmp "$BATS_TEST_TMPDIR/avec.json" "$CARTE"
     [ "$(jq -c '.tickets["12"].fichiers' "$CARTE")" = '["README.md","lib/a.sh"]' ]
 }
+
+@test "carte : fichier en CRLF (Windows) -> commentaire sans retour chariot" {
+    printf '#!/usr/bin/env bash\r\n# Texte du pourquoi\r\ncr() { :; }\r\n' >crlf.sh
+    git add crlf.sh
+    git commit -q --no-verify -m "feat: crlf"
+    "$RW" carte >/dev/null
+    [ "$(jq -r '.fichiers["crlf.sh"].fonctions[0].pourquoi' "$CARTE")" = "Texte du pourquoi" ]
+}
