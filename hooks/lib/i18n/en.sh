@@ -738,6 +738,7 @@ _msg_en() {
         garde.gh_pr_create) _M="command refused: \"%s\"; the draft PR is opened by the bot on the first push of the ticket's branch.\n  → git push -u origin HEAD" ;;
         garde.gh_rerun) _M="command refused: \"%s\"; workflows are re-run through repowarden.\n  → repowarden run rerun <run-id|--failed>" ;;
         garde.gh_mainteneur) _M="command refused: \"%s\"; this is the maintainer's decision (leaving draft, merge, approval, deployment).\n  → Say the PR is ready (CI green) and let the maintainer decide." ;;
+        garde.ticket_mainteneur) _M="command refused: \"%s\"; validating a ticket is the maintainer's decision (\"validé\" or status label, added or removed).\n  → Ask the maintainer to validate the ticket, then take it: repowarden ticket <n>" ;;
         garde.gh_sans_ticket) _M="command refused: \"%s\" changes GitHub outside the PR flow, without a ticket.\n  → Create the ticket (repowarden ticket nouveau), get it validated, then run again: REPOWARDEN_TICKET=<n> %s" ;;
         garde.gh_ticket_illisible) _M="command refused: \"%s\"; ticket #%s unreadable (gh issue view): a write without proof of a ticket.\n  → Check the number and gh auth status, then run again: REPOWARDEN_TICKET=<n> gh …" ;;
         garde.gh_ticket_non_valide) _M="command refused: \"%s\"; ticket #%s is not open and validated (label \"%s\").\n  → Get the ticket validated by the maintainer, then run again." ;;
