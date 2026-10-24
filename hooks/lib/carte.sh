@@ -7,8 +7,13 @@
 # « fonctions sans commentaire » (commentaires.sh) : pas de second analyseur.
 # Demande commentaires.sh (via lang.sh) et common.sh ; lancé à la racine.
 
+# shellcheck disable=SC2016 # programmes jq et awk entre apostrophes, rien à développer
 CARTE_DIR=.repowarden/carte
 CARTE_JSON="$CARTE_DIR/carte.json"
+
+# jq sans retour chariot : sous Windows, jq finit ses lignes par CRLF, et un
+# read garderait le CR collé à la dernière valeur lue
+cjq() { jq "$@" | tr -d '\r'; }
 
 # Une ligne « fichier<TAB>ligne<TAB>nom<TAB>pourquoi » par fonction des
 # fichiers du dépôt (suivis, ou nouveaux non ignorés) ; shell seulement
@@ -72,7 +77,7 @@ carte_fichier() {
             t carte.no_comment
             printf '  %s  %s %s\n' "$ligne" "$nom" "$REPLY"
         fi
-    done < <(jq -r --arg f "$f" '(.fichiers[$f].fonctions // [])[] | "\(.ligne)\t\(.nom)\t\(.pourquoi)"' "$CARTE_JSON")
+    done < <(cjq -r --arg f "$f" '(.fichiers[$f].fonctions // [])[] | "\(.ligne)\t\(.nom)\t\(.pourquoi)"' "$CARTE_JSON")
     [ "$n" -gt 0 ] || info_t carte.file_empty "$f"
 }
 
@@ -96,7 +101,7 @@ carte_fonction() {
             t carte.no_comment
             printf '  %s\n' "$REPLY"
         fi
-    done < <(jq -r --arg n "$nom" '.fichiers | to_entries[] | .key as $f
+    done < <(cjq -r --arg n "$nom" '.fichiers | to_entries[] | .key as $f
         | .value.fonctions[]? | select(.nom == $n) | "\($f)\t\(.ligne)\t\(.pourquoi)"' "$CARTE_JSON")
     [ "$n" -gt 0 ] && return 0
     err_t carte.unknown "$nom"
@@ -115,5 +120,6 @@ function sortie(   i, n) {
     }
 }
 FNR == 1 { if (NR > 1) sortie(); f = FILENAME; N = 0 }
-{ L[FNR] = $0; N = FNR }
+# Fichier en CRLF (extraction Windows) : le CR ne fait pas partie du texte
+{ sub(/\r$/, ""); L[FNR] = $0; N = FNR }
 END { if (NR > 0) sortie() }'
