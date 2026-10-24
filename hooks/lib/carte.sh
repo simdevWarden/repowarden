@@ -10,6 +10,10 @@
 CARTE_DIR=.repowarden/carte
 CARTE_JSON="$CARTE_DIR/carte.json"
 
+# jq sans retour chariot : sous Windows, jq finit ses lignes par CRLF, et un
+# read garderait le CR collé à la dernière valeur lue
+cjq() { jq "$@" | tr -d '\r'; }
+
 # Une ligne « fichier<TAB>ligne<TAB>nom<TAB>pourquoi » par fonction des
 # fichiers du dépôt (suivis, ou nouveaux non ignorés) ; shell seulement
 carte_fonctions() {
@@ -54,5 +58,6 @@ function sortie(   i, n) {
     }
 }
 FNR == 1 { if (NR > 1) sortie(); f = FILENAME; N = 0 }
-{ L[FNR] = $0; N = FNR }
+# Fichier en CRLF (extraction Windows) : le CR ne fait pas partie du texte
+{ sub(/\r$/, ""); L[FNR] = $0; N = FNR }
 END { if (NR > 0) sortie() }'
