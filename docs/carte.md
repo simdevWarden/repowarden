@@ -1,6 +1,6 @@
 # Carte du projet
 
-Un agent IA (ou une personne) qui reprend un projet l'explore fichier par fichier pour comprendre « quoi fait quoi et pourquoi » : coûteux en contexte. repowarden demande déjà, au-dessus de chaque nouvelle fonction, une à deux lignes qui disent ce qu'elle fait et pourquoi ([hooks](hooks.md)). La **carte** rassemble ces « pourquoi » en un index, sans LLM ni réseau.
+Un agent IA (ou une personne) qui reprend un projet l'explore fichier par fichier pour comprendre « quoi fait quoi et pourquoi » : coûteux en contexte. repowarden demande déjà, au-dessus de chaque nouvelle fonction, une à deux lignes qui disent ce qu'elle fait et pourquoi ([hooks](hooks.md)). La **carte** rassemble ces « pourquoi » en un index, sans LLM ; seule la conception des tickets passe par `gh`, en option.
 
 ```bash
 repowarden carte        # (re)génère .repowarden/carte/carte.json
@@ -78,3 +78,17 @@ repowarden carte bin/garde      # … puis « Tickets : #317 #407 … »
 ```
 
 Tout fichier encore présent (hors `repowarden.exclude`) touché par un ticket entre dans la carte, même sans fonction (doc, workflow) ; la racine `tickets` donne les fichiers de chaque ticket.
+
+## Conception des tickets
+
+La décision derrière un changement est écrite dans le commentaire « Conception retenue » de son ticket. La carte la rattache aux fichiers, pour qu'un agent n'ait pas à la chercher :
+
+```bash
+repowarden carte '#12'          # fichiers, puis « Conception : » et son résumé
+repowarden carte lib/a.sh       # … « #12 — <première ligne de la conception> » par ticket
+```
+
+- **Même résumé que la PR brouillon** : « Ce qui change » et « Hors périmètre » de la dernière « Conception retenue », puis les commentaires « Ajout » / « Constat lié » ; seuls les commentaires de mainteneur comptent.
+- **Lu par `gh`, mis en cache** dans `.repowarden/carte/conception/<n>.md` (vide pour un ticket sans conception) : un seul appel (`gh issue list --state all`, lecture), et seulement s'il manque des tickets au cache ; ensuite, plus aucun appel. Pour rafraîchir : supprimer ce dossier.
+- **`gh` absent ou non connecté** : avertissement, carte sans conception, code 0.
+- JSON : `"tickets": {"12": {"fichiers": [...], "conception": "…"}}`.

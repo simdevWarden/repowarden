@@ -2,7 +2,7 @@
 # Usage : repowarden carte                       (re)génère la carte
 #         repowarden carte <fichier|fonction|'#n'> [--json]   extrait utile
 #
-# Carte du projet, sans LLM ni réseau : chaque fonction des scripts shell,
+# Carte du projet, sans LLM (gh seulement pour la conception des tickets) : chaque fonction des scripts shell,
 # son fichier, sa ligne et son « pourquoi » (le commentaire juste au-dessus),
 # dans .repowarden/carte/carte.json (dossier ignoré par git). Interrogée,
 # elle est d'abord régénérée si elle est absente ou périmée. Voir docs/carte.md.

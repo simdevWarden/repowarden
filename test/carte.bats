@@ -12,6 +12,26 @@ setup() {
     setup_repo
     initial_commit
     git switch -q -c feat/1-carte
+    faux_gh
+}
+
+# Faux gh en tête du PATH : aucun test n'appelle le vrai (ni réseau). Appels
+# journalisés dans $GH_LOG ; connecté si $GH_CONNECTE=1 ; issue list renvoie
+# le fichier $GH_ISSUES
+faux_gh() {
+    export GH_LOG="$BATS_TEST_TMPDIR/gh.log" GH_ISSUES="$BATS_TEST_TMPDIR/issues.json"
+    mkdir -p "$BATS_TEST_TMPDIR/faux"
+    cat >"$BATS_TEST_TMPDIR/faux/gh" <<'GH'
+#!/usr/bin/env bash
+echo "$*" >>"$GH_LOG"
+case "$1 ${2:-}" in
+    "auth token") [ "${GH_CONNECTE:-}" = 1 ] && echo jeton-de-test && exit 0; exit 1 ;;
+    "issue list") cat "$GH_ISSUES" ;;
+    *) exit 1 ;;
+esac
+GH
+    chmod +x "$BATS_TEST_TMPDIR/faux/gh"
+    export PATH="$BATS_TEST_TMPDIR/faux:$PATH"
 }
 
 # Petit projet shell : script .sh, script à shebang sans extension, fichier texte
@@ -273,18 +293,12 @@ projet_tickets() {
     [[ "$output" == *"#99"* ]] || false
 }
 
-@test "carte : tickets sans appel reseau (gh jamais appele)" {
+@test "carte : tickets sans appel reseau (gh non connecte, aucune lecture gh)" {
     projet_tickets
-    mkdir -p "$BATS_TEST_TMPDIR/faux"
-    printf '#!/bin/sh\ntouch "%s/gh-appele"\nexit 1\n' "$BATS_TEST_TMPDIR" >"$BATS_TEST_TMPDIR/faux/gh"
-    chmod +x "$BATS_TEST_TMPDIR/faux/gh"
-    PATH="$BATS_TEST_TMPDIR/faux:$PATH" "$RW" carte >/dev/null
-    [ ! -e "$BATS_TEST_TMPDIR/gh-appele" ]
-    cp "$CARTE" "$BATS_TEST_TMPDIR/avec.json"
-    rm "$BATS_TEST_TMPDIR/faux/gh"
     "$RW" carte >/dev/null
-    cmp "$BATS_TEST_TMPDIR/avec.json" "$CARTE"
+    [[ "$(cat "$GH_LOG")" != *"issue"* ]] || false
     [ "$(jq -c '.tickets["12"].fichiers' "$CARTE")" = '["README.md","lib/a.sh"]' ]
+    [ "$(jq -c '.fichiers["lib/a.sh"].tickets' "$CARTE")" = '[12,30]' ]
 }
 
 @test "carte : fichier en CRLF (Windows) -> commentaire sans retour chariot" {
@@ -293,4 +307,61 @@ projet_tickets() {
     git commit -q --no-verify -m "feat: crlf"
     "$RW" carte >/dev/null
     [ "$(jq -r '.fichiers["crlf.sh"].fonctions[0].pourquoi' "$CARTE")" = "Texte du pourquoi" ]
+}
+
+# Réponse de « gh issue list » : ticket 12 avec conception et ajout de
+# mainteneur, commentaire d'un tiers ignoré ; ticket 30 sans conception
+issues_simulees() {
+    cat >"$GH_ISSUES" <<'JSON'
+[{"number":12,"comments":[
+  {"authorAssociation":"OWNER","body":"## Conception retenue\n\n### Ce qui change\n\n- Somme des paniers dans lib/a.sh\n\n### Tests prévus\n\n- un test\n\n### Hors périmètre\n\nLes remises."},
+  {"authorAssociation":"NONE","body":"## Conception retenue\n\n### Ce qui change\n\n- Avis d un tiers"},
+  {"authorAssociation":"MEMBER","body":"**Ajout** : arrondi au centime."}]},
+ {"number":30,"comments":[{"authorAssociation":"OWNER","body":"Merci"}]}]
+JSON
+}
+
+@test "carte : conception des tickets lue par gh, citee par ticket et par fichier" {
+    projet_tickets
+    issues_simulees
+    export GH_CONNECTE=1
+    run "$RW" carte '#12'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Conception :"* ]] || false
+    [[ "$output" == *"Somme des paniers dans lib/a.sh"* ]] || false
+    [[ "$output" == *"Les remises."* ]] || false
+    [[ "$output" == *"arrondi au centime"* ]] || false
+    [[ "$output" != *"Avis d un tiers"* ]] || false
+    [[ "$output" != *"un test"* ]] || false
+    run "$RW" carte lib/a.sh
+    [[ "$output" == *"#12 — "*"Somme des paniers dans lib/a.sh"* ]] || false
+    [[ "$output" != *"#30 — "* ]] || false
+    jq -e '.tickets["30"] | has("conception") | not' "$CARTE" >/dev/null
+    [ "$(cat .repowarden/carte/conception/30.md)" = "" ]
+    git status --porcelain | grep -q . && return 1
+    true
+}
+
+@test "carte : second lancement servi par le cache, sans appel gh" {
+    projet_tickets
+    issues_simulees
+    export GH_CONNECTE=1
+    "$RW" carte >/dev/null
+    [ "$(grep -c '^issue list' "$GH_LOG")" = 1 ]
+    : >"$GH_LOG"
+    "$RW" carte >/dev/null
+    run "$RW" carte '#12' --json
+    [ "$status" -eq 0 ]
+    [[ "$(jq -r .conception <<<"$output")" == *"Somme des paniers"* ]] || false
+    [ ! -s "$GH_LOG" ]
+}
+
+@test "carte : gh non connecte -> avertissement, code 0, sans conception" {
+    projet_tickets
+    run "$RW" carte
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"carte sans la conception des tickets"* ]] || false
+    jq -e '.tickets["12"] | has("conception") | not' "$CARTE" >/dev/null
+    touch lib/a.sh
+    "$RW" carte '#12' --json 2>/dev/null | jq -e '.fichiers' >/dev/null
 }

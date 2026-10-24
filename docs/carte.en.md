@@ -1,6 +1,6 @@
 # Project map
 
-An AI agent (or a person) taking over a project explores it file by file to understand "what does what and why": costly in context. repowarden already asks, right above each new function, for one or two lines saying what it does and why ([hooks](hooks.md)). The **map** gathers these "whys" into an index, with no LLM and no network.
+An AI agent (or a person) taking over a project explores it file by file to understand "what does what and why": costly in context. repowarden already asks, right above each new function, for one or two lines saying what it does and why ([hooks](hooks.md)). The **map** gathers these "whys" into an index, with no LLM; only the tickets' design goes through `gh`, optionally.
 
 ```bash
 repowarden carte        # (re)generates .repowarden/carte/carte.json
@@ -78,3 +78,17 @@ repowarden carte bin/garde      # … then "Tickets: #317 #407 …"
 ```
 
 Any file still present (outside `repowarden.exclude`) touched by a ticket enters the map, even without functions (doc, workflow); the root `tickets` key gives each ticket's files.
+
+## Tickets' design
+
+The decision behind a change is written in the "Conception retenue" comment of its ticket. The map attaches it to the files, so that an agent does not have to look for it:
+
+```bash
+repowarden carte '#12'          # files, then "Design:" and its summary
+repowarden carte lib/a.sh       # … "#12 — <first line of the design>" per ticket
+```
+
+- **Same summary as the draft PR**: "Ce qui change" and "Hors périmètre" of the last "Conception retenue", then the "Ajout" / "Constat lié" comments; only maintainers' comments count.
+- **Read with `gh`, cached** in `.repowarden/carte/conception/<n>.md` (empty for a ticket without design): a single call (`gh issue list --state all`, read-only), and only when tickets are missing from the cache; then no call at all. To refresh: delete that folder.
+- **`gh` missing or not logged in**: warning, map without design, exit code 0.
+- JSON: `"tickets": {"12": {"fichiers": [...], "conception": "…"}}`.

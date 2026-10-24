@@ -6,8 +6,15 @@
 # Les fonctions et leur « pourquoi » viennent de la détection du contrôle
 # « fonctions sans commentaire » (commentaires.sh) : pas de second analyseur.
 # Demande commentaires.sh (via lang.sh) et common.sh ; lancé à la racine.
+# La conception des tickets est résumée comme pour les PR brouillon du bot :
+# mêmes lecteurs (ci/tickets/push.sh), pas un second.
+# shellcheck disable=SC2016,SC2013 # programmes jq et awk entre apostrophes ; numéros de tickets, un mot par ligne
+_carte_ci="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../ci/tickets" && pwd -P)"
+# shellcheck source=../../ci/tickets/commun.sh
+source "$_carte_ci/commun.sh"
+# shellcheck source=../../ci/tickets/push.sh
+source "$_carte_ci/push.sh"
 
-# shellcheck disable=SC2016 # programmes jq et awk entre apostrophes, rien à développer
 CARTE_DIR=.repowarden/carte
 CARTE_JSON="$CARTE_DIR/carte.json"
 
@@ -51,6 +58,14 @@ carte_generer() {
     git -c core.quotePath=false log --no-color --diff-merges=first-parent --name-only \
         --format='%x1e%s%n%b%x1f' 2>/dev/null |
         awk -v D=$'\x1e' -v F=$'\x1f' "$CARTE_HIST_AWK" >"$d/historique" || true
+    # Conceptions en cache, « \x1d<n> » puis le résumé, ticket par ticket
+    carte_conceptions "$d/historique"
+    : >"$d/conceptions"
+    for f in $(cut -f2 "$d/historique" | sort -un); do
+        [ -s "$CARTE_DIR/conception/$f.md" ] || continue
+        printf '\035%s\n' "$f" >>"$d/conceptions"
+        cat "$CARTE_DIR/conception/$f.md" >>"$d/conceptions"
+    done
     if [ ${#shell[@]} -gt 0 ]; then
         # « fichier<TAB>ligne<TAB>nom<TAB>pourquoi » par fonction
         awk -v lang=shell -v q="'" "$COMMENTS_AWK_LIB$CARTE_AWK" "${shell[@]}" >"$d/fonctions"
@@ -59,13 +74,15 @@ carte_generer() {
             awk "$CARTE_TESTS_AWK" "$d/shell" "${tests[@]}" >"$d/liens"
     fi
     jq -n -S --rawfile s "$d/shell" --rawfile fo "$d/fonctions" --rawfile li "$d/liens" \
-        --rawfile to "$d/tous" --rawfile hi "$d/historique" '
+        --rawfile to "$d/tous" --rawfile hi "$d/historique" --rawfile co "$d/conceptions" '
         def lignes($x): $x | split("\n") | map(select(length > 0) | split("\t"));
         (lignes($fo) | group_by(.[0]) | map({key: .[0][0], value:
             map({nom: .[2], ligne: (.[1] | tonumber), pourquoi: (.[3] // "")})
             | sort_by(.ligne)}) | from_entries) as $fn
         | (lignes($li) | group_by(.[0])
             | map({key: .[0][0], value: (map(.[1]) | unique)}) | from_entries) as $te
+        | ($co | split("\u001d") | map(select(length > 0) | index("\n") as $i
+            | {key: .[:$i], value: (.[$i + 1:] | rtrimstr("\n"))}) | from_entries) as $cn
         | (lignes($to) | map({key: .[0], value: 1}) | from_entries) as $ok
         | (lignes($hi) | map(select($ok[.[0]] != null))) as $h
         | ($h | group_by(.[0])
@@ -76,7 +93,9 @@ carte_generer() {
                 tickets: ($tf[.] // [])}})
             | from_entries)),
            tickets: ($h | group_by(.[1])
-            | map({key: .[0][1], value: {fichiers: (map(.[0]) | unique)}}) | from_entries)}' >"$d/carte.json"
+            | map({key: .[0][1], value: ({fichiers: (map(.[0]) | unique)}
+                + (if $cn[.[0][1]] then {conception: $cn[.[0][1]]} else {} end))})
+            | from_entries)}' >"$d/carte.json"
     mv -f "$d/carte.json" "$CARTE_JSON"
     rm -rf "$d"
 }
@@ -126,12 +145,72 @@ carte_fichier() {
     # Tickets qui l'ont modifié : le pourquoi de son histoire
     tickets="$(cjq -r --arg f "$f" '(.fichiers[$f].tickets // []) | map("#\(.)") | join(" ")' "$CARTE_JSON")"
     [ -z "$tickets" ] || echo_t carte.tickets "$tickets"
+    # Conception de chacun de ces tickets : sa première ligne utile
+    cjq -r --arg f "$f" '. as $c | (.fichiers[$f].tickets // [])[] | tostring as $n
+        | ($c.tickets[$n].conception // empty) | split("\n")
+        | map(select(test("^\\s*(#|$)") | not)) | first // empty
+        | "  #\($n) — \(sub("^\\s*[-*]\\s*"; ""))"' "$CARTE_JSON"
 }
 
-# Fichiers modifiés par le ticket $1 (numéro, sans #) ; JSON si $2 = json.
+# Met en cache (conception/<n>.md, vide sans conception) le résumé de chaque
+# ticket de l'historique $1 absent du cache : un seul appel gh, jamais bloquant
+carte_conceptions() {
+    local n manquants="" tmp ligne num="" texte=""
+    mkdir -p "$CARTE_DIR/conception"
+    for n in $(cut -f2 "$1" | sort -un); do
+        [ -f "$CARTE_DIR/conception/$n.md" ] || manquants="$manquants $n"
+    done
+    [ -n "$manquants" ] || return 0
+    if ! has gh || ! gh auth token >/dev/null 2>&1; then
+        attention_t carte.no_gh
+        return 0
+    fi
+    tmp="$(mktemp)"
+    if ! gh issue list --state all --limit 1000 --json number,comments >"$tmp" 2>/dev/null; then
+        attention_t carte.no_gh
+        rm -f "$tmp"
+        return 0
+    fi
+    # Par ticket : « \x1d<n> » puis ses commentaires de mainteneur, chacun
+    # suivi de SEP_COMMENTAIRE (forme de commentaires_mainteneur_r) ; une
+    # dernière ligne « \x1d » seule clôt le dernier ticket
+    while IFS= read -r ligne; do
+        if [[ "$ligne" == $'\035'* ]]; then
+            if [ -n "$num" ] && [[ " $manquants " == *" $num "* ]]; then
+                carte_resume_r "$texte"
+                printf '%s' "$REPLY" >"$CARTE_DIR/conception/$num.md"
+            fi
+            num="${ligne#$'\035'}" texte=""
+            [ -n "$num" ] || break
+            continue
+        fi
+        texte="$texte$ligne"$'\n'
+    done < <(cjq -r '.[] | "\u001d\(.number)", (.comments[]
+        | select(.authorAssociation == "OWNER" or .authorAssociation == "MEMBER" or .authorAssociation == "COLLABORATOR")
+        | .body + "\n\u001e")' "$tmp"; printf '\035\n')
+    rm -f "$tmp"
+    # Tickets absents de la réponse : sans conception, pas redemandés
+    for n in $manquants; do
+        [ -f "$CARTE_DIR/conception/$n.md" ] || : >"$CARTE_DIR/conception/$n.md"
+    done
+}
+
+# REPLY = résumé de conception des commentaires $1 : « Ce qui change » et
+# « Hors périmètre » de la dernière conception, puis les ajouts
+carte_resume_r() {
+    local conception
+    resume_conception_r "$1"
+    conception="$REPLY"
+    ajouts_ticket_r "$1"
+    REPLY="$conception${conception:+${REPLY:+$'\n\n'}}$REPLY"
+    [ -z "$REPLY" ] || REPLY="$REPLY"$'\n'
+}
+
+# Fichiers modifiés par le ticket $1 (numéro, sans #), puis sa conception ;
+# JSON si $2 = json.
 # Code 1 si l'historique git ne le cite pas
 carte_ticket() {
-    local n="$1" f c=0
+    local n="$1" f c=0 conception
     if [ "${2:-}" = json ]; then
         jq -e -S --arg n "$n" '.tickets[$n] // empty | {ticket: ($n | tonumber)} + .' "$CARTE_JSON" && return 0
         err_t carte.ticket_unknown "$n" "$n" "$n"
@@ -142,7 +221,11 @@ carte_ticket() {
         [ "$c" -gt 1 ] || { t carte.ticket_title "$n"; printf '%s%s%s\n' "$UI_B" "$REPLY" "$UI_N"; }
         printf '  %s\n' "$f"
     done < <(cjq -r --arg n "$n" '(.tickets[$n].fichiers // [])[]' "$CARTE_JSON")
-    [ "$c" -gt 0 ] && return 0
+    if [ "$c" -gt 0 ]; then
+        conception="$(cjq -r --arg n "$n" '.tickets[$n].conception // empty' "$CARTE_JSON")"
+        [ -z "$conception" ] || { echo_t carte.conception; printf '%s\n' "$conception" | sed 's/^/  /'; }
+        return 0
+    fi
     err_t carte.ticket_unknown "$n" "$n" "$n"
     return 1
 }
