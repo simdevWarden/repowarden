@@ -748,6 +748,7 @@ _msg_fr() {
         garde.gh_pr_create) _M="commande refusée : « %s » ; la PR brouillon est ouverte par le bot au premier push de la branche du ticket.\n  → git push -u origin HEAD" ;;
         garde.gh_rerun) _M="commande refusée : « %s » ; un workflow se relance par repowarden.\n  → repowarden run rerun <run-id|--failed>" ;;
         garde.gh_mainteneur) _M="commande refusée : « %s » ; c'est une décision du mainteneur (sortie du brouillon, merge, approbation, déploiement).\n  → Annoncer que la PR est prête (CI verte) et laisser le mainteneur décider." ;;
+        garde.ticket_mainteneur) _M="commande refusée : « %s » ; valider un ticket est une décision du mainteneur (étiquette « validé » ou de statut, ajout comme retrait).\n  → Demander au mainteneur de valider le ticket, puis le prendre : repowarden ticket <n>" ;;
         garde.gh_sans_ticket) _M="commande refusée : « %s » modifie GitHub hors du circuit des PR, sans ticket.\n  → Créer le ticket (repowarden ticket nouveau), le faire valider, puis relancer : REPOWARDEN_TICKET=<n> %s" ;;
         garde.gh_ticket_illisible) _M="commande refusée : « %s » ; ticket #%s illisible (gh issue view) : écriture sans preuve de ticket.\n  → Vérifier le numéro et gh auth status, puis relancer : REPOWARDEN_TICKET=<n> gh …" ;;
         garde.gh_ticket_non_valide) _M="commande refusée : « %s » ; le ticket #%s n'est pas ouvert et validé (étiquette « %s »).\n  → Faire valider le ticket par le mainteneur, puis relancer." ;;

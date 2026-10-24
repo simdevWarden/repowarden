@@ -456,3 +456,28 @@ GH
         [ "$status" -eq 0 ] || { echo "REPOWARDEN_TICKET=12 $c refusé : $output"; return 1; }
     done
 }
+
+@test "garde : valider un ticket (valide, statut) refuse, meme avec REPOWARDEN_TICKET" {
+    gh_simule
+    export FAKE_TICKET='OPEN\nvalidé'
+    for c in 'repowarden ticket label 12 validé' 'repowarden ticket label 12 validé --remove' \
+        'repowarden ticket label 12 "statut: en cours"' "repowarden ticket label 12 'statut: backlog' --remove" \
+        'repowarden ticket-label 12 validé' 'REPOWARDEN_TICKET=12 repowarden ticket label 12 validé' \
+        'REPOWARDEN_TICKET=12 repowarden ticket label 12 "statut: done"' 'git status && repowarden ticket label 12 validé'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"valider un ticket est une décision du mainteneur"* ]] || false
+    done
+    for c in 'repowarden ticket label 12 "type: fix"' 'repowarden ticket label 12 "type: fix" --remove' \
+        'repowarden ticket label --help' 'repowarden ticket comment 12 "validé ?"'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refusé : $output"; return 1; }
+    done
+    REPOWARDEN_LANG=en run shell 'repowarden ticket label 12 validé'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"validating a ticket is the maintainer's decision"* ]] || false
+    # Hors dépôt repowarden : tout est permis
+    git init -q -b main "$BATS_TEST_TMPDIR/libre"
+    run shell "cd $BATS_TEST_TMPDIR/libre && repowarden ticket label 12 validé"
+    [ "$status" -eq 0 ]
+}
