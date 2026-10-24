@@ -244,7 +244,7 @@ _msg_fr() {
         help.bots) _M="Usage : repowarden bots\n\nBots du dépôt GitHub courant : une question globale, un accord par bot (CI,\nreleases, nettoyage, tickets, App, protection, npm), l'aperçu de ce qui sera\ncréé ou modifié, puis une confirmation finale. Rien sans accord, relançable\npour compléter. Aussi : repowarden install --bots, et --sans-bots pour ne\nplus les proposer. Demande un terminal, gh connecté et les droits\nd'administration du dépôt." ;;
         help.bot) _M="Usage : repowarden bot [--repo o/r]… [--dry-run] [--rapport FICHIER]\n        repowarden bot rapport FICHIER\n        repowarden bot init\n\nBot d'organisation : chaque nuit (et à la demande) il applique chaque projet\nadopté (protection, migration) et publie son rapport dans l'issue « Rapport\ndu bot repowarden » ; --dry-run voit sans rien modifier. init : écrit le\nworkflow du dépôt de pilotage (.github/workflows/bot.yml). GH_TOKEN : jeton\nd'installation de l'App (repowarden app init --bot)." ;;
         help.cc) _M="Usage : repowarden cc [options de git commit]   (alias : git cc, installé par install.sh)\n        repowarden cc -m \"description\" [--type T] [--scope S] [--breaking NOTE] [--body TEXTE] [--refs \"Ticket : #12\"]\n        repowarden cc --dry-run\n\nAssistant de commit conventionnel : guide l'en-tête, le corps et le pied,\npuis commit via les hooks habituels. Sans question (-m : scripts, agents) :\nmêmes contrôles, type et scope déduits de la branche s'ils sont omis.\n  --strict    une réponse refusée arrête tout (rien n'est commité)\n  --dry-run   affiche le message sans commiter" ;;
-        help.carte) _M="Usage : repowarden carte\n\nCarte du projet, sans LLM ni réseau : chaque fonction des scripts shell, avec\nson fichier, sa ligne et son « pourquoi » (le commentaire juste au-dessus).\nÉcrite dans .repowarden/carte/carte.json, dossier ignoré par git. Demande jq." ;;
+        help.carte) _M="Usage : repowarden carte                              (re)génère la carte\n        repowarden carte <fichier|fonction|'#n'> [--json]  extrait utile\n\nCarte du projet, sans LLM : chaque fonction des scripts shell, avec\nson fichier, sa ligne et son « pourquoi » (le commentaire juste au-dessus),\nles tests de chaque fichier (même nom, chemin ou commande cités) et les\ntickets qui l'ont modifié (pieds « Ticket : #n » de git, sans réseau), avec\nla conception de chacun (lue par gh une fois, mise en cache).\nÉcrite dans .repowarden/carte/carte.json, dossier ignoré par git ; interrogée,\nelle est d'abord régénérée si elle est absente ou périmée. --json : sortie\npour les outils. Demande jq." ;;
         help.code-mort) _M="Usage : repowarden code-mort [base]\n\nCode mort introduit par ta branche, comme en CI : seules les lignes ajoutées\nou modifiées depuis la base comptent (commits, modifications en cours,\nnouveaux fichiers). Défaut : point de départ de la branche depuis origin/main.\nVoir docs/code-mort.md : ce qui est prouvé (bloquant) et ce qui est candidat." ;;
         help.ticket) _M="Usage : repowarden ticket <n>                          branche du ticket (créée, liée, si besoin)\n        repowarden ticket                              ticket de la branche courante\n        repowarden ticket nouveau \"<titre>\" [--type fix] [--description \"…\"]\n        repowarden ticket comment <n> \"<texte>\"        commentaire sur le ticket\n        repowarden ticket label <n> <label> [--remove] labels du ticket\n\nLe ticket d'abord : prendre <n> l'assigne à toi et place sur sa branche\n(créée depuis develop au besoin) ; nouveau crée le ticket (« à valider » si\nle suivi est géré par repowarden). Demande gh connecté (https://cli.github.com)." ;;
         help.tickets) _M="Usage : repowarden tickets init [--repo propriétaire/nom] [--sans-validation-auto]\n        repowarden tickets sync\n\nPrépare le suivi des tickets d'un dépôt GitHub (relançable sans risque) :\nétiquettes (« validé », statuts et types, préfixe des branches), modèle de\nticket, workflow ; tickets existants rangés ; branches des PR inscrites sur\nleurs tickets. sync : branches locales des tickets qui me sont assignés\n(automatique avec ticketSync = auto, défaut manual)." ;;
@@ -446,6 +446,17 @@ _msg_fr() {
         carte.done) _M="Carte : %s fichier(s), %s fonction(s), dont %s sans commentaire → %s" ;;
         carte.no_repo) _M="repowarden carte : à lancer dans un dépôt git." ;;
         carte.no_jq) _M="jq absent : la carte en a besoin (installer jq : https://jqlang.org)." ;;
+        carte.no_comment) _M="(sans commentaire)" ;;
+        carte.file_empty) _M="%s : aucune fonction répertoriée dans la carte." ;;
+        carte.tests) _M="Tests : %s" ;;
+        carte.tickets) _M="Tickets : %s" ;;
+        carte.conception) _M="Conception :" ;;
+        carte.no_gh) _M="gh absent ou non connecté (gh auth login) : carte sans la conception des tickets." ;;
+        carte.ticket_title) _M="Ticket #%s : fichiers modifiés" ;;
+        carte.ticket_unknown) _M="Ticket #%s : aucun commit ne le cite (pied « Ticket : #%s » ou branche type/%s-sujet)." ;;
+        carte.tests_run) _M="  → %s" ;;
+        carte.no_tests) _M="Aucun test trouvé pour %s (ni test du même nom, ni chemin ou commande repowarden cités dans un test)." ;;
+        carte.unknown) _M="« %s » n'est ni un fichier ni une fonction de la carte." ;;
         ci.section.commits) _M="Messages de commit (Conventional Commits)" ;;
         ci.section.branch) _M="Nom de branche" ;;
         ci.section.secrets) _M="Secrets (gitleaks)" ;;
@@ -521,6 +532,9 @@ _msg_fr() {
         st.agents_sans_garde) _M="Agent IA sans garde-fou (Claude Code, opencode) : ses actions ne sont vérifiées qu'au commit. → %s" ;;
         st.agents_stale) _M="Garde-fou repowarden périmé (%s) : posé par une version antérieure de repowarden. → %s" ;;
         st.next) _M="Étape suivante :" ;;
+        st.carte_absente) _M="Carte du projet absente (facultative, lue par les agents avant de modifier un fichier) : repowarden carte" ;;
+        st.carte_ok) _M="Carte du projet à jour (repowarden carte <fichier>)" ;;
+        st.carte_perimee) _M="Carte du projet périmée : des fichiers ont changé depuis, elle ne dit plus ce que fait le code." ;;
         st.ready) _M="Tout est prêt : git cc pour commiter, repowarden code-mort sur une branche." ;;
         st.help) _M="Toutes les commandes : repowarden --help" ;;
         # Tickets
@@ -733,6 +747,7 @@ _msg_fr() {
         garde.detache) _M="modification refusée : HEAD détaché dans %s.\n  → Se placer sur la branche d'un ticket : repowarden ticket <n>" ;;
         garde.protegee) _M="modification refusée : « %s » est une branche protégée.\n  → Travailler sur la branche d'un ticket : repowarden ticket <n>" ;;
         garde.protegee_libre) _M="modification refusée : « %s » est une branche protégée.\n  → Créer une branche de travail : git switch -c <type>/<sujet>" ;;
+        garde.carte) _M="  → Avant de modifier %s, une fois sur la bonne branche : repowarden carte %s (fonctions, tests, tickets)" ;;
         garde.hors_ticket) _M="modification refusée : la branche « %s » n'est pas celle d'un ticket (<type>/<n>-<sujet>).\n  → Prendre le ticket : repowarden ticket <n>" ;;
         garde.branche) _M="commande refusée : « %s » crée une branche ; ici, la branche naît du ticket.\n  → repowarden ticket <n>" ;;
         garde.commit) _M="commande refusée : « %s » ; les commits passent par l'assistant (seul --amend --no-edit est permis).\n  → repowarden cc -m \"<description>\" --refs \"Ticket : #<n>\"" ;;

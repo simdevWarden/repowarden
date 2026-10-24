@@ -121,7 +121,7 @@ _msg_en() {
         help.bots) _M="Usage: repowarden bots\n\nSet up GitHub repo bots (CI, releases, cleanup, tickets, App, protection,\nnpm): one global question, per-bot confirmation, preview, final confirmation.\nNothing done without consent. Can be rerun. Also via install --bots.\nNeeds a terminal, gh logged in and admin rights on the repo." ;;
         help.bot) _M="Usage: repowarden bot [--repo o/r]… [--dry-run] [--rapport FILE]\n       repowarden bot rapport FILE\n       repowarden bot init\n\nOrg bot: nightly (and on demand) updates adopted projects (protection,\nmigration), publishes a report to the \"Rapport du bot repowarden\" issue.\n--dry-run shows without changes. init writes .github/workflows/bot.yml.\nUses installation token of the bot App (repowarden app init --bot)." ;;
         help.cc) _M="Usage: repowarden cc [git commit options]   (alias: git cc)\n       repowarden cc -m \"description\" [--type T] [--scope S] [--breaking NOTE] [--body TEXT] [--refs \"Ticket: #12\"]\n       repowarden cc --dry-run\n\nConventional commit assistant: guides header, body and footer, runs hooks.\nBatch mode (-m etc.): same checks, type/scope inferred from branch if omitted.\n  --strict    any refused answer stops (nothing committed)\n  --dry-run   show message without committing" ;;
-        help.carte) _M="Usage: repowarden carte\n\nProject map, no LLM nor network: every function of the shell scripts, with\nits file, line and \"why\" (the comment right above it).\nWritten to .repowarden/carte/carte.json, a folder ignored by git. Requires jq." ;;
+        help.carte) _M="Usage: repowarden carte                              (re)generates the map\n       repowarden carte <file|function|'#n'> [--json] useful excerpt\n\nProject map, no LLM: every function of the shell scripts, with\nits file, line and \"why\" (the comment right above it),\nthe tests of each file (same name, cited path or command) and the tickets\nthat changed it (git \"Ticket : #n\" footers, no network), with the design\nof each (read with gh once, cached).\nWritten to .repowarden/carte/carte.json, a folder ignored by git; when queried,\nit is regenerated first if missing or stale. --json: output for tools.\nRequires jq." ;;
         help.code-mort) _M="Usage: repowarden code-mort [base]\n\nDead code introduced by your branch (like CI): only added/changed lines\nsince base (commits, staged/uncommitted, new files). Default: merge-base\nwith origin/main. See docs/code-mort.md (proven vs candidates)." ;;
         help.ticket) _M="Usage: repowarden ticket <n>                          branch for ticket (created, linked if needed)\n       repowarden ticket                              ticket of current branch\n       repowarden ticket nouveau \"<title>\" [--type fix] [--description \"…\"]\n       repowarden ticket comment <n> \"<text>\"         add comment\n       repowarden ticket label <n> <label> [--remove] manage labels\n\nTicket first: taking <n> assigns to you and switches to its branch\n(created from develop if needed). \"nouveau\" creates a ticket (\"à valider\"\nif tracking is managed). Needs gh connected (https://cli.github.com)." ;;
         help.tickets) _M="Usage: repowarden tickets init [--repo owner/name] [--sans-validation-auto]\n       repowarden tickets sync\n\nSets up ticket tracking: labels, issue template, workflow; classifies\nexisting tickets; records PR branches. sync checks out local branches for\ntickets assigned to you (auto with ticketSync=auto, manual by default)." ;;
@@ -445,6 +445,17 @@ _msg_en() {
         carte.done) _M="Map: %s file(s), %s function(s), %s without a comment → %s" ;;
         carte.no_repo) _M="repowarden carte: run it inside a git repository." ;;
         carte.no_jq) _M="jq is missing: the map needs it (install jq: https://jqlang.org)." ;;
+        carte.no_comment) _M="(no comment)" ;;
+        carte.file_empty) _M="%s: no function listed in the map." ;;
+        carte.tests) _M="Tests: %s" ;;
+        carte.tickets) _M="Tickets: %s" ;;
+        carte.conception) _M="Design:" ;;
+        carte.no_gh) _M="gh missing or not logged in (gh auth login): map without the tickets' design." ;;
+        carte.ticket_title) _M="Ticket #%s: modified files" ;;
+        carte.ticket_unknown) _M="Ticket #%s: no commit cites it (footer \"Ticket : #%s\" or branch type/%s-topic)." ;;
+        carte.tests_run) _M="  → %s" ;;
+        carte.no_tests) _M="No test found for %s (no test with the same name, no test citing its path or repowarden command)." ;;
+        carte.unknown) _M="\"%s\" is neither a file nor a function of the map." ;;
         ci.section.commits) _M="Commit messages (Conventional Commits)" ;;
         ci.section.branch) _M="Branch name" ;;
         ci.section.secrets) _M="Secrets (gitleaks)" ;;
@@ -520,6 +531,9 @@ _msg_en() {
         st.agents_sans_garde) _M="AI agent without the guard (Claude Code, opencode): its actions are only checked at commit time. → %s" ;;
         st.agents_stale) _M="Outdated repowarden guard (%s): wired by an earlier version of repowarden. → %s" ;;
         st.next) _M="Next step:" ;;
+        st.carte_absente) _M="No project map (optional, read by agents before changing a file): repowarden carte" ;;
+        st.carte_ok) _M="Project map up to date (repowarden carte <file>)" ;;
+        st.carte_perimee) _M="Project map is stale: files changed since, it no longer tells what the code does." ;;
         st.ready) _M="All set: git cc to commit, repowarden code-mort on a branch." ;;
         st.help) _M="Every command: repowarden --help" ;;
         # Tickets
@@ -732,6 +746,7 @@ _msg_en() {
         garde.detache) _M="change refused: detached HEAD in %s.\n  → Switch to a ticket's branch: repowarden ticket <n>" ;;
         garde.protegee) _M="change refused: \"%s\" is a protected branch.\n  → Work on a ticket's branch: repowarden ticket <n>" ;;
         garde.protegee_libre) _M="change refused: \"%s\" is a protected branch.\n  → Create a work branch: git switch -c <type>/<topic>" ;;
+        garde.carte) _M="  → Before changing %s, once on the right branch: repowarden carte %s (functions, tests, tickets)" ;;
         garde.hors_ticket) _M="change refused: branch \"%s\" is not a ticket's branch (<type>/<n>-<topic>).\n  → Take the ticket: repowarden ticket <n>" ;;
         garde.branche) _M="command refused: \"%s\" creates a branch; here, branches come from tickets.\n  → repowarden ticket <n>" ;;
         garde.commit) _M="command refused: \"%s\"; commits go through the assistant (only --amend --no-edit is allowed).\n  → repowarden cc -m \"<description>\" --refs \"Ticket : #<n>\"" ;;

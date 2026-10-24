@@ -456,3 +456,18 @@ GH
         [ "$status" -eq 0 ] || { echo "REPOWARDEN_TICKET=12 $c refusé : $output"; return 1; }
     done
 }
+
+@test "garde : refus d'une modification de fichier existant -> rappel de repowarden carte" {
+    mkdir -p lib
+    echo x >lib/outil.sh
+    run edit lib/outil.sh
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"repowarden carte lib/outil.sh"* ]] || false
+    # Chemin lu par jq sous Windows : CR final
+    run claude Edit "$(jq -n --arg f "$PWD/lib/outil.sh"$'\r' '{file_path: $f, old_string: "a", new_string: "b"}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"repowarden carte lib/outil.sh"* ]] || false
+    run claude Write "$(jq -n --arg f "$PWD/nouveau.sh" '{file_path: $f, content: "x"}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" != *"repowarden carte"* ]] || false
+}

@@ -29,6 +29,7 @@ le détail est dans la doc, voir « Où trouver le reste ».
 
 ```bash
 repowarden ticket <n>                    # prendre un ticket, se placer sur sa branche
+repowarden carte <fichier|fonction|'#n'> # avant de modifier : pourquoi, tests, tickets
 repowarden cc --dry-run -m "<description>" --type <type> --scope <portée> \
     --body "<pourquoi>" --refs "Ticket : #<n>"   # aperçu du message
 repowarden cc -m "…" --type … --scope … --body "…" --refs "Ticket : #<n>"   # commit
@@ -37,6 +38,9 @@ repowarden cc -m "…" --type … --scope … --body "…" --refs "Ticket : #<n>
 - Messages en **français**, en-tête ≤ 72 caractères, **sans signature ni
   co-auteur d'agent**. Utiliser `repowarden cc` (paquet installé), pas un alias
   local ni `git commit -m`.
+- **Avant de modifier un fichier X : `repowarden carte X`** (ses fonctions et
+  leur pourquoi, les tests à écrire d'abord puis relancer, les tickets et leur
+  conception) plutôt qu'explorer le dépôt ; voir [`docs/carte.md`](docs/carte.md).
 - **Toute nouvelle fonction** a, juste au-dessus, une à deux lignes qui disent
   ce qu'elle fait et **pourquoi**, sans paraphraser le code (pas de gros bloc).
   Le pre-commit et la CI signalent une fonction ajoutée sans commentaire.
