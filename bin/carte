@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Usage : repowarden carte
+# Usage : repowarden carte                       (re)génère la carte
+#         repowarden carte <fichier|fonction> [--json]   extrait utile
 #
 # Carte du projet, sans LLM ni réseau : chaque fonction des scripts shell,
 # son fichier, sa ligne et son « pourquoi » (le commentaire juste au-dessus),
-# dans .repowarden/carte/carte.json (dossier ignoré par git). Voir docs/carte.md.
+# dans .repowarden/carte/carte.json (dossier ignoré par git). Interrogée,
+# elle est d'abord régénérée si elle est absente ou périmée. Voir docs/carte.md.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -14,12 +16,21 @@ source "$ROOT/hooks/lib/lang.sh"
 # shellcheck source=../hooks/lib/carte.sh
 source "$ROOT/hooks/lib/carte.sh"
 
-if [ $# -gt 0 ]; then
-    err_t install.unknown_arg "$1"
-    _tr help.carte
-    printf '%b\n' "$_T" >&2
-    exit 1
-fi
+# Arguments : une cible (fichier ou fonction), --json
+cible="" json=""
+for a in "$@"; do
+    case "$a" in
+        --json) json=json ;;
+        -*) inconnu="$a" ;;
+        *) if [ -z "$cible" ]; then cible="$a"; else inconnu="$a"; fi ;;
+    esac
+    if [ -n "${inconnu:-}" ]; then
+        err_t install.unknown_arg "$inconnu"
+        _tr help.carte
+        printf '%b\n' "$_T" >&2
+        exit 1
+    fi
+done
 if [ -z "$GIT_TOPLEVEL" ]; then
     err_t carte.no_repo
     exit 1
@@ -28,9 +39,29 @@ if ! has jq; then
     err_t carte.no_jq
     exit 1
 fi
+# Fichier existant : chemin depuis la racine du dépôt, quel que soit le dossier courant
+chemin=""
+if [ -n "$cible" ] && [ -e "$cible" ]; then
+    chemin="$(cd "$(dirname "$cible")" && pwd -P)/${cible##*/}"
+    chemin="${chemin#"$(cd "$GIT_TOPLEVEL" && pwd -P)"/}"
+    chemin="${chemin%/.}"
+fi
 cd "$GIT_TOPLEVEL"
-carte_generer
-# shellcheck disable=SC2016 # programme jq, rien à développer
-read -r fichiers fonctions sans < <(cjq -r '[.fichiers[].fonctions[]] as $f
-    | "\(.fichiers | length) \($f | length) \([$f[] | select(.pourquoi == "")] | length)"' "$CARTE_JSON")
-ok_t carte.done "$fichiers" "$fonctions" "$sans" "$CARTE_JSON"
+
+if [ -z "$cible" ] && [ -z "$json" ]; then
+    carte_generer
+    # shellcheck disable=SC2016 # programme jq, rien à développer
+    read -r fichiers fonctions sans < <(cjq -r '[.fichiers[].fonctions[]?] as $f
+        | "\(.fichiers | length) \($f | length) \([$f[] | select(.pourquoi == "")] | length)"' "$CARTE_JSON")
+    ok_t carte.done "$fichiers" "$fonctions" "$sans" "$CARTE_JSON"
+    exit 0
+fi
+# Interrogation : carte absente ou périmée, régénérée d'abord
+carte_a_jour || carte_generer
+if [ -z "$cible" ]; then
+    cat "$CARTE_JSON"
+elif [ -n "$chemin" ] || jq -e --arg f "$cible" '.fichiers | has($f)' "$CARTE_JSON" >/dev/null; then
+    carte_fichier "${chemin:-$cible}" "$json"
+else
+    carte_fonction "$cible" "$json"
+fi
