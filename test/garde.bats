@@ -327,6 +327,21 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     [ "$status" -eq 0 ]
 }
 
+# Ticket #469 : outils d'opencode 2.x (write/edit à argument path, shell)
+@test "garde : opencode 2.x, write et edit (path) et shell verifies" {
+    run opencode write "$(jq -n --arg f "$PWD/README.md" '{path: $f, content: "x"}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"« main » est une branche protégée"* ]] || false
+    run opencode edit "$(jq -n '{path: "README.md", oldString: "a", newString: "b"}')"
+    [ "$status" -eq 2 ]
+    run opencode shell "$(jq -n '{command: "git commit -m x", workdir: "."}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"repowarden cc"* ]] || false
+    git switch -q -c feat/essai
+    run opencode write "$(jq -n '{path: "nouveau.txt", content: "x"}')"
+    [ "$status" -eq 0 ]
+}
+
 @test "garde : hors depot repowarden, tout est permis" {
     libre="$BATS_TEST_TMPDIR/libre"
     git init -q -b main "$libre"
@@ -487,4 +502,19 @@ GH
         FAKE_TICKET='OPEN\nvalidé' run shell "REPOWARDEN_TICKET=12 $c"
         [ "$status" -eq 0 ] || { echo "REPOWARDEN_TICKET=12 $c refusé : $output"; return 1; }
     done
+}
+
+@test "garde : refus d'une modification de fichier existant -> rappel de repowarden carte" {
+    mkdir -p lib
+    echo x >lib/outil.sh
+    run edit lib/outil.sh
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"repowarden carte lib/outil.sh"* ]] || false
+    # Chemin lu par jq sous Windows : CR final
+    run claude Edit "$(jq -n --arg f "$PWD/lib/outil.sh"$'\r' '{file_path: $f, old_string: "a", new_string: "b"}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"repowarden carte lib/outil.sh"* ]] || false
+    run claude Write "$(jq -n --arg f "$PWD/nouveau.sh" '{file_path: $f, content: "x"}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" != *"repowarden carte"* ]] || false
 }

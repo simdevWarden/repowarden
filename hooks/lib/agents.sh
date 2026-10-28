@@ -4,7 +4,10 @@
 
 # Forme actuelle du garde-fou : un garde-fou posé par repowarden qui en diffère
 # date d'une version antérieure et est mis à jour (#470)
-AGENTS_MODELE_OPENCODE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../agents" && pwd -P)/repowarden-garde.js"
+AGENTS_MODELES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../agents" && pwd -P)"
+# Plugins opencode, un par API : 1.x lit l'export nommé, 2.x l'export par
+# défaut, et 1.x ignore l'export nommé d'un module qui a les deux (#469)
+AGENTS_PLUGINS_OPENCODE="repowarden-garde.js repowarden-garde-v2.js"
 AGENTS_COMMANDE_CLAUDE="repowarden garde --format claude"
 AGENTS_MATCHER_CLAUDE="Edit|Write|MultiEdit|NotebookEdit|Bash"
 
@@ -25,10 +28,10 @@ agents_plugin_repowarden() {
     return 1
 }
 
-# Vrai si le plugin $1 vient de repowarden mais diffère du modèle actuel :
-# posé par une version antérieure, il n'a pas suivi les mises à jour
+# Vrai si le plugin $1 vient de repowarden mais diffère du modèle actuel (même
+# nom) : posé par une version antérieure, il n'a pas suivi les mises à jour
 agents_plugin_perime() {
-    agents_plugin_repowarden "$1" && ! cmp -s "$1" "$AGENTS_MODELE_OPENCODE"
+    agents_plugin_repowarden "$1" && ! cmp -s "$1" "$AGENTS_MODELES/$(basename "$1")"
 }
 
 # Vrai si le settings.json $1 a un hook « repowarden garde… » d'une autre forme
@@ -47,13 +50,23 @@ agents_perimes() {
     agents_dossiers_globaux
     if [ -n "${1:-}" ]; then
         ! agents_claude_perime "$1/.claude/settings.json" || echo "projet claude $1/.claude/settings.json"
-        ! agents_plugin_perime "$1/.opencode/plugins/repowarden-garde.js" ||
-            echo "projet opencode $1/.opencode/plugins/repowarden-garde.js"
+        agents_opencode_perimes projet "$1/.opencode/plugins"
     fi
     ! agents_claude_perime "$AGENTS_CLAUDE_DIR/settings.json" || echo "global claude $AGENTS_CLAUDE_DIR/settings.json"
-    ! agents_plugin_perime "$AGENTS_OPENCODE_DIR/plugins/repowarden-garde.js" ||
-        echo "global opencode $AGENTS_OPENCODE_DIR/plugins/repowarden-garde.js"
+    agents_opencode_perimes global "$AGENTS_OPENCODE_DIR/plugins"
     return 0
+}
+
+# Plugins opencode périmés du dossier $2 (portée $1) : différents du modèle, ou
+# absents à côté d'un plugin repowarden (posé avant le plugin 2.x, #469)
+agents_opencode_perimes() {
+    local p
+    for p in $AGENTS_PLUGINS_OPENCODE; do
+        if agents_plugin_perime "$2/$p" ||
+            { [ ! -e "$2/$p" ] && agents_plugin_repowarden "$2/repowarden-garde.js"; }; then
+            echo "$1 opencode $2/$p"
+        fi
+    done
 }
 
 # Vrai si Claude Code ou opencode est sur ce poste (commande, ou dossier de

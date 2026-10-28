@@ -11,6 +11,11 @@ exit_if_skipped
 run_local_hook "$@"
 # Branches locales des tickets qui me sont assignés (au plus toutes les 15 min)
 tickets_sync || true
+# Carte du projet déjà générée (repowarden carte) : recalculée après la fusion,
+# hors ligne (ni gh ni réseau), sans jamais faire échouer le hook
+if [ -n "$GIT_TOPLEVEL" ] && [ -f "$GIT_TOPLEVEL/.repowarden/carte/carte.json" ] && has jq; then
+    REPOWARDEN_CARTE_HORS_LIGNE=1 bash "$(dirname "$0")/../bin/carte" >/dev/null 2>&1 || true
+fi
 skipped prune-branches && exit 0
 
 current="$(git symbolic-ref --short HEAD 2>/dev/null || echo "")"

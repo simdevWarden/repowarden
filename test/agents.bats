@@ -6,6 +6,7 @@ load helpers
 
 RW="$BATS_TEST_DIRNAME/../bin/repowarden"
 MODELE="$BATS_TEST_DIRNAME/../hooks/agents/repowarden-garde.js"
+MODELE_V2="$BATS_TEST_DIRNAME/../hooks/agents/repowarden-garde-v2.js"
 
 setup() {
     require jq
@@ -31,11 +32,12 @@ setup() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"Claude Code : garde-fou ajouté"* ]] || false
     [[ "$output" == *"opencode : garde-fou ajouté"* ]] || false
-    [[ "$output" == *"À versionner : git add .claude/settings.json .opencode/plugins/repowarden-garde.js"* ]] || false
+    [[ "$output" == *"À versionner : git add .claude/settings.json .opencode/plugins/repowarden-garde.js .opencode/plugins/repowarden-garde-v2.js"* ]] || false
     # jq -e : comparaison dans jq, sans les fins de ligne \r\n de jq sous Windows
     jq -e '.hooks.PreToolUse[0].matcher == "Edit|Write|MultiEdit|NotebookEdit|Bash"
         and .hooks.PreToolUse[0].hooks[0].command == "repowarden garde --format claude"' .claude/settings.json
     cmp -s .opencode/plugins/repowarden-garde.js "$MODELE"
+    cmp -s .opencode/plugins/repowarden-garde-v2.js "$MODELE_V2"
 }
 
 @test "agents init : relance, rien ne change" {
@@ -153,6 +155,7 @@ JS
     [[ "$output" == *"Claude Code : garde-fou retiré"* ]] || false
     [[ "$output" == *"opencode : garde-fou retiré"* ]] || false
     [ ! -e .claude/settings.json ] && [ ! -e .opencode/plugins/repowarden-garde.js ]
+    [ ! -e .opencode/plugins/repowarden-garde-v2.js ]
     # Relance : rien a retirer, sans erreur
     run "$RW" agents retirer
     [ "$status" -eq 0 ]
@@ -225,4 +228,63 @@ ANCIEN_PLUGIN="$BATS_TEST_DIRNAME/fixtures/agents/ancien-plugin-opencode-autonom
     jq -e '.model == "x" and .hooks.Stop[0].hooks[0].command == "fin" and (.hooks.PreToolUse | length) == 3' .claude/settings.json
     run "$RW" agents init --claude
     [[ "$output" == *"Claude Code : garde-fou déjà en place"* ]] || false
+}
+
+# Ticket #469 : opencode 2.x n'appelle que l'export par défaut { id, setup } ;
+# opencode 1.x ignore l'export nommé d'un module qui en a un : deux fichiers
+@test "agents init : plugin opencode 2.x a cote du plugin 1.x, ajoute s'il manque" {
+    mkdir -p .opencode/plugins
+    cp "$MODELE" .opencode/plugins/repowarden-garde.js
+    run "$RW" statut
+    [[ "$output" == *"Garde-fou repowarden périmé"*"repowarden-garde-v2.js"* ]] || false
+    run "$RW" agents init --opencode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"opencode : garde-fou déjà en place ("*"/.opencode/plugins/repowarden-garde.js)"* ]] || false
+    [[ "$output" == *"opencode : garde-fou ajouté ("*"/.opencode/plugins/repowarden-garde-v2.js)"* ]] || false
+    cmp -s .opencode/plugins/repowarden-garde-v2.js "$MODELE_V2"
+    run "$RW" statut
+    [[ "$output" != *"périmé"* ]] || false
+}
+
+@test "agents init : plugin opencode 2.x refuse sur main, permet sur une branche (contexte v2 simule)" {
+    require node
+    case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*) skip "Node natif sous Windows" ;; esac
+    "$RW" agents init --opencode >/dev/null
+    cp .opencode/plugins/repowarden-garde.js "$BATS_TEST_TMPDIR/v1.mjs"
+    cp .opencode/plugins/repowarden-garde-v2.js "$BATS_TEST_TMPDIR/v2.mjs"
+    # Contexte d'opencode 2.x : ctx.tool.hook(nom, rappel), ctx.location.directory
+    cat >"$BATS_TEST_TMPDIR/appel.mjs" <<'JS'
+const plugin = (await import(process.argv[2])).default
+const crochets = {}
+await plugin.setup({ location: { directory: process.cwd() }, tool: { hook: (nom, rappel) => { crochets[nom] = rappel } } })
+const [tool, input] = [process.argv[3], JSON.parse(process.argv[4])]
+try {
+  await crochets["execute.before"]({ tool, sessionID: "s", id: "c", input })
+  console.log("permis")
+} catch (e) {
+  console.log("refusé : " + e.message)
+}
+JS
+    run node "$BATS_TEST_TMPDIR/appel.mjs" "$BATS_TEST_TMPDIR/v2.mjs" write '{"path":"README.md","content":"x"}'
+    [[ "$output" == "refusé : "*"branche protégée"* ]] || false
+    run node "$BATS_TEST_TMPDIR/appel.mjs" "$BATS_TEST_TMPDIR/v2.mjs" shell '{"command":"git commit -m x"}'
+    [[ "$output" == "refusé : "*"repowarden cc"* ]] || false
+    # repowarden absent : rien n'est bloqué
+    node="$(command -v node)"
+    PATH="$BATS_TEST_TMPDIR/vide" run "$node" "$BATS_TEST_TMPDIR/appel.mjs" "$BATS_TEST_TMPDIR/v2.mjs" write '{"path":"README.md","content":"x"}'
+    [ "$output" = permis ]
+    git switch -q -c feat/essai
+    run node "$BATS_TEST_TMPDIR/appel.mjs" "$BATS_TEST_TMPDIR/v2.mjs" write '{"path":"README.md","content":"x"}'
+    [ "$output" = permis ]
+    # Contexte d'opencode 1.x (sans ctx.tool) : setup ne fait rien ; le plugin
+    # 1.x n'a pas d'export par défaut, sinon 1.x n'appellerait plus son crochet
+    cat >"$BATS_TEST_TMPDIR/v1x.mjs" <<'JS'
+const v2 = (await import(process.argv[2])).default
+await v2.setup({ agent: {}, plugin: {} })
+const v1 = await import(process.argv[3])
+console.log(v2.id, typeof v1.default, typeof v1.RepowardenGarde)
+JS
+    run node "$BATS_TEST_TMPDIR/v1x.mjs" "$BATS_TEST_TMPDIR/v2.mjs" "$BATS_TEST_TMPDIR/v1.mjs"
+    [ "$status" -eq 0 ]
+    [ "$output" = "repowarden-garde undefined function" ]
 }

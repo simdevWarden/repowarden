@@ -4,7 +4,7 @@ An AI agent (Claude Code, opencode…) can change a protected branch, work witho
 
 ```bash
 repowarden agents init        # Claude Code and opencode, in the repository (to commit)
-git add .claude/settings.json .opencode/plugins/repowarden-garde.js
+git add .claude/settings.json .opencode/plugins/repowarden-garde.js .opencode/plugins/repowarden-garde-v2.js
 ```
 
 ## What is refused
@@ -42,7 +42,10 @@ Help and preview (`--help`, `-h`, `--dry-run` of `repowarden cc`, `git cc`, `git
 | Tool | Wiring | Project (`--projet`, default) | User (`--global`) |
 |---|---|---|---|
 | [Claude Code](https://code.claude.com/docs/en/hooks) | `PreToolUse` hook (`Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `Bash` tools): `repowarden garde --format claude` | `.claude/settings.json` | `$CLAUDE_CONFIG_DIR/settings.json` ([if set](https://code.claude.com/docs/en/settings)), else `~/.claude/settings.json` |
-| [opencode](https://opencode.ai/docs/plugins/) | plugin, `tool.execute.before` hook (`edit`, `write`, `apply_patch`, `bash` tools) | `.opencode/plugins/repowarden-garde.js` | `$OPENCODE_CONFIG_DIR/plugins/` ([if set](https://opencode.ai/docs/config/)), else `${XDG_CONFIG_HOME:-~/.config}/opencode/plugins/` |
+| [opencode](https://opencode.ai/docs/plugins/) 1.x | plugin, `tool.execute.before` hook (`edit`, `write`, `apply_patch`, `bash` tools) | `.opencode/plugins/repowarden-garde.js` | `$OPENCODE_CONFIG_DIR/plugins/` ([if set](https://opencode.ai/docs/config/)), else `${XDG_CONFIG_HOME:-~/.config}/opencode/plugins/` |
+| opencode 2.x (`@opencode/cli`) | `{ id, setup }` plugin, `ctx.tool.hook("execute.before")` hook (`edit`, `write`, `shell` tools) | `.opencode/plugins/repowarden-garde-v2.js` | same folder |
+
+Two files, one per opencode version: opencode 1.x takes a module with a default `{ id, setup }` export for a 2.x plugin and no longer calls its 1.x export. Each version loads both; the other version's file does nothing. Tried with opencode 1.18.34, 1.19.4 and 2.1.4.
 
 `repowarden agents init --claude` or `--opencode` for a single tool. Re-runnable: an existing `settings.json` is completed (nothing if the hook is already there), a modified plugin is kept as is and reported. **The guard follows repowarden updates**: a plugin written by repowarden (first line `// Garde-fou repowarden pour opencode…`, the former standalone plugin included) or a `repowarden garde…` hook in a form other than the current one is replaced by the template, other hooks staying intact ("guard updated"). A personal file (without that header) is never overwritten. `repowarden statut` reports an outdated guard, in the repository or for the user, with `repowarden agents init` (`--global` for the user); `repowarden install` updates, without asking, the user guard already wired. repowarden hooks inactive (repository, or `--global` without `repowarden install --global`): reported, with the command, since the guard will then refuse commits. `repowarden statut` and `repowarden install` report an agent present (`claude` or `opencode` in the `PATH`, or their configuration folder) with the guard wired neither in the repository nor for the user, with `repowarden agents init`; `install` offers it in a terminal.
 
@@ -52,7 +55,7 @@ Help and preview (`--help`, `-h`, `--dry-run` of `repowarden cc`, `git cc`, `git
 repowarden agents retirer             # repository; --global: user configuration (alias: remove)
 ```
 
-Same options as `init` (`--claude`, `--opencode`, `--projet`, `--global`). Only what `init` wrote goes: in `settings.json`, the `repowarden garde` commands (other hooks and settings stay; the file is deleted if nothing is left); the opencode plugin if identical to the template (modified, it is kept and reported). Run again, nothing to remove, no error.
+Same options as `init` (`--claude`, `--opencode`, `--projet`, `--global`). Only what `init` wrote goes: in `settings.json`, the `repowarden garde` commands (other hooks and settings stay; the file is deleted if nothing is left); each opencode plugin if identical to its template (modified, it is kept and reported). Run again, nothing to remove, no error.
 
 ## Checker: `repowarden garde`
 
@@ -70,11 +73,21 @@ Formats: `--format claude` (`tool_name`, `tool_input`, `cwd`: the `PreToolUse` h
 
 Every new function has, right above it, one or two lines saying what it does and **why**, without paraphrasing the code: features documented in the code, without big comment blocks. Copy it into the project instructions (`AGENTS.md`, `CLAUDE.md`…); the pre-commit hook and the CI report omissions ([functions without a comment](hooks.md#functions-without-a-comment)).
 
+## Project map
+
+**Before changing a file X: `repowarden carte X`.** The agent reads the useful excerpt instead of exploring the repository: X's functions and their why, the tests covering it (to write first, then run again, with the command), the tickets that changed it and their design ([project map](carte.md)). `repowarden carte <function>` and `repowarden carte '#<n>'` too. Copy it into the project instructions (`AGENTS.md`, `CLAUDE.md`…). A modification refused by the guard reminds it:
+
+```text
+✖ repowarden: change refused: "main" is a protected branch.
+  → Work on a ticket's branch: repowarden ticket <n>
+  → Before changing bin/garde, once on the right branch: repowarden carte bin/garde (functions, tests, tickets)
+```
+
 ## Limitations
 
 - **Safety net, not a wall**: git hooks and the `ticket` check in CI remain the protection. A change made through the shell (`sed -i`, `>` redirection, script) is not seen before the commit, where the hooks check it.
 - **GitHub writes**: only `gh` ones are seen, and only from a repowarden repository: `gh -R …` run outside such a repository is not seen; neither are the web interface and `curl` to the API.
 - **Reading a shell line**: simple splitting (quotes and subshells are not interpreted); a command hidden in `bash -c "…"` or in a variable is not seen.
 - **Requirements**: `repowarden` on the `PATH` (`npm install -g repowarden`) and [jq](https://jqlang.org). Otherwise nothing is blocked (the guard never blocks an agent because of a failure).
-- **opencode**: the plugin API is evolving; the guard uses the documented `tool.execute.before` hook. The new `{ id, setup }` API (`@opencode-ai/plugin` package, v2) does not expose tools yet.
+- **opencode**: the plugin API is evolving. In 1.x, the documented `tool.execute.before` hook; in 2.x, `ctx.tool.hook("execute.before")`, established by testing (not documented yet). A repowarden plugin written before the 2.x plugin is reported outdated by `repowarden statut` and completed by `repowarden agents init`.
 - **Other tools** (Cursor, Gemini CLI…): not supported yet; only hooks and CI apply.

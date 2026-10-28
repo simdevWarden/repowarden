@@ -9,27 +9,17 @@
 # Une ligne « fichier:ligne<TAB>nom » par fonction ajoutée sans commentaire
 # entre $1 (commit de base) et $2 (commit, ou vide pour le contenu stagé).
 comments_missing() {
-    local base="$1" new="$2" st a b f old lang added tmp
+    local base="$1" new="$2" a b f old lang added tmp
     tmp="$(mktemp -d)"
-    while IFS=$'\t' read -r st a b; do
+    while IFS=$'\t' read -r _ a b; do
         [ -n "$a" ] || continue
         # Renommage ou copie : l'ancien chemin donne les fonctions existantes
         if [ -n "$b" ]; then old="$a" f="$b"; else old="$a" f="$a"; fi
         is_excluded "$f" && continue
-        case "${f##*/}" in
-            *.sh | *.bash) lang=shell ;;
-            *.py) lang=py ;;
-            *.js | *.jsx | *.mjs | *.cjs | *.ts | *.tsx) lang=js ;;
-            *.*) continue ;;
-            *) lang=shebang ;;
-        esac
         git show "$new:$f" >"$tmp/new" 2>/dev/null || continue
-        if [ "$lang" = shebang ]; then
-            # Script sans extension (bin/…) : seul un shebang sh ou bash compte
-            IFS= read -r st <"$tmp/new" || true
-            [[ "$st" =~ ^#!.*[/\ ](ba)?sh([[:space:]]|$) ]] || continue
-            lang=shell
-        fi
+        comments_lang_r "$f" "$tmp/new"
+        lang="$REPLY"
+        [ -n "$lang" ] || continue
         git show "$base:$old" >"$tmp/base" 2>/dev/null || : >"$tmp/base"
         if [ -n "$new" ]; then
             git diff -U0 --no-color --no-ext-diff "$base" "$new" -- "$f"
@@ -42,7 +32,7 @@ comments_missing() {
             for (i = 0; i < n; i++) printf " %d", s + i
         }' "$tmp/diff") "
         [ "$added" != " " ] || continue
-        awk -v lang="$lang" -v added="$added" -v f="$f" -v q="'" "$COMMENTS_AWK" "$tmp/base" "$tmp/new"
+        awk -v lang="$lang" -v added="$added" -v f="$f" -v q="'" "$COMMENTS_AWK_LIB$COMMENTS_AWK" "$tmp/base" "$tmp/new"
     done < <(
         if [ -n "$new" ]; then
             git diff --name-status -M --diff-filter=ACMR "$base" "$new"
@@ -51,6 +41,22 @@ comments_missing() {
         fi 2>/dev/null
     )
     rm -rf "$tmp"
+}
+
+# REPLY = langage du fichier $1 pour la détection des fonctions (shell, py,
+# js), vide sinon ; $2 = son contenu, dont le shebang décide sans extension.
+# Partagé par le contrôle et la carte (repowarden carte) : une seule détection.
+comments_lang_r() {
+    local l=""
+    case "${1##*/}" in
+        *.sh | *.bash) REPLY=shell; return 0 ;;
+        *.py) REPLY=py; return 0 ;;
+        *.js | *.jsx | *.mjs | *.cjs | *.ts | *.tsx) REPLY=js; return 0 ;;
+        *.*) REPLY=""; return 0 ;;
+    esac
+    # Script sans extension (bin/…) : seul un shebang sh ou bash compte
+    IFS= read -r l <"$2" 2>/dev/null || true
+    if [[ "$l" =~ ^#!.*[/\ ](ba)?sh([[:space:]]|$) ]]; then REPLY=shell; else REPLY=""; fi
 }
 
 # Avertit des fonctions ajoutées sans commentaire, sans jamais bloquer : le
@@ -66,11 +72,10 @@ comments_check() {
     REPLY="$n"
 }
 
-# Programme awk de comments_missing : lit le fichier de base (noms des
-# fonctions existantes) puis le nouveau, et signale les fonctions nouvelles
-# dont aucune ligne de commentaire ne précède la déclaration
+# Bibliothèque awk commune au contrôle et à la carte : déclarations de
+# fonctions et commentaire au-dessus (variables lang et q)
 # shellcheck disable=SC2016 # programme awk, rien à développer
-COMMENTS_AWK='
+COMMENTS_AWK_LIB='
 # Nom de la fonction déclarée par la ligne l (vide sinon), selon le langage
 function nom(l) {
     if (lang == "shell") {
@@ -111,6 +116,26 @@ function commentee(i,   j, s) {
     s = "^[ \t]*[rRuUbBfF]*[\"" q "]"
     return j <= N && L[j] ~ s
 }
+# Texte des lignes de commentaire contiguës juste au-dessus de la ligne i,
+# jointes par une espace (décorateurs et directives sautés), vide sinon
+function commentaire(i,   j, s, t) {
+    s = ""
+    for (j = i - 1; j > 0 && L[j] !~ /^#!/ && (L[j] ~ /^[ \t]*@/ || L[j] ~ /^[ \t]*(#|\/\/|\/\*|\*)/); j--) {
+        if (L[j] ~ /^[ \t]*@/ || directive(L[j])) continue
+        t = L[j]
+        sub(/^[ \t]*(#+|\/\/+|\/\*+|\*+)[ \t]*/, "", t); sub(/[ \t]*\*\/[ \t]*$/, "", t)
+        gsub(/\t/, " ", t); sub(/[ \t]+$/, "", t)
+        if (t != "") s = (s == "" ? t : t " " s)
+    }
+    return s
+}
+'
+
+# Programme awk de comments_missing : lit le fichier de base (noms des
+# fonctions existantes) puis le nouveau, et signale les fonctions nouvelles
+# dont aucune ligne de commentaire ne précède la déclaration
+# shellcheck disable=SC2016 # programme awk, rien à développer
+COMMENTS_AWK='
 FILENAME == ARGV[1] { n = nom($0); if (n != "") ancien[n] = 1; next }
 { L[FNR] = $0; N = FNR }
 END {

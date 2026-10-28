@@ -29,6 +29,7 @@ le détail est dans la doc, voir « Où trouver le reste ».
 
 ```bash
 repowarden ticket <n>                    # prendre un ticket, se placer sur sa branche
+repowarden carte <fichier|fonction|'#n'> # avant de modifier : pourquoi, tests, tickets
 repowarden cc --dry-run -m "<description>" --type <type> --scope <portée> \
     --body "<pourquoi>" --refs "Ticket : #<n>"   # aperçu du message
 repowarden cc -m "…" --type … --scope … --body "…" --refs "Ticket : #<n>"   # commit
@@ -37,6 +38,9 @@ repowarden cc -m "…" --type … --scope … --body "…" --refs "Ticket : #<n>
 - Messages en **français**, en-tête ≤ 72 caractères, **sans signature ni
   co-auteur d'agent**. Utiliser `repowarden cc` (paquet installé), pas un alias
   local ni `git commit -m`.
+- **Avant de modifier un fichier X : `repowarden carte X`** (ses fonctions et
+  leur pourquoi, les tests à écrire d'abord puis relancer, les tickets et leur
+  conception) plutôt qu'explorer le dépôt ; voir [`docs/carte.md`](docs/carte.md).
 - **Toute nouvelle fonction** a, juste au-dessus, une à deux lignes qui disent
   ce qu'elle fait et **pourquoi**, sans paraphraser le code (pas de gros bloc).
   Le pre-commit et la CI signalent une fonction ajoutée sans commentaire.
@@ -49,7 +53,11 @@ bats test/
 ```
 
 - Shell compatible **bash 3.2** (macOS) : lancer aussi les tests touchés avec
-  `/bin/bash` en tête du `PATH`. Un tableau vide sous `set -u` s'écrit
+  `/bin/bash` en tête du `PATH`. Sans bash 3.2 sur le poste (Linux, conteneur
+  devzone), ce sont les jobs macOS de la CI qui le couvrent : les surveiller
+  (`repowarden pr checks <n>`) et ne déclarer le ticket fini qu'une fois
+  verts ; facultatif, bash 3.2 compilé localement (procédure dans
+  [`CONTRIBUTING.md`](CONTRIBUTING.md)). Un tableau vide sous `set -u` s'écrit
   `${t[@]+"${t[@]}"}`. Dans un test bats, une condition s'écrit
   `[[ … ]] || false` : sinon son échec n'arrête pas le test sous bash 3.2.
 - Un nouveau test : vérifier qu'il **échoue sans le changement**.
