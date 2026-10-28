@@ -62,6 +62,38 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     [ "$status" -eq 2 ]
 }
 
+@test "garde : fichier ignore par git permis sur une branche protegee, fichier suivi controle" {
+    printf 'notes/\n*.log\n' >.gitignore
+    printf 'x\n' >suivi.log
+    git add .gitignore && git add -f suivi.log
+    git -c core.hooksPath=/dev/null commit -q -m "chore: ignore"
+    git config repowarden.integrationBranch develop
+    patch='*** Begin Patch\n*** Add File: notes/p.md\n+x\n*** Update File: sortie.log\n+x\n*** End Patch'
+    for b in main develop; do
+        git switch -q "$b" 2>/dev/null || git switch -q -c "$b"
+        mkdir -p src/sous
+        for f in notes/a/x.md sortie.log src/sous/y.log; do
+            run edit "$f"
+            [ "$status" -eq 0 ] || { echo "$b : $f refusé : $output"; return 1; }
+        done
+        run opencode apply_patch "$(jq -n --arg p "$(printf "$patch")" '{patchText: $p}')"
+        [ "$status" -eq 0 ] || { echo "$b : apply_patch refusé : $output"; return 1; }
+        # Non ignoré, ou suivi malgré le motif d'ignore : toujours contrôlé
+        for f in README.md src/n.ts suivi.log; do
+            run edit "$f"
+            [ "$status" -eq 2 ] || { echo "$b : $f permis"; return 1; }
+            [[ "$output" == *"« $b » est une branche protégée"* ]] || false
+        done
+    done
+    # Dépôt qui suit ses tickets : branche hors ticket, fichier ignoré permis
+    git config repowarden.tickets true
+    git switch -q -c feat/essai
+    run edit notes/x.md
+    [ "$status" -eq 0 ]
+    run edit README.md
+    [ "$status" -eq 2 ]
+}
+
 @test "garde : HEAD detache refuse" {
     git switch -q --detach
     run edit

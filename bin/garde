@@ -133,8 +133,22 @@ protegee() {
     [ -n "$REPLY" ] && [ "$REPLY" = "$1" ]
 }
 
+# Vrai si le chemin $1 (absolu), dans le dépôt du dossier courant $2 (son
+# dossier existant le plus proche), est ignoré par git : jamais versionné.
+# Un fichier suivi n'est jamais ignoré (git check-ignore sans --no-index)
+fichier_ignore() {
+    local reste="${1#"$2"}" prefixe cdup
+    reste="${reste#/}"
+    [ -n "$reste" ] || return 1
+    # Relatif à la racine par --show-prefix/--show-cdup : ni lien symbolique
+    # (/tmp → /private/tmp) ni forme Windows (C:/… contre /c/…) à comparer
+    prefixe="$(git rev-parse --show-prefix 2>/dev/null)" || return 1
+    cdup="$(git rev-parse --show-cdup 2>/dev/null)" || return 1
+    git -C "./$cdup" check-ignore -q -- "$prefixe$reste" 2>/dev/null
+}
+
 # Modification du fichier $1 : seulement sur une branche de travail (de ticket,
-# si le dépôt suit ses tickets)
+# si le dépôt suit ses tickets) ; un fichier ignoré par git l'est partout
 verifier_fichier() {
     dossier_r "$1"
     # Sous Windows, jq finit le chemin lu par un CR (retiré) et le chemin peut
@@ -146,6 +160,8 @@ verifier_fichier() {
         depot_repowarden || exit 0
         # Fichiers internes de git (.git/…) : hors du travail de l'agent
         case "$(pwd -P)/" in "$(cd "$(git rev-parse --git-dir)" && pwd -P)"/*) exit 0 ;; esac
+        # Fichier ignoré par git : jamais versionné, règle de branche non applicable
+        ! fichier_ignore "$f" "$d" || exit 0
         if [ -f "$f" ]; then
             FICHIER_CARTE="$(cd "$(dirname "$f")" && pwd -P)/${f##*/}"
             FICHIER_CARTE="${FICHIER_CARTE#"$(cd "$(git rev-parse --show-toplevel)" && pwd -P)"/}"

@@ -13,7 +13,7 @@ Only in a repowarden repository (`.repowarden.conf`, a `repowarden.*` setting or
 
 | Agent action | Refused when | Instead |
 |---|---|---|
-| Change a file | detached HEAD; protected branch (`protectedBranches`, `integrationBranch`); if the repository tracks its [tickets](tickets.md): branch that is not a ticket's branch (`type/<n>-topic`) | `repowarden ticket <n>` (without ticket tracking: `git switch -c <type>/<topic>`) |
+| Change a file | detached HEAD; protected branch (`protectedBranches`, `integrationBranch`); if the repository tracks its [tickets](tickets.md): branch that is not a ticket's branch (`type/<n>-topic`). Never for a file ignored by git and not tracked (`git check-ignore`): it is never versioned | `repowarden ticket <n>` (without ticket tracking: `git switch -c <type>/<topic>`) |
 | Create a branch (`git checkout -b`, `git switch -c`, `git branch <name>`, `git worktree add -b`) | the repository tracks its tickets | `repowarden ticket <n>`: branches come from tickets |
 | `git commit` | always, except `--amend --no-edit` | `repowarden cc -m "…" --refs "Ticket : #<n>"` (or `git cc`) |
 | `repowarden cc`, `git cc` | protected branch: the commit would be refused there, and without a terminal `cc` does not create a branch for the agent | `git switch -c <type>/<topic>` (changes follow); if the repository tracks its tickets: `repowarden ticket <n>` |
