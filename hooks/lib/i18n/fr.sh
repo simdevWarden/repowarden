@@ -783,7 +783,7 @@ _msg_fr() {
         agents.kept_remove) _M="%s : %s diffère du modèle ; gardé (à retirer à la main s'il n'est plus voulu)." ;;
         agents.skill_added) _M="%s : skill repowarden ajoutée (%s)." ;;
         agents.skill_present) _M="%s : skill repowarden déjà en place (%s)." ;;
-        agents.skill_updated) _M="%s : skill repowarden mise à jour (%s)." ;;
+        agents.skill_updated) _M="%s : skill repowarden mise à jour (%s) ; pour la personnaliser, retirer la ligne repère." ;;
         agents.skill_kept) _M="%s : skill repowarden (%s) diffère du modèle ; gardée telle quelle (modèle : %s)." ;;
         agents.skill_removed) _M="%s : skill repowarden retirée (%s)." ;;
         agents.skill_absent) _M="%s : pas de skill repowarden à retirer (%s)." ;;

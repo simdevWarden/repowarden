@@ -2,7 +2,7 @@
 name: repowarden
 description: Skill repowarden pour agents IA. Déclenche sur ticket, commit, branche, push, PR, CI, gh, action interdite ou refus du garde-fou.
 ---
-<!-- repowarden:skill posée par repowarden agents init -->
+<!-- repowarden:skill posée par repowarden agents init ; retirer cette ligne pour la personnaliser -->
 
 # Repowarden
 

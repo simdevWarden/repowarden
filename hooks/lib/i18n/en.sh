@@ -782,7 +782,7 @@ _msg_en() {
         agents.kept_remove) _M="%s: %s differs from the template; kept (remove it by hand if no longer wanted)." ;;
         agents.skill_added) _M="%s: repowarden skill added (%s)." ;;
         agents.skill_present) _M="%s: repowarden skill already in place (%s)." ;;
-        agents.skill_updated) _M="%s: repowarden skill updated (%s)." ;;
+        agents.skill_updated) _M="%s: repowarden skill updated (%s); to customize it, remove its marker line (<!-- repowarden:skill …)." ;;
         agents.skill_kept) _M="%s: repowarden skill (%s) differs from the template; kept as is (template: %s)." ;;
         agents.skill_removed) _M="%s: repowarden skill removed (%s)." ;;
         agents.skill_absent) _M="%s: no repowarden skill to remove (%s)." ;;
