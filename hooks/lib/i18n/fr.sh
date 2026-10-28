@@ -254,7 +254,7 @@ _msg_fr() {
         help.migrer) _M="Usage : repowarden migrer [--pr] [--hooks]\n\nPassage de repogarde à repowarden dans le projet courant\n(docs/migration-v4.md) : configuration (.repowarden.conf, .repowarden/),\nworkflows (uses: vers le dépôt repowarden et sa version majeure, anciens\nnoms), puis la liste de ce qui reste à faire à la main. Relançable : rien\nn'est fait deux fois.\n  --pr     sur la branche chore/migration-repowarden-vN : commit, push et PR\n  --hooks  déplace aussi les hooks lefthook résiduels dans .git/hooks-lefthook/" ;;
         help.npm-publication) _M="Usage : repowarden npm-publication [--repo propriétaire/nom] [--workflow release.yml]\n        [--environnement NOM] [--dry-run]\n\nPublication npm automatique mise en place en une commande : chaque release\npublie le paquet (workflow npm-publish.yml), sans jeton (publication de\nconfiance OIDC, provenance jointe) : connexion npm, paquet existant, puis\nrelation de confiance. Interrompue, la commande reprend où elle en était." ;;
         help.garde) _M="Usage : repowarden garde [--format claude|opencode]   (lit l'action sur l'entrée standard)\n\nGarde-fou des agents IA, appelé par leur hook avant chaque action\n(repowarden agents init le branche) : code 0 permis, code 2 refusé avec la\ncommande à lancer. Dans un dépôt repowarden : pas de modification en HEAD\ndétaché, sur une branche protégée, ni hors branche de ticket si le dépôt\nsuit ses tickets ; branche créée par repowarden ticket <n>, commit par\nrepowarden cc (hooks repowarden actifs, hors branche protégée) ; ni\n--no-verify ni git add . / -A / --all. Demande jq." ;;
-        help.agents) _M="Usage : repowarden agents init    [--claude] [--opencode] [--projet | --global]\n        repowarden agents retirer [--claude] [--opencode] [--projet | --global]\n\nBranche le garde-fou (repowarden garde) dans les agents IA : hook PreToolUse\nde Claude Code (.claude/settings.json), plugins opencode\n(.opencode/plugins/repowarden-garde.js pour opencode 1.x,\nrepowarden-garde-v2.js pour 2.x). Sans --claude ni --opencode : les\ndeux. --projet (défaut) : fichiers du dépôt, à versionner ; --global :\nconfiguration de l'utilisateur (\$CLAUDE_CONFIG_DIR, ~/.claude par défaut ;\n\$OPENCODE_CONFIG_DIR, sinon \$XDG_CONFIG_HOME/opencode, ~/.config/opencode par\ndéfaut). Relançable : fichiers existants complétés, jamais écrasés.\nretirer : enlève seulement ce qu'init a écrit." ;;
+        help.agents) _M="Usage : repowarden agents init    [--claude] [--opencode] [--projet | --global]\n        repowarden agents retirer [--claude] [--opencode] [--projet | --global]\n\nBranche le garde-fou (repowarden garde) dans les agents IA : hook PreToolUse\nde Claude Code (.claude/settings.json), plugins opencode\n(.opencode/plugins/repowarden-garde.js pour opencode 1.x,\nrepowarden-garde-v2.js pour 2.x). Pose aussi la skill repowarden\n(.claude/skills/repowarden/SKILL.md, .opencode/skills/repowarden/SKILL.md)\ndans la langue de repowarden. Sans --claude ni --opencode : les deux.\n--projet (défaut) : fichiers du dépôt, à versionner ; --global :\nconfiguration de l'utilisateur (\$CLAUDE_CONFIG_DIR, ~/.claude par défaut ;\n\$OPENCODE_CONFIG_DIR, sinon \$XDG_CONFIG_HOME/opencode, ~/.config/opencode par\ndéfaut). Relançable : fichiers existants complétés, jamais écrasés.\nretirer : enlève seulement ce qu'init a écrit." ;;
         help.app) _M="Usage : repowarden app init [--repo propriétaire/nom] [--nom NOM] [--administration]\n        repowarden app init --bot\n\nGitHub App du dépôt : identité d'automatisation des workflows repowarden (le\njeton des Actions ne déclenche aucun workflow, un jeton de l'App, si).\nCréation dans le navigateur (flux « manifest »), permissions minimales,\nidentifiants rangés sans être affichés, installation sur le dépôt. --bot :\nApp du bot d'organisation, dans le dépôt de pilotage. Relançable ; demande\ngh et node." ;;
         # CI et protection
         ci.check.2) _M="Pas de base : vérification ignorée." ;;
@@ -531,6 +531,7 @@ _msg_fr() {
         st.tools) _M="Outils présents : %s · absents : %s (selon les langages des projets)" ;;
         st.agents_sans_garde) _M="Agent IA sans garde-fou (Claude Code, opencode) : ses actions ne sont vérifiées qu'au commit. → %s" ;;
         st.agents_stale) _M="Garde-fou repowarden périmé (%s) : posé par une version antérieure de repowarden. → %s" ;;
+        st.agents_skill_stale) _M="Skill repowarden périmée (%s) : posée par une version antérieure de repowarden. → %s" ;;
         st.next) _M="Étape suivante :" ;;
         st.carte_absente) _M="Carte du projet absente (facultative, lue par les agents avant de modifier un fichier) : repowarden carte" ;;
         st.carte_ok) _M="Carte du projet à jour (repowarden carte <fichier>)" ;;
@@ -779,6 +780,13 @@ _msg_fr() {
         agents.removed) _M="%s : garde-fou retiré (%s)." ;;
         agents.absent) _M="%s : pas de garde-fou à retirer (%s)." ;;
         agents.kept_remove) _M="%s : %s diffère du modèle ; gardé (à retirer à la main s'il n'est plus voulu)." ;;
+        agents.skill_added) _M="%s : skill repowarden ajoutée (%s)." ;;
+        agents.skill_present) _M="%s : skill repowarden déjà en place (%s)." ;;
+        agents.skill_updated) _M="%s : skill repowarden mise à jour (%s)." ;;
+        agents.skill_kept) _M="%s : skill repowarden (%s) diffère du modèle ; gardée telle quelle (modèle : %s)." ;;
+        agents.skill_removed) _M="%s : skill repowarden retirée (%s)." ;;
+        agents.skill_absent) _M="%s : pas de skill repowarden à retirer (%s)." ;;
+        agents.skill_kept_remove) _M="%s : skill repowarden %s diffère du modèle ; gardée (à retirer à la main s'il n'est plus voulu)." ;;
         *) _M="" ;;
     esac
 }

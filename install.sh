@@ -257,6 +257,17 @@ fi
 # question (déjà branché par lui), une ligne par agent
 while read -r portee agent fichier; do
     [ "$portee" = global ] || continue
+    if [ "$agent" = skill-claude ]; then
+        bash "$ROOT/bin/agents" init --global --claude >/dev/null 2>&1 || continue
+        t agents.skill_updated "Claude Code" "$fichier"
+        ok "$REPLY"
+        continue
+    elif [ "$agent" = skill-opencode ]; then
+        bash "$ROOT/bin/agents" init --global --opencode >/dev/null 2>&1 || continue
+        t agents.skill_updated opencode "$fichier"
+        ok "$REPLY"
+        continue
+    fi
     bash "$ROOT/bin/agents" init --global "--$agent" >/dev/null 2>&1 || continue
     nom=opencode
     [ "$agent" != claude ] || nom="Claude Code"
