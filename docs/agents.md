@@ -4,7 +4,7 @@ Un agent IA (Claude Code, opencode…) peut modifier une branche protégée, tra
 
 ```bash
 repowarden agents init        # Claude Code et opencode, dans le dépôt (à versionner)
-git add .claude/settings.json .opencode/plugins/repowarden-garde.js .opencode/plugins/repowarden-garde-v2.js
+git add .claude/settings.json .claude/skills/repowarden/SKILL.md .opencode/plugins/repowarden-garde.js .opencode/plugins/repowarden-garde-v2.js .opencode/skills/repowarden/SKILL.md
 ```
 
 ## Ce qui est refusé

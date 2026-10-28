@@ -2,15 +2,15 @@
 # Branche le garde-fou repowarden (repowarden garde) dans les agents IA :
 #   repowarden agents init    [--claude] [--opencode] [--projet | --global]
 #   repowarden agents retirer [--claude] [--opencode] [--projet | --global]
-#     Claude Code  hook PreToolUse dans .claude/settings.json
+#     Claude Code  hook PreToolUse dans .claude/settings.json + skill repowarden
 #     opencode     plugins .opencode/plugins/repowarden-garde.js (opencode 1.x)
-#                  et repowarden-garde-v2.js (opencode 2.x)
+#                  et repowarden-garde-v2.js (opencode 2.x) + skill repowarden
 # Sans --claude ni --opencode : les deux. --projet (défaut) : fichiers du dépôt,
 # à versionner ; --global : configuration de l'utilisateur, là où chaque outil
 # la lit (CLAUDE_CONFIG_DIR ; OPENCODE_CONFIG_DIR, sinon XDG_CONFIG_HOME).
-# Relançable : fichiers existants complétés ; un garde-fou posé par une version
-# antérieure de repowarden est mis à jour, un fichier personnel jamais écrasé ;
-# retirer n'enlève que ce qu'init a écrit.
+# Relançable : fichiers existants complétés ; un garde-fou ou une skill posés
+# par une version antérieure de repowarden sont mis à jour, un fichier
+# personnel jamais écrasé ; retirer n'enlève que ce qu'init a écrit.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -23,6 +23,7 @@ aide() { _tr help.agents; printf '%b\n' "$_T"; }
 
 COMMANDE_CLAUDE="$AGENTS_COMMANDE_CLAUDE"
 MATCHER_CLAUDE="$AGENTS_MATCHER_CLAUDE"
+MODELE_SKILL="$(agents_modele_skill)"
 
 action=""
 case "${1:-}" in
@@ -51,12 +52,16 @@ if [ "$portee" = projet ]; then
     base="$GIT_TOPLEVEL"
     fichier_claude="$base/.claude/settings.json"
     dossier_opencode="$base/.opencode/plugins"
+    fichier_skill_claude="$base/.claude/skills/repowarden/SKILL.md"
+    fichier_skill_opencode="$base/.opencode/skills/repowarden/SKILL.md"
 else
     # Réglages utilisateur de Claude Code : $CLAUDE_CONFIG_DIR s'il est défini
     # (code.claude.com/docs/en/settings) ; plugins globaux d'opencode :
     # $OPENCODE_CONFIG_DIR, sinon $XDG_CONFIG_HOME/opencode (opencode.ai/docs/config)
     fichier_claude="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/settings.json"
     dossier_opencode="${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/plugins"
+    fichier_skill_claude="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/skills/repowarden/SKILL.md"
+    fichier_skill_opencode="${OPENCODE_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/opencode}/skills/repowarden/SKILL.md"
 fi
 
 ecrits=()
@@ -122,6 +127,28 @@ init_opencode() {
     done
 }
 
+# Skill repowarden de l'agent $2 au fichier $1, posée selon la langue :
+# remplacée si posée par repowarden et périmée, gardée si personnalisée
+poser_skill() {
+    local f="$1" nom="$2"
+    if [ -f "$f" ]; then
+        if cmp -s "$f" "$MODELE_SKILL"; then
+            ok_t agents.skill_present "$nom" "$f"
+        elif agents_skill_repowarden "$f"; then
+            cp "$MODELE_SKILL" "$f"
+            ecrits+=("$f")
+            ok_t agents.skill_updated "$nom" "$f"
+        else
+            attention_t agents.skill_kept "$nom" "$f" "$MODELE_SKILL"
+        fi
+        return 0
+    fi
+    mkdir -p "$(dirname "$f")"
+    cp "$MODELE_SKILL" "$f"
+    ecrits+=("$f")
+    ok_t agents.skill_added "$nom" "$f"
+}
+
 # Hook PreToolUse : seules les commandes « repowarden garde » retirées ; une
 # entrée vidée disparaît, et le fichier s'il ne reste plus rien
 retirer_claude() {
@@ -164,14 +191,47 @@ retirer_opencode() {
     done
 }
 
+# Skill repowarden : retirée si identique au modèle de la langue ; sinon
+# gardée et signalée (peut être modifiée ou dans une autre langue)
+retirer_skill_claude() {
+    local f="$fichier_skill_claude" nom="Claude Code"
+    if [ ! -f "$f" ]; then
+        ok_t agents.skill_absent "$nom" "$f"
+    elif cmp -s "$f" "$MODELE_SKILL"; then
+        rm -f "$f"
+        rmdir "$(dirname "$f")" 2>/dev/null || true
+        ok_t agents.skill_removed "$nom" "$f"
+    else
+        attention_t agents.skill_kept_remove "$nom" "$f"
+    fi
+}
+
+# Skill repowarden pour opencode : même règle
+retirer_skill_opencode() {
+    local f="$fichier_skill_opencode" nom="opencode"
+    if [ ! -f "$f" ]; then
+        ok_t agents.skill_absent "$nom" "$f"
+    elif cmp -s "$f" "$MODELE_SKILL"; then
+        rm -f "$f"
+        rmdir "$(dirname "$f")" 2>/dev/null || true
+        ok_t agents.skill_removed "$nom" "$f"
+    else
+        attention_t agents.skill_kept_remove "$nom" "$f"
+    fi
+}
+
 statut=0
 if [ "$action" = retirer ]; then
     [ -z "$claude" ] || retirer_claude || statut=1
     [ -z "$opencode" ] || retirer_opencode || statut=1
+    [ -z "$claude" ] || retirer_skill_claude || statut=1
+    [ -z "$opencode" ] || retirer_skill_opencode || statut=1
     exit "$statut"
 fi
 [ -z "$claude" ] || init_claude || statut=1
 [ -z "$opencode" ] || init_opencode || statut=1
+[ -z "$claude" ] || poser_skill "$fichier_skill_claude" "Claude Code" || statut=1
+[ -z "$opencode" ] || poser_skill "$fichier_skill_opencode" "opencode" || statut=1
 
 has repowarden || attention_t agents.no_repowarden
 # Hooks repowarden inactifs : le garde-fou refusera les commits, autant le

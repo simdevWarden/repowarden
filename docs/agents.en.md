@@ -4,7 +4,7 @@ An AI agent (Claude Code, opencode…) can change a protected branch, work witho
 
 ```bash
 repowarden agents init        # Claude Code and opencode, in the repository (to commit)
-git add .claude/settings.json .opencode/plugins/repowarden-garde.js .opencode/plugins/repowarden-garde-v2.js
+git add .claude/settings.json .claude/skills/repowarden/SKILL.md .opencode/plugins/repowarden-garde.js .opencode/plugins/repowarden-garde-v2.js .opencode/skills/repowarden/SKILL.md
 ```
 
 ## What is refused

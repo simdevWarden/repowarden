@@ -11,6 +11,15 @@ AGENTS_PLUGINS_OPENCODE="repowarden-garde.js repowarden-garde-v2.js"
 AGENTS_COMMANDE_CLAUDE="repowarden garde --format claude"
 AGENTS_MATCHER_CLAUDE="Edit|Write|MultiEdit|NotebookEdit|Bash"
 
+# Modèles de la skill repowarden selon la langue (fr/en)
+agents_modele_skill() {
+    local lang="${REPOWARDEN_LANG:-fr}"
+    case "$lang" in
+        en) echo "$(cd "$(dirname "${BASH_SOURCE[0]}")/../agents" && pwd -P)/skill-repowarden.en.md" ;;
+        *)  echo "$(cd "$(dirname "${BASH_SOURCE[0]}")/../agents" && pwd -P)/skill-repowarden.fr.md" ;;
+    esac
+}
+
 # Dossiers de configuration de l'utilisateur, là où chaque outil les lit
 # (CLAUDE_CONFIG_DIR ; OPENCODE_CONFIG_DIR, sinon XDG_CONFIG_HOME)
 agents_dossiers_globaux() {
@@ -47,13 +56,27 @@ agents_claude_perime() {
 # Garde-fous périmés du dépôt $1 (vide hors dépôt) puis de l'utilisateur, une
 # ligne « portée agent fichier » chacun : statut les signale, install les met à jour
 agents_perimes() {
+    local modele
+    modele="$(agents_modele_skill)"
     agents_dossiers_globaux
     if [ -n "${1:-}" ]; then
         ! agents_claude_perime "$1/.claude/settings.json" || echo "projet claude $1/.claude/settings.json"
         agents_opencode_perimes projet "$1/.opencode/plugins"
+        if agents_skill_perime "$1/.claude/skills/repowarden/SKILL.md" "$modele"; then
+            echo "projet skill-claude $1/.claude/skills/repowarden/SKILL.md"
+        fi
+        if agents_skill_perime "$1/.opencode/skills/repowarden/SKILL.md" "$modele"; then
+            echo "projet skill-opencode $1/.opencode/skills/repowarden/SKILL.md"
+        fi
     fi
     ! agents_claude_perime "$AGENTS_CLAUDE_DIR/settings.json" || echo "global claude $AGENTS_CLAUDE_DIR/settings.json"
     agents_opencode_perimes global "$AGENTS_OPENCODE_DIR/plugins"
+    if agents_skill_perime "$AGENTS_CLAUDE_DIR/skills/repowarden/SKILL.md" "$modele"; then
+        echo "global skill-claude $AGENTS_CLAUDE_DIR/skills/repowarden/SKILL.md"
+    fi
+    if agents_skill_perime "$AGENTS_OPENCODE_DIR/skills/repowarden/SKILL.md" "$modele"; then
+        echo "global skill-opencode $AGENTS_OPENCODE_DIR/skills/repowarden/SKILL.md"
+    fi
     return 0
 }
 
@@ -77,12 +100,25 @@ agents_sans_garde() {
     agents_dossiers_globaux
     command -v claude >/dev/null 2>&1 || command -v opencode >/dev/null 2>&1 ||
         [ -d "$AGENTS_CLAUDE_DIR" ] || [ -d "$AGENTS_OPENCODE_DIR" ] || return 1
-    [ -z "${1:-}" ] || fichiers=("$1/.claude/settings.json" "$1/.opencode/plugins/repowarden-garde.js")
-    fichiers+=("$AGENTS_CLAUDE_DIR/settings.json" "$AGENTS_OPENCODE_DIR/plugins/repowarden-garde.js")
+    [ -z "${1:-}" ] || fichiers=("$1/.claude/settings.json" "$1/.opencode/plugins/repowarden-garde.js" "$1/.opencode/plugins/repowarden-garde-v2.js")
+    fichiers+=("$AGENTS_CLAUDE_DIR/settings.json" "$AGENTS_OPENCODE_DIR/plugins/repowarden-garde.js" "$AGENTS_OPENCODE_DIR/plugins/repowarden-garde-v2.js")
     # Plugin repowarden d'une version antérieure : branché (périmé, pas absent)
     for f in "${fichiers[@]}"; do
         ! grep -qs "repowarden garde" "$f" || return 1
         ! agents_plugin_repowarden "$f" || return 1
     done
     return 0
+}
+
+# Vrai si le fichier skill $1 a été posé par repowarden (repère)
+agents_skill_repowarden() {
+    grep -q '<!-- repowarden:skill' "$1" 2>/dev/null
+}
+
+# Vrai si la skill $1 vient de repowarden mais diffère du modèle de la langue
+agents_skill_perime() {
+    local modele="$2"
+    [ -f "$1" ] || return 1
+    agents_skill_repowarden "$1" || return 1
+    ! cmp -s "$1" "$modele"
 }

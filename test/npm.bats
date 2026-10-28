@@ -66,6 +66,9 @@ setup() {
     for f in ci/tickets.sh ci/tickets/commun.sh ci/tickets/adopter.sh; do
         [[ "$output" == *"\"$f\""* ]] || false
     done
+    for f in hooks/agents/skill-repowarden.fr.md hooks/agents/skill-repowarden.en.md; do
+        [[ "$output" == *"\"$f\""* ]] || false
+    done
     for d in test/ ci/check.sh ci/version.sh templates/; do
         [[ "$output" != *"\"$d"* ]] || false
     done

@@ -177,11 +177,15 @@ if agents_sans_garde "$GIT_TOPLEVEL"; then
     attention_t st.agents_sans_garde "$cmd_agents"
     suivant="${suivant:-$cmd_agents}"
 fi
-# Garde-fou posé par une version antérieure de repowarden : init le met à jour
-while read -r portee _agent fichier; do
+# Garde-fou ou skill posés par une version antérieure de repowarden : init le met à jour
+while read -r portee agent fichier; do
     cmd_agents="repowarden agents init"
     [ "$portee" = projet ] || cmd_agents="$cmd_agents --global"
-    attention_t st.agents_stale "$fichier" "$cmd_agents"
+    if [ "$agent" = skill-claude ] || [ "$agent" = skill-opencode ]; then
+        attention_t st.agents_skill_stale "$fichier" "$cmd_agents"
+    else
+        attention_t st.agents_stale "$fichier" "$cmd_agents"
+    fi
     suivant="${suivant:-$cmd_agents}"
 done < <(agents_perimes "$GIT_TOPLEVEL")
 

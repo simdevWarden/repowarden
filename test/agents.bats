@@ -32,7 +32,7 @@ setup() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"Claude Code : garde-fou ajouté"* ]] || false
     [[ "$output" == *"opencode : garde-fou ajouté"* ]] || false
-    [[ "$output" == *"À versionner : git add .claude/settings.json .opencode/plugins/repowarden-garde.js .opencode/plugins/repowarden-garde-v2.js"* ]] || false
+    [[ "$output" == *"À versionner : git add .claude/settings.json .opencode/plugins/repowarden-garde.js .opencode/plugins/repowarden-garde-v2.js .claude/skills/repowarden/SKILL.md .opencode/skills/repowarden/SKILL.md"* ]] || false
     # jq -e : comparaison dans jq, sans les fins de ligne \r\n de jq sous Windows
     jq -e '.hooks.PreToolUse[0].matcher == "Edit|Write|MultiEdit|NotebookEdit|Bash"
         and .hooks.PreToolUse[0].hooks[0].command == "repowarden garde --format claude"' .claude/settings.json
@@ -42,13 +42,15 @@ setup() {
 
 @test "agents init : relance, rien ne change" {
     "$RW" agents init >/dev/null
-    avant="$(cat .claude/settings.json .opencode/plugins/repowarden-garde.js | git hash-object --stdin)"
+    avant="$(cat .claude/settings.json .opencode/plugins/repowarden-garde.js .claude/skills/repowarden/SKILL.md .opencode/skills/repowarden/SKILL.md | git hash-object --stdin)"
     run "$RW" agents init
     [ "$status" -eq 0 ]
     [[ "$output" == *"Claude Code : garde-fou déjà en place"* ]] || false
     [[ "$output" == *"opencode : garde-fou déjà en place"* ]] || false
+    [[ "$output" == *"Claude Code : skill repowarden déjà en place"* ]] || false
+    [[ "$output" == *"opencode : skill repowarden déjà en place"* ]] || false
     [[ "$output" != *"À versionner"* ]] || false
-    [ "$(cat .claude/settings.json .opencode/plugins/repowarden-garde.js | git hash-object --stdin)" = "$avant" ]
+    [ "$(cat .claude/settings.json .opencode/plugins/repowarden-garde.js .claude/skills/repowarden/SKILL.md .opencode/skills/repowarden/SKILL.md | git hash-object --stdin)" = "$avant" ]
 }
 
 @test "agents init : settings.json existant complete, rien de perdu" {
@@ -154,8 +156,11 @@ JS
     [ "$status" -eq 0 ]
     [[ "$output" == *"Claude Code : garde-fou retiré"* ]] || false
     [[ "$output" == *"opencode : garde-fou retiré"* ]] || false
+    [[ "$output" == *"Claude Code : skill repowarden retirée"* ]] || false
+    [[ "$output" == *"opencode : skill repowarden retirée"* ]] || false
     [ ! -e .claude/settings.json ] && [ ! -e .opencode/plugins/repowarden-garde.js ]
     [ ! -e .opencode/plugins/repowarden-garde-v2.js ]
+    [ ! -e .claude/skills/repowarden ] && [ ! -e .opencode/skills/repowarden ]
     # Relance : rien a retirer, sans erreur
     run "$RW" agents retirer
     [ "$status" -eq 0 ]
@@ -230,6 +235,11 @@ ANCIEN_PLUGIN="$BATS_TEST_DIRNAME/fixtures/agents/ancien-plugin-opencode-autonom
     [[ "$output" == *"Claude Code : garde-fou déjà en place"* ]] || false
 }
 
+# Ticket #475 : skill repowarden (le circuit, les commandes, quoi faire d'un
+# refus) posée avec le garde-fou, mise à jour selon la même règle
+SKILL_FR="$BATS_TEST_DIRNAME/../hooks/agents/skill-repowarden.fr.md"
+SKILL_EN="$BATS_TEST_DIRNAME/../hooks/agents/skill-repowarden.en.md"
+
 # Ticket #469 : opencode 2.x n'appelle que l'export par défaut { id, setup } ;
 # opencode 1.x ignore l'export nommé d'un module qui en a un : deux fichiers
 @test "agents init : plugin opencode 2.x a cote du plugin 1.x, ajoute s'il manque" {
@@ -287,4 +297,85 @@ JS
     run node "$BATS_TEST_TMPDIR/v1x.mjs" "$BATS_TEST_TMPDIR/v2.mjs" "$BATS_TEST_TMPDIR/v1.mjs"
     [ "$status" -eq 0 ]
     [ "$output" = "repowarden-garde undefined function" ]
+}
+
+@test "agents init : skill repowarden posee pour Claude Code et opencode, dans la langue de repowarden" {
+    run "$RW" agents init
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Claude Code : skill repowarden ajoutée"* ]] || false
+    [[ "$output" == *"opencode : skill repowarden ajoutée"* ]] || false
+    cmp -s .claude/skills/repowarden/SKILL.md "$SKILL_FR"
+    cmp -s .opencode/skills/repowarden/SKILL.md "$SKILL_FR"
+    rm -rf .claude .opencode
+    REPOWARDEN_LANG=en run "$RW" agents init --opencode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"opencode: repowarden skill added"* ]] || false
+    cmp -s .opencode/skills/repowarden/SKILL.md "$SKILL_EN"
+    [ ! -e .claude ]
+}
+
+@test "agents init --global : skill dans la configuration de l'utilisateur, CLAUDE_CONFIG_DIR et OPENCODE_CONFIG_DIR suivis" {
+    run "$RW" agents init --global
+    [ "$status" -eq 0 ]
+    cmp -s "$HOME/.claude/skills/repowarden/SKILL.md" "$SKILL_FR"
+    cmp -s "$HOME/.config/opencode/skills/repowarden/SKILL.md" "$SKILL_FR"
+    CLAUDE_CONFIG_DIR="$BATS_TEST_TMPDIR/claude" OPENCODE_CONFIG_DIR="$BATS_TEST_TMPDIR/oc" run "$RW" agents init --global
+    [ "$status" -eq 0 ]
+    [ -f "$BATS_TEST_TMPDIR/claude/skills/repowarden/SKILL.md" ]
+    [ -f "$BATS_TEST_TMPDIR/oc/skills/repowarden/SKILL.md" ]
+    [ ! -e .claude ]
+}
+
+@test "agents init : skill repowarden perimee remplacee, skill personnalisee gardee" {
+    # Posée par repowarden (repère), mais d'une version antérieure
+    mkdir -p .claude/skills/repowarden .opencode/skills/repowarden
+    sed 's/^# .*/# Ancienne version/' "$SKILL_FR" >.claude/skills/repowarden/SKILL.md
+    run cmp -s .claude/skills/repowarden/SKILL.md "$SKILL_FR"
+    [ "$status" -ne 0 ]
+    # Écrite à la main, sans repère : jamais écrasée
+    printf -- '---\nname: repowarden\ndescription: la mienne\n---\nMes règles\n' >.opencode/skills/repowarden/SKILL.md
+    cp .opencode/skills/repowarden/SKILL.md "$BATS_TEST_TMPDIR/perso.md"
+    run "$RW" agents init
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Claude Code : skill repowarden mise à jour"* ]] || false
+    [[ "$output" == *"opencode : skill repowarden"*"diffère du modèle ; gardée telle quelle"* ]] || false
+    cmp -s .claude/skills/repowarden/SKILL.md "$SKILL_FR"
+    cmp -s .opencode/skills/repowarden/SKILL.md "$BATS_TEST_TMPDIR/perso.md"
+    # Autre langue : posée par repowarden, remplacée par le modèle de la langue
+    REPOWARDEN_LANG=en run "$RW" agents init --claude
+    [[ "$output" == *"Claude Code: repowarden skill updated"* ]] || false
+    cmp -s .claude/skills/repowarden/SKILL.md "$SKILL_EN"
+}
+
+@test "agents retirer : skill identique au modele retiree, skill modifiee gardee" {
+    "$RW" agents init >/dev/null
+    printf '\nMa règle\n' >>.opencode/skills/repowarden/SKILL.md
+    run "$RW" agents retirer
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Claude Code : skill repowarden retirée"* ]] || false
+    [[ "$output" == *"opencode : skill repowarden"*"gardée"* ]] || false
+    [ ! -e .claude/skills/repowarden ]
+    [ -f .opencode/skills/repowarden/SKILL.md ]
+    run "$RW" agents retirer --claude
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"pas de skill repowarden à retirer"* ]] || false
+}
+
+@test "skill repowarden : modeles fr et en, nom, declencheurs et commandes du circuit" {
+    for f in "$SKILL_FR" "$SKILL_EN"; do
+        [ "$(sed -n 1p "$f")" = --- ]
+        [ "$(sed -n 2p "$f")" = "name: repowarden" ]
+        description="$(grep -m1 '^description: ' "$f")"
+        for mot in ticket commit PR push; do
+            [[ "$description" == *"$mot"* ]] || false
+        done
+        grep -q '^<!-- repowarden:skill' "$f"
+        for commande in "repowarden ticket <n>" "repowarden ticket comment" "repowarden cc -m" "git add <" \
+            "git push -u origin HEAD" "repowarden pr checks" "repowarden run rerun" "REPOWARDEN_TICKET=<n>" \
+            "opencode run --auto" "< /dev/null" "--no-verify"; do
+            grep -qF -- "$commande" "$f" || { echo "$f : $commande absente"; false; }
+        done
+    done
+    # Même plan dans les deux langues
+    [ "$(grep -c '^## ' "$SKILL_FR")" = "$(grep -c '^## ' "$SKILL_EN")" ]
 }
