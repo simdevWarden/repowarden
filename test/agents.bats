@@ -338,12 +338,16 @@ JS
     run "$RW" agents init
     [ "$status" -eq 0 ]
     [[ "$output" == *"Claude Code : skill repowarden mise à jour"* ]] || false
+    [[ "$output" == *"pour la personnaliser"* ]] || false
+    [[ "$output" == *"retirer la ligne repère"* ]] || false
     [[ "$output" == *"opencode : skill repowarden"*"diffère du modèle ; gardée telle quelle"* ]] || false
     cmp -s .claude/skills/repowarden/SKILL.md "$SKILL_FR"
     cmp -s .opencode/skills/repowarden/SKILL.md "$BATS_TEST_TMPDIR/perso.md"
     # Autre langue : posée par repowarden, remplacée par le modèle de la langue
     REPOWARDEN_LANG=en run "$RW" agents init --claude
     [[ "$output" == *"Claude Code: repowarden skill updated"* ]] || false
+    [[ "$output" == *"to customize it"* ]] || false
+    [[ "$output" == *"remove its marker line"* ]] || false
     cmp -s .claude/skills/repowarden/SKILL.md "$SKILL_EN"
 }
 
@@ -376,6 +380,10 @@ JS
             grep -qF -- "$commande" "$f" || { echo "$f : $commande absente"; false; }
         done
     done
+    grep -q 'retirer cette ligne pour la personnaliser' "$SKILL_FR" || false
+    grep -q 'remove this line to customize it' "$SKILL_EN" || false
+    grep -q 'Personnaliser la skill' "$BATS_TEST_DIRNAME/../docs/agents.md" || false
+    grep -q 'Customizing the skill' "$BATS_TEST_DIRNAME/../docs/agents.en.md" || false
     # Même plan dans les deux langues
     [ "$(grep -c '^## ' "$SKILL_FR")" = "$(grep -c '^## ' "$SKILL_EN")" ]
 }

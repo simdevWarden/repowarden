@@ -58,6 +58,10 @@ repowarden agents retirer             # repository; --global: user configuration
 
 Same options as `init` (`--claude`, `--opencode`, `--projet`, `--global`). Only what `init` wrote goes: in `settings.json`, the `repowarden garde` commands (other hooks and settings stay; the file is deleted if nothing is left); each opencode plugin if identical to its template (modified, it is kept and reported). Run again, nothing to remove, no error.
 
+### Customizing the skill
+
+If the repowarden skill placed by `repowarden agents init` still has the marker line `<!-- repowarden:skill ... -->`, it is considered placed by repowarden and will be replaced by the template on the next `agents init`. To customize it, remove that marker line from `SKILL.md` (Claude Code or opencode, project or global). A skill without the marker is kept as is by `agents init` and `agents retirer`.
+
 ## Checker: `repowarden garde`
 
 One checker for all tools: it reads the action on standard input (JSON) and answers with its exit code.

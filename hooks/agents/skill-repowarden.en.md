@@ -2,7 +2,7 @@
 name: repowarden
 description: Repowarden skill for AI agents. Triggers on ticket, commit, branch, push, PR, CI, gh, forbidden action or guard refusal.
 ---
-<!-- repowarden:skill posée par repowarden agents init -->
+<!-- repowarden:skill installed by repowarden agents init; remove this line to customize it -->
 
 # Repowarden
 

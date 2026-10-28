@@ -58,6 +58,10 @@ repowarden agents retirer             # dépôt ; --global : configuration de l'
 
 Mêmes options qu'`init` (`--claude`, `--opencode`, `--projet`, `--global`). Seul ce qu'`init` a écrit part : dans `settings.json`, les commandes `repowarden garde` (les autres hooks et réglages restent ; le fichier est supprimé s'il ne contient plus rien) ; chaque plugin opencode s'il est identique à son modèle (modifié, il est gardé et signalé). Relancé, rien à retirer, sans erreur.
 
+### Personnaliser la skill
+
+Si la skill repowarden posée par `repowarden agents init` garde son repère `<!-- repowarden:skill ... -->`, elle est considérée comme posée par repowarden et sera remplacée par le modèle à la prochaine relance d'`agents init`. Pour la personnaliser, retirer cette ligne repère dans `SKILL.md` (Claude Code ou opencode, projet ou global). Une skill sans repère est gardée telle quelle par `agents init` et par `agents retirer`.
+
 ## Vérificateur : `repowarden garde`
 
 Un seul vérificateur pour tous les outils : il lit l'action sur l'entrée standard (JSON) et répond par son code de sortie.
