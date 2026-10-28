@@ -69,12 +69,13 @@ titre_pr_brouillon_r() {
     suggest_pr_title_r "$branche"
 }
 
-# $1 = corps d'un ticket → REPLY : les puces de ses critères d'acceptation
+# $1 = corps d'un ticket → REPLY : ses sections de critères d'acceptation
 # (« Terminé quand… », « Critères d'acceptation ») en cases à cocher « - [ ] »,
-# le reste inchangé
+# RESTE_TICKET : le reste (constat, proposition), que la PR replie
 criteres_coches_r() {
-    local corps="$1" ligne dedans=0 sortie=""
+    local corps="$1" ligne dedans=0 criteres="" reste=""
     while IFS= read -r ligne; do
+        ligne="${ligne%$'\r'}"
         if [[ "$ligne" =~ ^#{1,6}[[:space:]] ]]; then
             dedans=0
             case "$ligne" in
@@ -85,9 +86,16 @@ criteres_coches_r() {
             ligne="$(printf '%s' "$ligne" |
                 sed -E 's/^([[:space:]]*[-*][[:space:]]+)(\[[xX ]\][[:space:]]+)?/\1[ ] /')"
         fi
-        sortie="$sortie$ligne"$'\n'
+        if [ "$dedans" = 1 ]; then
+            criteres="$criteres$ligne"$'\n'
+        else
+            reste="$reste$ligne"$'\n'
+        fi
     done <<<"$corps"
-    REPLY="${sortie%$'\n'}"
+    while [[ "$reste" == $'\n'* ]]; do reste="${reste#$'\n'}"; done
+    sans_fin_vide_r "$reste"
+    RESTE_TICKET="$REPLY"
+    sans_fin_vide_r "$criteres"
 }
 
 # Fin de chaque commentaire lu d'un bloc (séparateur ASCII) : un texte écrit à
@@ -189,41 +197,98 @@ section_realise_r() {
     sans_fin_vide_r "$section"
 }
 
+# Ligne de pied d'un commit (`repowarden cc --refs`), faite seulement de
+# références : retirée, le pied de la PR porte déjà le ticket
+PIED_COMMIT_RE='^[[:space:]]*(Tickets?|Refs?|Closes|Fixes|Resolves)[[:space:]]*:?[[:space:]]*#[0-9]+([[:space:],]+#[0-9]+)*[[:space:]]*$'
+
+# $1 = commits lus par l'API (« parents sha message », chacun suivi d'une ligne
+# SEP_COMMENTAIRE) → REPLY : pour chaque commit hors fusion, « ### en-tête (sha) »
+# puis son corps, le pourquoi que le relecteur cherche avant le ticket
+ce_que_fait_r() {
+    local ligne debut=1 fusion=0 entete="" bloc="" sortie="" reste
+    while IFS= read -r ligne; do
+        ligne="${ligne%$'\r'}"
+        if [ "$ligne" = "$SEP_COMMENTAIRE" ]; then
+            if [ -n "$entete" ] && [ "$fusion" = 0 ]; then
+                sans_fin_vide_r "$bloc"
+                sortie="$sortie${sortie:+$'\n\n'}$entete${REPLY:+$'\n'}$REPLY"
+            fi
+            debut=1 fusion=0 entete="" bloc=""
+            continue
+        fi
+        if [ "$debut" = 1 ]; then
+            [ -n "$ligne" ] || continue
+            debut=0
+            # plus d'un parent : commit de fusion, sans rien à dire à la revue
+            [ "${ligne%% *}" -le 1 ] 2>/dev/null || fusion=1
+            reste="${ligne#* }"
+            entete="### ${reste#* } (${reste%% *})"
+            continue
+        fi
+        [ -n "$bloc" ] || [ -n "${ligne//[[:space:]]/}" ] || continue
+        [[ ! "$ligne" =~ $PIED_COMMIT_RE ]] || continue
+        ligne_reprise_r "$ligne"
+        bloc="$bloc$REPLY"$'\n'
+    done <<<"$1"$'\n'"$SEP_COMMENTAIRE"
+    REPLY="$sortie"
+}
+
 # REPLY = description de la PR brouillon du ticket $1 (branche $2, PR $3 si
-# elle existe) : le ticket (critères en cases à cocher), ses ajouts en
-# commentaire, le résumé de sa conception, les commits, la section « Réalisé »
-# de l'auteur gardée, puis « Ticket : #N ». Le bot ne régénère que ses sections.
+# elle existe) : ce que fait la PR (corps des commits), les critères du ticket
+# en cases à cocher, ses ajouts en commentaire, le résumé de sa conception, le
+# reste du ticket replié, la section « Réalisé » de l'auteur gardée, puis
+# « Ticket : #N ». Le bot ne régénère que ses sections.
 description_pr_brouillon_r() {
-    local n="$1" branche="$2" pr="${3:-}" corps commits commentaires
+    local n="$1" branche="$2" pr="${3:-}" corps="" reste commentaires
+    ce_que_fait_r "$(gh api "repos/$GH_REPO/compare/$INTEGRATION...$branche" \
+        -q '.commits[] | "\(.parents | length) \(.sha[0:7]) \(.commit.message)\n\u001e"' 2>/dev/null || true)"
+    _tr tk.pr_does
+    [ -z "$REPLY" ] || corps="## $_T"$'\n'"$REPLY"
     criteres_coches_r "$(gh issue view "$n" --json body -q .body)"
-    corps="$REPLY"
+    reste="$RESTE_TICKET"
+    [ -z "$REPLY" ] || corps="$corps${corps:+$'\n\n'}$REPLY"
     commentaires_mainteneur_r "$n"
     commentaires="$REPLY"
     ajouts_ticket_r "$commentaires"
     _tr tk.pr_additions
-    [ -z "$REPLY" ] || corps="$corps"$'\n\n## '"$_T"$'\n'"$REPLY"
+    [ -z "$REPLY" ] || corps="$corps${corps:+$'\n\n'}## $_T"$'\n'"$REPLY"
     resume_conception_r "$commentaires"
     _tr tk.pr_design
-    [ -z "$REPLY" ] || corps="$corps"$'\n\n## '"$_T"$'\n'"$REPLY"
-    commits="$(gh api "repos/$GH_REPO/compare/$INTEGRATION...$branche" \
-        -q '.commits[] | "- \(.sha[0:7]) \(.commit.message | split("\n")[0])"' 2>/dev/null || true)"
-    [ -z "$commits" ] || corps="$corps"$'\n\n## Commits\n'"$commits"
+    [ -z "$REPLY" ] || corps="$corps${corps:+$'\n\n'}## $_T"$'\n'"$REPLY"
+    if [ -n "$reste" ]; then
+        # lignes vides autour du texte : sinon GitHub ne rend pas son Markdown
+        _tr tk.pr_ticket "$n"
+        corps="$corps${corps:+$'\n\n'}<details>"$'\n'"<summary>$_T</summary>"$'\n\n'"$reste"$'\n\n</details>'
+    fi
     if [ -n "$pr" ]; then
         section_realise_r "$(gh pr view "$pr" --json body -q .body 2>/dev/null || true)"
-        [ -z "$REPLY" ] || corps="$corps"$'\n\n'"$REPLY"
+        [ -z "$REPLY" ] || corps="$corps${corps:+$'\n\n'}$REPLY"
     fi
-    REPLY="$corps"$'\n\nTicket : #'"$n"
+    REPLY="$corps${corps:+$'\n\n'}Ticket : #$n"
+}
+
+# REPLY = compte à assigner à la PR brouillon du ticket $1 : l'auteur du push
+# s'il est une personne (GitHub refuse d'assigner un bot avec un jeton d'App),
+# sinon le premier assigné du ticket, sinon vide
+assigne_pr_r() {
+    REPLY=""
+    case "${PUSHER:-}" in
+        "" | *"[bot]") ;;
+        *) REPLY="$PUSHER"; return 0 ;;
+    esac
+    REPLY="$(assignes "$1")"
+    REPLY="${REPLY%%$'\n'*}"
 }
 
 # Premier push sur la branche d'un ticket : PR brouillon vers la branche
 # d'intégration, titrée par le premier commit (repli : le ticket), à la
-# description reprise du ticket, citant le
-# ticket, assignée à l'auteur du push ; ticket en cours. Ouverte par le jeton
-# des Actions, elle ne lance pas la CI : elle tourne au push suivant, ou au
+# description reprise du ticket, citant le ticket, assignée à l'auteur du
+# push (une personne, jamais un bot ; repli : l'assigné du ticket ; un refus
+# n'est qu'un avertissement) ; ticket en cours. Ouverte par le jeton des Actions, elle ne lance pas la CI : elle tourne au push suivant, ou au
 # passage « prête pour revue ». Tant qu'elle est en brouillon, chaque push met
 # à jour son titre et sa description ; une PR prête n'est plus touchée.
 cmd_push() {
-    local n pr titre corps url
+    local n pr titre corps url qui
     : "${PUSH_BRANCH:?}" "${SHA:?}"
     [ "${DELETED:-false}" != true ] || return 0
     branch_ticket_r "$PUSH_BRANCH"
@@ -245,8 +310,15 @@ cmd_push() {
         return 0
     fi
     url="$(gh pr create --draft --base "$INTEGRATION" --head "$PUSH_BRANCH" --title "$titre" \
-        --body "$corps" ${PUSHER:+--assignee "$PUSHER"})"
-    [ -z "${PUSHER:-}" ] || gh issue edit "$n" --add-assignee "$PUSHER" >/dev/null || true
+        --body "$corps")"
+    # assignation à part : un refus de GitHub ne doit pas faire échouer le suivi
+    assigne_pr_r "$n"
+    qui="$REPLY"
+    if [ -n "$qui" ]; then
+        gh pr edit "${url##*/}" --add-assignee "$qui" >/dev/null 2>&1 ||
+            avertir_t tk.assign_failed "${url##*/}" "$qui"
+        [ "$qui" != "${PUSHER:-}" ] || gh issue edit "$n" --add-assignee "$qui" >/dev/null 2>&1 || true
+    fi
     est_valide "$n" && statut "$n" "$S_ENCOURS"
     notice_t tk.draft_opened "${url##*/}" "$n"
     verifier "${url##*/}" "$SHA" "$n" "$PUSH_BRANCH" || true

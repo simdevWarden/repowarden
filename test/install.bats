@@ -231,6 +231,7 @@ faux_repowarden() {
     [[ "$output" == *"Claude Code : garde-fou mis à jour"* ]] || false
     [[ "$output" != *"sans garde-fou"* ]] || false
     cmp -s "$HOME/.config/opencode/plugins/repowarden-garde.js" "$BATS_TEST_DIRNAME/../hooks/agents/repowarden-garde.js"
+    cmp -s "$HOME/.config/opencode/plugins/repowarden-garde-v2.js" "$BATS_TEST_DIRNAME/../hooks/agents/repowarden-garde-v2.js"
     jq -e '.model == "x" and .hooks.PreToolUse == [{matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash", hooks: [{type: "command", command: "repowarden garde --format claude"}]}]' "$HOME/.claude/settings.json"
     # Déjà à jour : rien à dire ; plugin personnel jamais touché
     printf '// mon plugin\n' >"$HOME/.config/opencode/plugins/repowarden-garde.js"

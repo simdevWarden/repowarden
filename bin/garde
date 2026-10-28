@@ -43,10 +43,14 @@ args="$(jq -c ".$a // {}" <<<"$entree")"
 # Refus : raison et commande à lancer, puis code 2. Ligne shell de plusieurs
 # commandes (LIGNE_MULTIPLE) : refusée en bloc, ce que l'agent doit savoir
 LIGNE_MULTIPLE=""
+# Fichier existant dont la modification est vérifiée (chemin depuis la racine) :
+# un refus rappelle de lire sa carte avant de le modifier
+FICHIER_CARTE=""
 refuser() {
     _tr "$@"
     printf '✖ repowarden : %b\n' "$_T" >&2
     [ -z "$LIGNE_MULTIPLE" ] || { _tr garde.ligne_entiere; printf '%b\n' "$_T" >&2; }
+    [ -z "$FICHIER_CARTE" ] || { _tr garde.carte "$FICHIER_CARTE" "$FICHIER_CARTE"; printf '%b\n' "$_T" >&2; }
     exit 2
 }
 
@@ -133,12 +137,19 @@ protegee() {
 # si le dépôt suit ses tickets)
 verifier_fichier() {
     dossier_r "$1"
-    local d="$REPLY"
+    # Sous Windows, jq finit le chemin lu par un CR (retiré) et le chemin peut
+    # être en forme Windows (D:/…), absolu lui aussi
+    local d="$REPLY" f="${1%$'\r'}"
+    case "$f" in /* | [A-Za-z]:[/\\]*) ;; *) f="$cwd/$f" ;; esac
     (
         cd "$d" 2>/dev/null || exit 0
         depot_repowarden || exit 0
         # Fichiers internes de git (.git/…) : hors du travail de l'agent
         case "$(pwd -P)/" in "$(cd "$(git rev-parse --git-dir)" && pwd -P)"/*) exit 0 ;; esac
+        if [ -f "$f" ]; then
+            FICHIER_CARTE="$(cd "$(dirname "$f")" && pwd -P)/${f##*/}"
+            FICHIER_CARTE="${FICHIER_CARTE#"$(cd "$(git rev-parse --show-toplevel)" && pwd -P)"/}"
+        fi
         branche="$(git symbolic-ref -q --short HEAD 2>/dev/null || true)"
         [ -n "$branche" ] || refuser garde.detache "$GIT_TOPLEVEL"
         if protegee "$branche"; then
@@ -461,7 +472,8 @@ verifier_shell() {
 
 case "$outil" in
     Edit | Write | MultiEdit | NotebookEdit | edit | write | multiedit)
-        chemin="$(jq -r '.file_path // .filePath // .notebook_path // empty' <<<"$args" 2>/dev/null)"
+        # path : outils edit et write d'opencode 2.x
+        chemin="$(jq -r '.file_path // .filePath // .notebook_path // .path // empty' <<<"$args" 2>/dev/null)"
         [ -z "$chemin" ] || verifier_fichier "$chemin"
         ;;
     apply_patch)
@@ -470,7 +482,8 @@ case "$outil" in
         done < <(jq -r '.patchText // empty' <<<"$args" 2>/dev/null |
             sed -nE -e 's/^\*\*\* (Add|Update|Delete) File: //p' -e 's/^\*\*\* Move to: //p')
         ;;
-    Bash | bash)
+    # shell : nom de l'outil bash dans opencode 2.x
+    Bash | bash | shell)
         verifier_shell "$(jq -r '.command // empty' <<<"$args" 2>/dev/null)"
         ;;
 esac

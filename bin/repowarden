@@ -7,6 +7,7 @@
 #   repowarden uninstall [--global] [--purge]      les retire (avant npm uninstall -g)
 #   repowarden cc                                  assistant de commit
 #   repowarden code-mort                           nouveau code mort de la branche
+#   repowarden carte                               carte du projet : fonctions et leur pourquoi
 #   repowarden ticket <n>                         branche du ticket (créée, liée, si besoin)
 #   repowarden ticket nouveau "<titre>"           nouveau ticket
 #   repowarden ticket comment <n> "<texte>"       commentaire sur un ticket
@@ -52,6 +53,7 @@ help_key_r() {
         garde | guard) REPLY=help.garde ;;
         cc | commit) REPLY=help.cc ;;
         code-mort | deadcode) REPLY=help.code-mort ;;
+        carte | map) REPLY=help.carte ;;
         ticket) REPLY=help.ticket ;;
         tickets) REPLY=help.tickets ;;
         pr) REPLY=help.pr ;;
@@ -102,6 +104,7 @@ case "$cmd" in
     uninstall) exec bash "$ROOT/install.sh" --uninstall "$@" ;;
     cc | commit) exec bash "$ROOT/bin/commit" "$@" ;;
     code-mort | deadcode) exec bash "$ROOT/bin/code-mort" "$@" ;;
+    carte | map) exec bash "$ROOT/bin/carte" "$@" ;;
     tickets) exec bash "$ROOT/bin/tickets" "$@" ;;
     ticket) exec bash "$ROOT/bin/ticket" "$@" ;;
     ticket-comment) exec bash "$ROOT/bin/ticket-comment" "$@" ;;
