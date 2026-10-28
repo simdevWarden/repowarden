@@ -267,6 +267,10 @@ description_pr_brouillon_r() {
     REPLY="$corps${corps:+$'\n\n'}Ticket : #$n"
 }
 
+# Numéro de la PR ouverte depuis la branche $1, vide sinon ; relu juste avant
+# la création pour ne jamais ouvrir deux PR pour une même branche
+pr_ouverte() { gh pr list --state open --head "$1" --json number -q '.[0].number // empty'; }
+
 # REPLY = compte à assigner à la PR brouillon du ticket $1 : l'auteur du push
 # s'il est une personne (GitHub refuse d'assigner un bot avec un jeton d'App),
 # sinon le premier assigné du ticket, sinon vide
@@ -296,7 +300,7 @@ cmd_push() {
     [ -n "$n" ] || return 0
     # Branche faite hors du ticket (à la main) : inscrite sur le ticket
     inscrire_branche "$n" "$PUSH_BRANCH"
-    pr="$(gh pr list --state open --head "$PUSH_BRANCH" --json number -q '.[0].number // empty')"
+    pr="$(pr_ouverte "$PUSH_BRANCH")"
     # PR existante : rien à faire si elle n'est plus en brouillon
     [ -z "$pr" ] || [ "$(gh pr view "$pr" --json isDraft -q .isDraft)" = true ] || return 0
     [ "$(gh api "repos/$GH_REPO/compare/$INTEGRATION...$PUSH_BRANCH" -q .ahead_by)" != 0 ] || return 0
@@ -307,6 +311,12 @@ cmd_push() {
     if [ -n "$pr" ]; then
         gh pr edit "$pr" --title "$titre" --body "$corps" >/dev/null
         notice_t tk.draft_updated "$pr" "$n"
+        return 0
+    fi
+    # Deux push rapprochés : un autre run a pu ouvrir la PR entre-temps
+    pr="$(pr_ouverte "$PUSH_BRANCH")"
+    if [ -n "$pr" ]; then
+        notice_t tk.draft_exists "$pr" "$n"
         return 0
     fi
     url="$(gh pr create --draft --base "$INTEGRATION" --head "$PUSH_BRANCH" --title "$titre" \
