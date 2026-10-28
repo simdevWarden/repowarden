@@ -335,6 +335,32 @@ verifier_gh() {
     ) || exit $?
 }
 
+# repowarden ticket label <n> <label> [--remove] (mots $@ après « repowarden »),
+# lancé depuis $dir : poser ou retirer « validé » ou un statut valide le ticket,
+# décision du mainteneur refusée même avec REPOWARDEN_TICKET (incident #477)
+verifier_ticket_label() {
+    local ligne="repowarden $*" mot decision=""
+    case "$1" in
+        ticket) [ "${2:-}" = label ] || return 0; shift 2 ;;
+        *) shift ;;
+    esac
+    [ $# -ge 2 ] || return 0
+    lecture_seule "$@" && return 0
+    # Mots après le numéro : une étiquette entre guillemets y est découpée
+    # (« statut: en cours » → statut:), dans le doute refuser
+    shift
+    for mot in "$@"; do
+        case "$mot" in "$VALIDE" | statut:*) decision=1 ;; esac
+    done
+    [ -n "$decision" ] || return 0
+    dossier_r "$dir"
+    (
+        cd "$REPLY" 2>/dev/null || exit 0
+        depot_repowarden || exit 0
+        refuser garde.ticket_mainteneur "$ligne"
+    ) || exit $?
+}
+
 # Découpe $1 en une commande par ligne (REPLY) : seul le « & » d'une vraie
 # redirection (N>&M, >&2, >&-, &>, &>>, non échappée) reste dans la commande,
 # citée entière ; partout ailleurs il sépare. Dans le doute couper : au pire une
@@ -433,6 +459,10 @@ verifier_shell() {
                         cmd_cc="repowarden ${2//[\"\']/}"
                         shift 2
                         lecture_seule "${@//[\"\']/}" || verifier_cc "$cmd_cc"
+                        ;;
+                    ticket | ticket-label)
+                        shift
+                        verifier_ticket_label "${@//[\"\']/}"
                         ;;
                 esac
                 ;;
