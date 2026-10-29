@@ -33,9 +33,37 @@ concurrency:
 permissions: {}
 
 jobs:
+  # Préversion publiée sans aucune demande de livraison (#510) : c'est elle que
+  # npm-next et tickets-preprod attendent, avant toute approbation en production
+  preversion:
+    # Sur main, seule la release stable tourne : le job release
+    if: github.ref_name == 'develop'
+    uses: ./.github/workflows/release-auto.yml
+    permissions:
+      contents: write
+      pull-requests: write
+      actions: write
+      checks: read
+      statuses: write
+      issues: read # notes de version : tickets livrés
+    with:
+      mode: tag
+      integration-branch: develop
+      # Sans approbation : la demande de livraison part du job release
+      delivery-environment: ""
+      delivery-schedule: "0 7 * * 5"
+      app-client-id: ${{ vars.REPOWARDEN_APP_CLIENT_ID }}
+      workflows: ci.yml codeql.yml
+      repowarden-ref: ${{ github.sha }}
+    secrets:
+      app-key: ${{ secrets.REPOWARDEN_APP_KEY }}
+
   # Version, changelog, PR de release validée par la CI puis mergée, tag et
   # release : workflow réutilisable, le même que celui proposé aux projets
   release:
+    needs: preversion
+    # Sur main, preversion est sauté : la release stable tourne aussi
+    if: ${{ !cancelled() && needs.preversion.result != 'failure' }}
     uses: ./.github/workflows/release-auto.yml
     permissions:
       contents: write
@@ -51,6 +79,8 @@ jobs:
       # fichier écrit). Un correctif urgent sur main revient seul dans develop.
       mode: tag
       integration-branch: develop
+      # Préversion déjà publiée par le job preversion : ne pas la publier deux fois
+      preversion: ""
       # Livraison validée par « Approve and deploy » (environnement
       # production), puis mergée par la GitHub App
       delivery-environment: production
@@ -98,25 +128,40 @@ jobs:
   # Préversion de test (develop) sur npm, étiquette « next » :
   # npm install -g repowarden@next
   npm-next:
-    needs: release
-    if: vars.REPOWARDEN_NPM == 'true' && needs.release.outputs.prerelease_created == 'true'
+    needs: preversion
+    if: vars.REPOWARDEN_NPM == 'true' && needs.preversion.outputs.prerelease_created == 'true'
     uses: ./.github/workflows/npm-publish.yml
     permissions:
       contents: read
       id-token: write
     with:
-      tag: ${{ needs.release.outputs.prerelease_tag }}
+      tag: ${{ needs.preversion.outputs.prerelease_tag }}
       dist-tag: next
+
+  # Tickets en préprod dès la préversion publiée (commentaire), sans attendre
+  # l'approbation : done et fermeture restent au job tickets (#510)
+  tickets-preprod:
+    needs: preversion
+    if: needs.preversion.outputs.prerelease_created == 'true'
+    uses: ./.github/workflows/tickets.yml
+    permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
+    with:
+      tag: ${{ needs.preversion.outputs.prerelease_tag }}
+      repowarden-repository: ${{ github.repository }}
+      repowarden-ref: ${{ github.sha }}
+      app-client-id: ${{ vars.REPOWARDEN_APP_CLIENT_ID }}
+    secrets:
+      app-key: ${{ secrets.REPOWARDEN_APP_KEY }}
 
   # Tickets : en préprod à chaque préversion (commentaire), done et fermés à
   # chaque release, ou à une livraison sans nouvelle version
   tickets:
     needs: release
-    if: needs.release.outputs.release_created == 'true' || needs.release.outputs.prerelease_created == 'true' || needs.release.outputs.delivered_without_version != ''
+    if: needs.release.outputs.release_created == 'true' || needs.release.outputs.delivered_without_version != ''
     uses: ./.github/workflows/tickets.yml
     permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
     with:
-      tag: ${{ needs.release.outputs.tag_name || needs.release.outputs.prerelease_tag }}
+      tag: ${{ needs.release.outputs.tag_name }}
       delivered-sha: ${{ needs.release.outputs.delivered_without_version }}
       repowarden-repository: ${{ github.repository }}
       repowarden-ref: ${{ github.sha }}
