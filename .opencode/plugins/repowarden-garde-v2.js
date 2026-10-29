@@ -4,7 +4,10 @@
 // absent ou en panne : rien n'est bloqué. opencode 1.x : repowarden-garde.js,
 // à côté (un module à export par défaut y passerait pour un plugin 2.x).
 // Plugins opencode 2.x : export par défaut { id, setup }, crochet
-// ctx.tool.hook("execute.before") (outils edit, write, shell…)
+// ctx.tool.hook("execute.before") (outils edit, write, shell…). opencode 1.19
+// lit tout export par défaut qui a un id comme un plugin à server() : sans
+// lui, « failed to load plugin » à chaque démarrage ; server() ne rend aucun
+// crochet, le garde-fou 1.x reste celui de repowarden-garde.js
 import { spawnSync } from "node:child_process"
 
 // Soumet l'appel d'outil à repowarden garde ; l'erreur levée par le crochet
@@ -25,4 +28,5 @@ export default {
     const dossier = ctx.location?.directory || process.cwd()
     return ctx.tool.hook("execute.before", (appel) => garde(appel.tool, appel.input, dossier))
   },
+  server: async () => ({}),
 }

@@ -287,16 +287,19 @@ JS
     run node "$BATS_TEST_TMPDIR/appel.mjs" "$BATS_TEST_TMPDIR/v2.mjs" write '{"path":"README.md","content":"x"}'
     [ "$output" = permis ]
     # Contexte d'opencode 1.x (sans ctx.tool) : setup ne fait rien ; le plugin
-    # 1.x n'a pas d'export par défaut, sinon 1.x n'appellerait plus son crochet
+    # 1.x n'a pas d'export par défaut, sinon 1.x n'appellerait plus son crochet.
+    # Le v2 a aussi server() sans crochet : opencode 1.19 exige server() de tout
+    # export par défaut qui a un id, sinon « failed to load plugin » (#469)
     cat >"$BATS_TEST_TMPDIR/v1x.mjs" <<'JS'
 const v2 = (await import(process.argv[2])).default
 await v2.setup({ agent: {}, plugin: {} })
 const v1 = await import(process.argv[3])
-console.log(v2.id, typeof v1.default, typeof v1.RepowardenGarde)
+const crochets = typeof v2.server === "function" ? await v2.server({}) : undefined
+console.log(v2.id, typeof v1.default, typeof v1.RepowardenGarde, typeof v2.server, Object.keys(crochets ?? { absent: 1 }).length)
 JS
     run node "$BATS_TEST_TMPDIR/v1x.mjs" "$BATS_TEST_TMPDIR/v2.mjs" "$BATS_TEST_TMPDIR/v1.mjs"
     [ "$status" -eq 0 ]
-    [ "$output" = "repowarden-garde undefined function" ]
+    [ "$output" = "repowarden-garde undefined function function 0" ]
 }
 
 @test "agents init : skill repowarden posee pour Claude Code et opencode, dans la langue de repowarden" {
