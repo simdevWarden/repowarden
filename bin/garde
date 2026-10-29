@@ -425,14 +425,48 @@ verifier_ticket_nouveau() {
     ) || exit $?
 }
 
-# Découpe $1 en une commande par ligne (REPLY) : seul le « & » d'une vraie
-# redirection (N>&M, >&2, >&-, &>, &>>, non échappée) reste dans la commande,
-# citée entière ; partout ailleurs il sépare. Dans le doute couper : au pire une
-# commande de trop, jamais une masquée (true \>&git push -f lance git).
+# Découpe $1 en une commande par ligne (REPLY) : « ; », « | », « && », « || » et
+# le « & » séparateur coupent hors guillemets simples et doubles (antislash
+# compris) ; seul le « & » d'une vraie redirection (N>&M, >&2, >&-, &>, &>>, non
+# échappée) reste dans la commande, citée entière. Dans le doute couper : au pire
+# une commande de trop, jamais une masquée (true \>&git push -f lance git).
+# Entre guillemets le retour à la ligne devient une espace : le contenu exact
+# d'une chaîne n'importe pas pour juger la commande.
 decouper_lignes() {
-    local s="$1" out="" c i j prec avant nl=$'\n'
+    local s="$1" out="" c q="" i j prec avant nl=$'\n'
     for ((i = 0; i < ${#s}; i++)); do
         c="${s:i:1}"
+        if [ -n "$q" ]; then
+            if [ "$c" = "$nl" ]; then
+                out="$out "
+                continue
+            fi
+            out="$out$c"
+            if [ "$c" = "$q" ]; then
+                q=""
+            elif [ "$c" = "\\" ] && [ "$q" = '"' ]; then
+                i=$((i + 1))
+                out="$out${s:i:1}"
+            fi
+            continue
+        fi
+        case "$c" in
+            "'" | '"')
+                q="$c"
+                out="$out$c"
+                continue
+                ;;
+            "\\")
+                out="$out$c"
+                i=$((i + 1))
+                out="$out${s:i:1}"
+                continue
+                ;;
+            ";" | "|")
+                out="$out$nl"
+                continue
+                ;;
+        esac
         if [ "$c" != "&" ]; then
             out="$out$c"
             continue
@@ -468,28 +502,72 @@ decouper_lignes() {
     REPLY="$out"
 }
 
-# Ligne de commande shell : chaque commande (&&, ||, ;, |, retour à la ligne),
-# « cd » suivi, variables d'environnement en tête ignorées (sauf
-# REPOWARDEN_TICKET, le ticket d'une écriture gh hors du circuit des PR)
+# Découpe $1 en mots (MOTS) en respectant guillemets simples et doubles et
+# antislash, sans sous-processus ; guillemet non fermé : MOTS vide, code 1.
+decouper_mots() {
+    local s="$1" mot="" q="" c i n
+    MOTS=()
+    n=${#s}
+    for ((i = 0; i < n; i++)); do
+        c="${s:i:1}"
+        if [ -n "$q" ]; then
+            if [ "$c" = "$q" ]; then
+                q=""
+            elif [ "$c" = "\\" ] && [ "$q" = '"' ]; then
+                case "${s:i+1:1}" in
+                    '"' | "\\" | '$' | '`') i=$((i + 1)); mot="$mot${s:i:1}" ;;
+                    *) mot="$mot\\" ;;
+                esac
+            else
+                mot="$mot$c"
+            fi
+            continue
+        fi
+        case "$c" in
+            "'" | '"') q="$c" ;;
+            "\\")
+                i=$((i + 1))
+                mot="$mot${s:i:1}"
+                ;;
+            " " | $'\t')
+                [ -z "$mot" ] || { MOTS+=("$mot"); mot=""; }
+                ;;
+            *) mot="$mot$c" ;;
+        esac
+    done
+    if [ -n "$q" ]; then
+        MOTS=()
+        return 1
+    fi
+    [ -z "$mot" ] || MOTS+=("$mot")
+}
+
+# Ligne de commande shell : chaque commande (« ; », « | », « && », « || » et le
+# « & » séparateur, hors guillemets), « cd » suivi, variables d'environnement en
+# tête ignorées (sauf REPOWARDEN_TICKET, le ticket d'une écriture gh hors du
+# circuit des PR)
 verifier_shell() {
-    local commande="$1" segment mots m cmd_cc nl=$'\n' lignes ticket_gh
+    local commande="$1" segment m cmd_cc lignes ticket_gh
     dir="$cwd"
-    # Une commande par ligne. Découpage hors de <( … ) : bash 3.2 (macOS) y
-    # lit mal ces motifs (« bad substitution ») et ne vérifierait plus rien
-    lignes="${commande//&&/$nl}"
-    lignes="${lignes//||/$nl}"
-    lignes="${lignes//;/$nl}"
-    lignes="${lignes//|/$nl}"
-    # Un « & » de redirection (2>&1, >&2, &>log…) n'est pas un séparateur : la
-    # commande citée dans le refus et celle proposée restent entières
-    decouper_lignes "$lignes"
+    # Une commande par ligne, en un seul parcours caractère par caractère qui
+    # respecte les guillemets (pas de <( … ) : bash 3.2 le lit mal).
+    decouper_lignes "$commande"
     lignes="$REPLY"
     # Plusieurs commandes : un refus vaut pour toute la ligne (dit à l'agent)
     [ "$(grep -c '[^[:space:]]' <<<"$lignes")" -le 1 ] || LIGNE_MULTIPLE=1
     while IFS= read -r segment; do
-        # shellcheck disable=SC2162 # les antislashs restent tels quels, comme dans la commande
-        read -a mots <<<"$segment" || true
-        set -- ${mots[@]+"${mots[@]}"}
+        # Guillemet non fermé : commande illisible, refusée dans un dépôt
+        # repowarden (dans le doute, refuser) ; ailleurs, tout est permis
+        if ! decouper_mots "$segment"; then
+            dossier_r "$dir"
+            (
+                cd "$REPLY" 2>/dev/null || exit 0
+                depot_repowarden || exit 0
+                refuser garde.commande_illisible "$segment"
+            ) || exit $?
+            continue
+        fi
+        set -- ${MOTS[@]+"${MOTS[@]}"}
         ticket_gh=""
         while [ $# -gt 0 ]; do
             case "$1" in
@@ -499,7 +577,13 @@ verifier_shell() {
             esac
         done
         [ $# -gt 0 ] || continue
+        # Commande : dernier élément du chemin (/ ou \), sans .exe/.cmd/.bat
         m="${1//[\"\']/}"
+        m="${m##*/}"
+        m="${m##*\\}"
+        case "$m" in
+            *.exe | *.EXE | *.cmd | *.CMD | *.bat | *.BAT) m="${m%.*}" ;;
+        esac
         case "$m" in
             cd)
                 case "${2:-}" in
@@ -509,15 +593,15 @@ verifier_shell() {
                     *) dir="$dir/${2//[\"\']/}" ;;
                 esac
                 ;;
-            git | */git)
+            git)
                 shift
                 verifier_git "${@//[\"\']/}"
                 ;;
-            gh | */gh)
+            gh)
                 shift
                 verifier_gh "${@//[\"\']/}"
                 ;;
-            repowarden | */repowarden)
+            repowarden)
                 shift
                 verifier_ticket_nouveau "${@//[\"\']/}"
                 set -- repowarden "$@"

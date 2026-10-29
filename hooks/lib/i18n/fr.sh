@@ -746,6 +746,7 @@ _msg_fr() {
         garde.format) _M="Format inconnu « %s » : claude ou opencode." ;;
         garde.no_jq) _M="repowarden garde : jq absent, action non vérifiée (installer jq : https://jqlang.org)." ;;
         garde.json) _M="repowarden garde : entrée JSON illisible, action non vérifiée." ;;
+        garde.commande_illisible) _M="commande refusée : « %s » ; guillemet non fermé, commande illisible.\n  → Corriger les guillemets (ouvrir et fermer), puis relancer." ;;
         garde.detache) _M="modification refusée : HEAD détaché dans %s.\n  → Se placer sur la branche d'un ticket : repowarden ticket <n>" ;;
         garde.protegee) _M="modification refusée : « %s » est une branche protégée.\n  → Travailler sur la branche d'un ticket : repowarden ticket <n>" ;;
         garde.protegee_libre) _M="modification refusée : « %s » est une branche protégée.\n  → Créer une branche de travail : git switch -c <type>/<sujet>" ;;

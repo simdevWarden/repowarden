@@ -745,6 +745,7 @@ _msg_en() {
         garde.format) _M="Unknown format \"%s\": claude or opencode." ;;
         garde.no_jq) _M="repowarden garde: jq missing, action not checked (install jq: https://jqlang.org)." ;;
         garde.json) _M="repowarden garde: unreadable JSON input, action not checked." ;;
+        garde.commande_illisible) _M="command refused: \"%s\"; unclosed quote, unreadable command.\n  → Fix the quotes (open and close them), then run it again." ;;
         garde.detache) _M="change refused: detached HEAD in %s.\n  → Switch to a ticket's branch: repowarden ticket <n>" ;;
         garde.protegee) _M="change refused: \"%s\" is a protected branch.\n  → Work on a ticket's branch: repowarden ticket <n>" ;;
         garde.protegee_libre) _M="change refused: \"%s\" is a protected branch.\n  → Create a work branch: git switch -c <type>/<topic>" ;;

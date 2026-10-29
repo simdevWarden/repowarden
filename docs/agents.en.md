@@ -20,6 +20,7 @@ Only in a repowarden repository (`.repowarden.conf`, a `repowarden.*` setting or
 | any commit (`git commit --amend --no-edit` included) | repowarden hooks inactive in the repository (no `core.hooksPath` to the repowarden hooks): messages, secrets and formatting would not be checked | `repowarden install` (or `--global`) |
 | `--no-verify` (and `git commit -n`) | always | run it again without, fix what the hooks report |
 | `git add .`, `-A`, `--all` | always | `git add <files>` |
+| command whose path contains a space (`"/opt/my folder/git" commit …`), a Windows extension (`git.exe`, `repowarden.cmd`) or an unclosed quote | recognised on the last path element (`/` or `\`, without `.exe`/`.cmd`/`.bat`) and refused like its short form; an unclosed quote is an unreadable command, refused (when in doubt, refuse) | fix the quotes and run the short command |
 | forced `git push`: `--force`, `-f` (`-uf`…), `--force-with-lease[=…]`, `--force-if-includes`, `+branch` refspec | always: it rewrites the history already pushed | fix it with a new commit (`repowarden cc …`), then `git push` without forcing |
 | `gh issue create` | always | `repowarden ticket nouveau "<title>"` |
 | `repowarden ticket nouveau` | always, unless `repowarden.agentsTickets = true`: creating a ticket is the maintainer's decision (`--help` stays allowed) | report the defect to the maintainer, who creates the ticket; or note it on the current ticket |

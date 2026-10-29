@@ -20,6 +20,7 @@ Seulement dans un dépôt repowarden (`.repowarden.conf`, réglage `repowarden.*
 | tout commit (`git commit --amend --no-edit` compris) | hooks repowarden inactifs dans le dépôt (aucun `core.hooksPath` vers les hooks repowarden) : messages, secrets et formatage ne seraient pas vérifiés | `repowarden install` (ou `--global`) |
 | `--no-verify` (et `git commit -n`) | toujours | relancer sans, corriger ce que les hooks signalent |
 | `git add .`, `-A`, `--all` | toujours | `git add <fichiers>` |
+| commande dont le chemin contient une espace (`"/opt/mon dossier/git" commit …`), une extension Windows (`git.exe`, `repowarden.cmd`) ou un guillemet non fermé | reconnue sur le dernier élément du chemin (`/` ou `\`, sans `.exe`/`.cmd`/`.bat`) et refusée comme sa forme courte ; un guillemet non fermé est une commande illisible, refusée (dans le doute, refuser) | corriger les guillemets et lancer la commande courte |
 | `git push` forcé : `--force`, `-f` (`-uf`…), `--force-with-lease[=…]`, `--force-if-includes`, refspec `+branche` | toujours : il réécrit l'historique déjà poussé | corriger par un nouveau commit (`repowarden cc …`), puis `git push` sans forcer |
 | `gh issue create` | toujours | `repowarden ticket nouveau "<titre>"` |
 | `repowarden ticket nouveau` | toujours, sauf `repowarden.agentsTickets = true` : créer un ticket est une décision du mainteneur (`--help` reste permis) | signaler le défaut au mainteneur, qui crée le ticket ; ou le noter sur le ticket en cours |
