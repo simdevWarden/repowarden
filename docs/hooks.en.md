@@ -9,7 +9,7 @@
 | `prepare-commit-msg` | Prefixes the message based on the branch: on `feat/bean`, `git commit -m "add X"` → `feat(bean): add X` |
 | `commit-msg` | Enforces [Conventional Commits](https://www.conventionalcommits.org), 72 characters maximum |
 | `pre-push` | Rejects badly named branches and direct pushes to protected branches (`protectedBranches`, initial creation allowed), and the **messages of the pushed commits** (same rule as CI, `git rebase -i` suggested to fix them); **lint** (shellcheck for shell scripts, actionlint for GitHub workflows) then builds and tests **the pushed commit**, only for the affected projects (success: one summary line per project; failure: full output) |
-| `post-merge` | After a `git pull`: deletes merged local branches (regular or squash merge) whose remote branch has been deleted; never a branch containing unintegrated work |
+| `post-merge` | After a `git pull`: deletes merged local branches (regular or squash merge) whose remote branch has been deleted; never a branch containing unintegrated work; recomputes the [project map](carte.md) offline if it exists |
 
 One-off bypass: `git commit --no-verify`, `git push --no-verify` — the [CI](ci.md) re-runs the checks.
 

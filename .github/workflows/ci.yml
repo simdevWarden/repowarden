@@ -54,7 +54,7 @@ jobs:
           - { part: branches, files: test/branches.bats test/test_names.bats test/install.bats test/npm.bats test/npm-publication.bats test/tickets.bats test/compat.bats test/ticket_cli.bats test/app.bats test/bot.bats test/bots.bats test/cli_help.bats test/garde.bats test/agents.bats }
           - { part: ci, files: test/ci_check.bats test/migrer.bats test/verrous_pip.bats test/langue_projet.bats }
           - { part: messages, files: test/commit_messages.bats test/commit_assistant.bats }
-          - { part: safety, files: test/safety.bats test/secrets.bats test/commentaires.bats test/preuve.bats }
+          - { part: safety, files: test/safety.bats test/secrets.bats test/commentaires.bats test/carte.bats test/preuve.bats }
           - { part: languages-1, files: test/languages.bats, filter: '^(detection|config|find_up|IaC|performance|python)' }
           - { part: languages-2, files: test/languages.bats, filter: '^(format|\.repowarden|pre-push)' }
     runs-on: windows-latest

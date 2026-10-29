@@ -18,6 +18,7 @@ Versionné à la racine du projet, au format `git config`, lu **par les hooks et
     allowedBranches = main develop release/*
     exclude = vendor/* generated/*      # chemins ni formatés ni testés
     allowAgentSignatures = false        # agents IA (auteur, Co-Authored-By) refusés ; défaut false
+    agentsTickets = false               # un agent IA peut créer un ticket (repowarden ticket nouveau) ; défaut false
     releaseUpdate = npm update -g mon-outil   # commande « Mettre à jour » des notes de version
     sensitiveFiles = .env .env.* *.pem  # noms signalés s'ils ne sont ni suivis ni ignorés (voir Hooks)
     # Bot d'organisation (repowarden bot)
@@ -26,6 +27,8 @@ Versionné à la racine du projet, au format `git config`, lu **par les hooks et
 ```
 
 `version` : si repowarden est plus ancien sur un poste, les hooks le signalent avec la commande de mise à jour (`npm update -g repowarden`, ou `git pull` pour un clone). C'est un avertissement seulement : la CI vérifie chaque PR à sa propre version.
+
+`agentsTickets` : à `true`, le garde-fou laisse un agent IA créer un ticket (`repowarden ticket nouveau`) ; par défaut, il le refuse et demande de signaler le défaut au mainteneur, qui le crée, ou de le noter sur le ticket en cours.
 
 ## Flux avec branche d'intégration (`develop`)
 

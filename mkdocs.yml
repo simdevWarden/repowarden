@@ -51,6 +51,7 @@ nav:
   - Validation humaine: validation.md
   - Tickets: tickets.md
   - Code mort: code-mort.md
+  - Carte du projet: carte.md
   - Agents IA: agents.md
   - En organisation: industrialisation.md
   - Désinstallation: desinstallation.md
@@ -90,6 +91,7 @@ plugins:
             Versions et releases: Versions and releases
             Validation humaine: Human approval
             Code mort: Dead code
+            Carte du projet: Project map
             Agents IA: AI agents
             En organisation: In an organisation
             Désinstallation: Uninstalling

@@ -104,8 +104,10 @@ jobs:
   tickets:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # push : un run à la fois par dépôt et branche (deux push rapprochés
+    # n'ouvrent qu'une PR) ; github.* est le contexte du dépôt appelant
     concurrency:
-      group: tickets-${{ github.event.issue.number || github.event.pull_request.number || github.sha }}
+      group: ${{ github.event_name == 'push' && format('tickets-push-{0}-{1}', github.repository, github.ref) || format('tickets-{0}', github.event.issue.number || github.event.pull_request.number || github.sha) }}
       cancel-in-progress: false
     permissions:
       contents: write # branche du ticket : création à la validation, suppression à l'abandon

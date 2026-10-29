@@ -43,10 +43,14 @@ args="$(jq -c ".$a // {}" <<<"$entree")"
 # Refus : raison et commande à lancer, puis code 2. Ligne shell de plusieurs
 # commandes (LIGNE_MULTIPLE) : refusée en bloc, ce que l'agent doit savoir
 LIGNE_MULTIPLE=""
+# Fichier existant dont la modification est vérifiée (chemin depuis la racine) :
+# un refus rappelle de lire sa carte avant de le modifier
+FICHIER_CARTE=""
 refuser() {
     _tr "$@"
     printf '✖ repowarden : %b\n' "$_T" >&2
     [ -z "$LIGNE_MULTIPLE" ] || { _tr garde.ligne_entiere; printf '%b\n' "$_T" >&2; }
+    [ -z "$FICHIER_CARTE" ] || { _tr garde.carte "$FICHIER_CARTE" "$FICHIER_CARTE"; printf '%b\n' "$_T" >&2; }
     exit 2
 }
 
@@ -129,16 +133,39 @@ protegee() {
     [ -n "$REPLY" ] && [ "$REPLY" = "$1" ]
 }
 
+# Vrai si le chemin $1 (absolu), dans le dépôt du dossier courant $2 (son
+# dossier existant le plus proche), est ignoré par git : jamais versionné.
+# Un fichier suivi n'est jamais ignoré (git check-ignore sans --no-index)
+fichier_ignore() {
+    local reste="${1#"$2"}" prefixe cdup
+    reste="${reste#/}"
+    [ -n "$reste" ] || return 1
+    # Relatif à la racine par --show-prefix/--show-cdup : ni lien symbolique
+    # (/tmp → /private/tmp) ni forme Windows (C:/… contre /c/…) à comparer
+    prefixe="$(git rev-parse --show-prefix 2>/dev/null)" || return 1
+    cdup="$(git rev-parse --show-cdup 2>/dev/null)" || return 1
+    git -C "./$cdup" check-ignore -q -- "$prefixe$reste" 2>/dev/null
+}
+
 # Modification du fichier $1 : seulement sur une branche de travail (de ticket,
-# si le dépôt suit ses tickets)
+# si le dépôt suit ses tickets) ; un fichier ignoré par git l'est partout
 verifier_fichier() {
     dossier_r "$1"
-    local d="$REPLY"
+    # Sous Windows, jq finit le chemin lu par un CR (retiré) et le chemin peut
+    # être en forme Windows (D:/…), absolu lui aussi
+    local d="$REPLY" f="${1%$'\r'}"
+    case "$f" in /* | [A-Za-z]:[/\\]*) ;; *) f="$cwd/$f" ;; esac
     (
         cd "$d" 2>/dev/null || exit 0
         depot_repowarden || exit 0
         # Fichiers internes de git (.git/…) : hors du travail de l'agent
         case "$(pwd -P)/" in "$(cd "$(git rev-parse --git-dir)" && pwd -P)"/*) exit 0 ;; esac
+        # Fichier ignoré par git : jamais versionné, règle de branche non applicable
+        ! fichier_ignore "$f" "$d" || exit 0
+        if [ -f "$f" ]; then
+            FICHIER_CARTE="$(cd "$(dirname "$f")" && pwd -P)/${f##*/}"
+            FICHIER_CARTE="${FICHIER_CARTE#"$(cd "$(git rev-parse --show-toplevel)" && pwd -P)"/}"
+        fi
         branche="$(git symbolic-ref -q --short HEAD 2>/dev/null || true)"
         [ -n "$branche" ] || refuser garde.detache "$GIT_TOPLEVEL"
         if protegee "$branche"; then
@@ -256,11 +283,38 @@ ticket_valide() {
     [ "$(head -n 1 <<<"$lu")" = OPEN ] && grep -qxF "$VALIDE" <<<"$lu"
 }
 
+# Vrai si le texte $1 vise une étiquette de décision du mainteneur (validé,
+# statut: …, à décider), même encodée dans une URL (valid%C3%A9)
+etiquette_decision() {
+    local t
+    t="$(printf '%b' "${1//%/\\x}")"
+    [[ "$t" == *"$VALIDE"* || "$t" == *"statut:"* || "$t" == *"$A_DECIDER"* ]]
+}
+
+# Vrai si l'écriture gh api (méthode $1, chemin $2, mots $3, corps lu d'un
+# fichier si $4) pose, retire ou remplace les étiquettes de décision d'un
+# ticket : refusée même avec un ticket validé (#496). Dans le doute, refuser
+api_etiquettes_decision() {
+    local m="${1:-POST}" re_etiq='/issues/[0-9]+/labels(/|\?|$)' re_ticket='/issues/[0-9]+/?(\?|$)'
+    if [[ "/$2" =~ $re_etiq ]]; then
+        # PUT remplace l'ensemble, DELETE sans nom le vide : validé compris
+        [ "$m" != PUT ] || return 0
+        [ "$m" != DELETE ] || [[ "$2" == */labels/?* ]] || return 0
+        [ -z "$4" ] || return 0
+        etiquette_decision "$2 $3"
+    elif [[ "/$2" =~ $re_ticket ]]; then
+        # PATCH du ticket : un champ labels remplace l'ensemble
+        [ -n "$4" ] || [[ "$3" == *labels* ]]
+    else
+        return 1
+    fi
+}
+
 # Commande gh (mots $@, sans « gh ») lancée depuis $dir, préfixe
 # REPOWARDEN_TICKET=$ticket_gh : lectures connues permises, écritures du circuit
 # par repowarden, décisions au mainteneur, tout le reste avec un ticket validé
 verifier_gh() {
-    local ligne="gh $*" pos=() depot="" methode="" champs="" approuve="" mutation="" ecriture="" hors="" rc
+    local ligne="gh $*" mots="$*" pos=() depot="" methode="" champs="" corps="" approuve="" mutation="" ecriture="" hors="" rc
     while [ $# -gt 0 ]; do
         case "$1" in
             -R | --repo) shift; depot="${1:-}" ;;
@@ -268,7 +322,8 @@ verifier_gh() {
             -X | --method) shift; methode="${1:-}" ;;
             -X?*) methode="${1#-X}" ;;
             --method=*) methode="${1#--method=}" ;;
-            -f | -F | --field | --raw-field | --input | -f?* | -F?* | --field=* | --raw-field=* | --input=*) champs=1 ;;
+            --input | --input=*) champs=1 corps=1 ;;
+            -f | -F | --field | --raw-field | -f?* | -F?* | --field=* | --raw-field=*) champs=1 ;;
             -a | --approve) approuve=1 ;;
             -h | --help) return 0 ;;
             -*) ;;
@@ -303,6 +358,7 @@ verifier_gh() {
             "api "*)
                 [ -n "$ecriture" ] || exit 0
                 [[ "${pos[1]:-}" != *pending_deployments* ]] || refuser garde.gh_mainteneur "$ligne"
+                ! api_etiquettes_decision "$methode" "${pos[1]:-}" "$mots" "$corps" || refuser garde.etiquette_mainteneur "$ligne"
                 hors=1
                 ;;
             # Lectures connues et description de la PR : permises ; tout le
@@ -324,14 +380,93 @@ verifier_gh() {
     ) || exit $?
 }
 
-# Découpe $1 en une commande par ligne (REPLY) : seul le « & » d'une vraie
-# redirection (N>&M, >&2, >&-, &>, &>>, non échappée) reste dans la commande,
-# citée entière ; partout ailleurs il sépare. Dans le doute couper : au pire une
-# commande de trop, jamais une masquée (true \>&git push -f lance git).
+# repowarden ticket label <n> <label> [--remove] (mots $@ après « repowarden »),
+# lancé depuis $dir : poser ou retirer « validé » ou un statut valide le ticket,
+# décision du mainteneur refusée même avec REPOWARDEN_TICKET (incident #477)
+verifier_ticket_label() {
+    local ligne="repowarden $*" mot decision=""
+    case "$1" in
+        ticket) [ "${2:-}" = label ] || return 0; shift 2 ;;
+        *) shift ;;
+    esac
+    [ $# -ge 2 ] || return 0
+    lecture_seule "$@" && return 0
+    # Mots après le numéro : une étiquette entre guillemets y est découpée
+    # (« statut: en cours » → statut:), dans le doute refuser
+    shift
+    for mot in "$@"; do
+        etiquette_decision "$mot" && decision=1
+    done
+    # Étiquette de décision en plusieurs mots (« à décider »), découpée par read -a
+    etiquette_decision "$*" && decision=1
+    [ -n "$decision" ] || return 0
+    dossier_r "$dir"
+    (
+        cd "$REPLY" 2>/dev/null || exit 0
+        depot_repowarden || exit 0
+        refuser garde.ticket_mainteneur "$ligne"
+    ) || exit $?
+}
+
+# repowarden ticket nouveau/new (mots $@), depuis $dir : créer un ticket est
+# une décision du mainteneur, sauf agentsTickets ; --help reste permis (#496)
+verifier_ticket_nouveau() {
+    local ligne="repowarden $*"
+    [ "${1:-}" = ticket ] || return 0
+    case "${2:-}" in nouveau | new) ;; *) return 0 ;; esac
+    lecture_seule "$@" && return 0
+    dossier_r "$dir"
+    (
+        cd "$REPLY" 2>/dev/null || exit 0
+        depot_repowarden || exit 0
+        cfg_r agentsTickets false
+        [ "$REPLY" != true ] || exit 0
+        refuser garde.ticket_nouveau "$ligne"
+    ) || exit $?
+}
+
+# Découpe $1 en une commande par ligne (REPLY) : « ; », « | », « && », « || » et
+# le « & » séparateur coupent hors guillemets simples et doubles (antislash
+# compris) ; seul le « & » d'une vraie redirection (N>&M, >&2, >&-, &>, &>>, non
+# échappée) reste dans la commande, citée entière. Dans le doute couper : au pire
+# une commande de trop, jamais une masquée (true \>&git push -f lance git).
+# Entre guillemets le retour à la ligne devient une espace : le contenu exact
+# d'une chaîne n'importe pas pour juger la commande.
 decouper_lignes() {
-    local s="$1" out="" c i j prec avant nl=$'\n'
+    local s="$1" out="" c q="" i j prec avant nl=$'\n'
     for ((i = 0; i < ${#s}; i++)); do
         c="${s:i:1}"
+        if [ -n "$q" ]; then
+            if [ "$c" = "$nl" ]; then
+                out="$out "
+                continue
+            fi
+            out="$out$c"
+            if [ "$c" = "$q" ]; then
+                q=""
+            elif [ "$c" = "\\" ] && [ "$q" = '"' ]; then
+                i=$((i + 1))
+                out="$out${s:i:1}"
+            fi
+            continue
+        fi
+        case "$c" in
+            "'" | '"')
+                q="$c"
+                out="$out$c"
+                continue
+                ;;
+            "\\")
+                out="$out$c"
+                i=$((i + 1))
+                out="$out${s:i:1}"
+                continue
+                ;;
+            ";" | "|")
+                out="$out$nl"
+                continue
+                ;;
+        esac
         if [ "$c" != "&" ]; then
             out="$out$c"
             continue
@@ -367,28 +502,72 @@ decouper_lignes() {
     REPLY="$out"
 }
 
-# Ligne de commande shell : chaque commande (&&, ||, ;, |, retour à la ligne),
-# « cd » suivi, variables d'environnement en tête ignorées (sauf
-# REPOWARDEN_TICKET, le ticket d'une écriture gh hors du circuit des PR)
+# Découpe $1 en mots (MOTS) en respectant guillemets simples et doubles et
+# antislash, sans sous-processus ; guillemet non fermé : MOTS vide, code 1.
+decouper_mots() {
+    local s="$1" mot="" q="" c i n
+    MOTS=()
+    n=${#s}
+    for ((i = 0; i < n; i++)); do
+        c="${s:i:1}"
+        if [ -n "$q" ]; then
+            if [ "$c" = "$q" ]; then
+                q=""
+            elif [ "$c" = "\\" ] && [ "$q" = '"' ]; then
+                case "${s:i+1:1}" in
+                    '"' | "\\" | '$' | '`') i=$((i + 1)); mot="$mot${s:i:1}" ;;
+                    *) mot="$mot\\" ;;
+                esac
+            else
+                mot="$mot$c"
+            fi
+            continue
+        fi
+        case "$c" in
+            "'" | '"') q="$c" ;;
+            "\\")
+                i=$((i + 1))
+                mot="$mot${s:i:1}"
+                ;;
+            " " | $'\t')
+                [ -z "$mot" ] || { MOTS+=("$mot"); mot=""; }
+                ;;
+            *) mot="$mot$c" ;;
+        esac
+    done
+    if [ -n "$q" ]; then
+        MOTS=()
+        return 1
+    fi
+    [ -z "$mot" ] || MOTS+=("$mot")
+}
+
+# Ligne de commande shell : chaque commande (« ; », « | », « && », « || » et le
+# « & » séparateur, hors guillemets), « cd » suivi, variables d'environnement en
+# tête ignorées (sauf REPOWARDEN_TICKET, le ticket d'une écriture gh hors du
+# circuit des PR)
 verifier_shell() {
-    local commande="$1" segment mots m cmd_cc nl=$'\n' lignes ticket_gh
+    local commande="$1" segment m cmd_cc lignes ticket_gh
     dir="$cwd"
-    # Une commande par ligne. Découpage hors de <( … ) : bash 3.2 (macOS) y
-    # lit mal ces motifs (« bad substitution ») et ne vérifierait plus rien
-    lignes="${commande//&&/$nl}"
-    lignes="${lignes//||/$nl}"
-    lignes="${lignes//;/$nl}"
-    lignes="${lignes//|/$nl}"
-    # Un « & » de redirection (2>&1, >&2, &>log…) n'est pas un séparateur : la
-    # commande citée dans le refus et celle proposée restent entières
-    decouper_lignes "$lignes"
+    # Une commande par ligne, en un seul parcours caractère par caractère qui
+    # respecte les guillemets (pas de <( … ) : bash 3.2 le lit mal).
+    decouper_lignes "$commande"
     lignes="$REPLY"
     # Plusieurs commandes : un refus vaut pour toute la ligne (dit à l'agent)
     [ "$(grep -c '[^[:space:]]' <<<"$lignes")" -le 1 ] || LIGNE_MULTIPLE=1
     while IFS= read -r segment; do
-        # shellcheck disable=SC2162 # les antislashs restent tels quels, comme dans la commande
-        read -a mots <<<"$segment" || true
-        set -- ${mots[@]+"${mots[@]}"}
+        # Guillemet non fermé : commande illisible, refusée dans un dépôt
+        # repowarden (dans le doute, refuser) ; ailleurs, tout est permis
+        if ! decouper_mots "$segment"; then
+            dossier_r "$dir"
+            (
+                cd "$REPLY" 2>/dev/null || exit 0
+                depot_repowarden || exit 0
+                refuser garde.commande_illisible "$segment"
+            ) || exit $?
+            continue
+        fi
+        set -- ${MOTS[@]+"${MOTS[@]}"}
         ticket_gh=""
         while [ $# -gt 0 ]; do
             case "$1" in
@@ -398,7 +577,13 @@ verifier_shell() {
             esac
         done
         [ $# -gt 0 ] || continue
+        # Commande : dernier élément du chemin (/ ou \), sans .exe/.cmd/.bat
         m="${1//[\"\']/}"
+        m="${m##*/}"
+        m="${m##*\\}"
+        case "$m" in
+            *.exe | *.EXE | *.cmd | *.CMD | *.bat | *.BAT) m="${m%.*}" ;;
+        esac
         case "$m" in
             cd)
                 case "${2:-}" in
@@ -408,20 +593,27 @@ verifier_shell() {
                     *) dir="$dir/${2//[\"\']/}" ;;
                 esac
                 ;;
-            git | */git)
+            git)
                 shift
                 verifier_git "${@//[\"\']/}"
                 ;;
-            gh | */gh)
+            gh)
                 shift
                 verifier_gh "${@//[\"\']/}"
                 ;;
-            repowarden | */repowarden)
+            repowarden)
+                shift
+                verifier_ticket_nouveau "${@//[\"\']/}"
+                set -- repowarden "$@"
                 case "${2//[\"\']/}" in
                     cc | commit)
                         cmd_cc="repowarden ${2//[\"\']/}"
                         shift 2
                         lecture_seule "${@//[\"\']/}" || verifier_cc "$cmd_cc"
+                        ;;
+                    ticket | ticket-label)
+                        shift
+                        verifier_ticket_label "${@//[\"\']/}"
                         ;;
                 esac
                 ;;
@@ -431,7 +623,8 @@ verifier_shell() {
 
 case "$outil" in
     Edit | Write | MultiEdit | NotebookEdit | edit | write | multiedit)
-        chemin="$(jq -r '.file_path // .filePath // .notebook_path // empty' <<<"$args" 2>/dev/null)"
+        # path : outils edit et write d'opencode 2.x
+        chemin="$(jq -r '.file_path // .filePath // .notebook_path // .path // empty' <<<"$args" 2>/dev/null)"
         [ -z "$chemin" ] || verifier_fichier "$chemin"
         ;;
     apply_patch)
@@ -440,7 +633,8 @@ case "$outil" in
         done < <(jq -r '.patchText // empty' <<<"$args" 2>/dev/null |
             sed -nE -e 's/^\*\*\* (Add|Update|Delete) File: //p' -e 's/^\*\*\* Move to: //p')
         ;;
-    Bash | bash)
+    # shell : nom de l'outil bash dans opencode 2.x
+    Bash | bash | shell)
         verifier_shell "$(jq -r '.command // empty' <<<"$args" 2>/dev/null)"
         ;;
 esac

@@ -62,6 +62,38 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     [ "$status" -eq 2 ]
 }
 
+@test "garde : fichier ignore par git permis sur une branche protegee, fichier suivi controle" {
+    printf 'notes/\n*.log\n' >.gitignore
+    printf 'x\n' >suivi.log
+    git add .gitignore && git add -f suivi.log
+    git -c core.hooksPath=/dev/null commit -q -m "chore: ignore"
+    git config repowarden.integrationBranch develop
+    patch='*** Begin Patch\n*** Add File: notes/p.md\n+x\n*** Update File: sortie.log\n+x\n*** End Patch'
+    for b in main develop; do
+        git switch -q "$b" 2>/dev/null || git switch -q -c "$b"
+        mkdir -p src/sous
+        for f in notes/a/x.md sortie.log src/sous/y.log; do
+            run edit "$f"
+            [ "$status" -eq 0 ] || { echo "$b : $f refusé : $output"; return 1; }
+        done
+        run opencode apply_patch "$(jq -n --arg p "$(printf "$patch")" '{patchText: $p}')"
+        [ "$status" -eq 0 ] || { echo "$b : apply_patch refusé : $output"; return 1; }
+        # Non ignoré, ou suivi malgré le motif d'ignore : toujours contrôlé
+        for f in README.md src/n.ts suivi.log; do
+            run edit "$f"
+            [ "$status" -eq 2 ] || { echo "$b : $f permis"; return 1; }
+            [[ "$output" == *"« $b » est une branche protégée"* ]] || false
+        done
+    done
+    # Dépôt qui suit ses tickets : branche hors ticket, fichier ignoré permis
+    git config repowarden.tickets true
+    git switch -q -c feat/essai
+    run edit notes/x.md
+    [ "$status" -eq 0 ]
+    run edit README.md
+    [ "$status" -eq 2 ]
+}
+
 @test "garde : HEAD detache refuse" {
     git switch -q --detach
     run edit
@@ -286,12 +318,94 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     [ "$status" -eq 2 ]
 }
 
+@test "garde : chemin de la commande reconnu (dernier element, .exe/.cmd/.bat)" {
+    for c in 'cd .; "/opt/mon dossier/repowarden" ticket label 12 validé' \
+        'cd .; "/opt/mon dossier/repowarden" ticket nouveau x' \
+        'cd .; "/opt/mon dossier/git" commit -m x' \
+        'cd .; "/opt/mon dossier/gh" pr merge 3' \
+        'cd .; "C:/Program Files/Git/cmd/git.exe" push --force' \
+        'cd .; "C:\Program Files\GitHub CLI\gh.exe" pr merge 3' \
+        'git.exe commit -m x' 'repowarden.cmd ticket label 12 validé'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+    done
+    run shell 'cd .; "/opt/mon dossier/repowarden" ticket label 12 validé'
+    [[ "$output" == *"décision du mainteneur"* ]] || false
+    run shell 'cd .; "/opt/mon dossier/repowarden" ticket nouveau x'
+    [[ "$output" == *"créer un ticket est une décision du mainteneur"* ]] || false
+    run shell 'cd .; "/opt/mon dossier/git" commit -m x'
+    [[ "$output" == *"les commits passent par l'assistant"* ]] || false
+    run shell 'git.cmd push --force'
+    [[ "$output" == *"réécrit l'historique"* ]] || false
+}
+
+@test "garde : un argument entre guillemets reste un seul mot" {
+    run shell 'cd .; "/opt/mon dossier/git" commit -m "repowarden ticket nouveau"'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"les commits passent par l'assistant"* ]] || false
+    run shell 'cd .; "/opt/mon dossier/git" push origin "ma branche"'
+    [ "$status" -eq 0 ]
+}
+
+@test "garde : guillemet non ferme refuse dans un depot repowarden, permis ailleurs" {
+    run shell 'git commit -m "x'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"illisible"* ]] || false
+    git init -q -b main "$BATS_TEST_TMPDIR/libre"
+    run shell "cd $BATS_TEST_TMPDIR/libre && git commit -m \"x"
+    [ "$status" -eq 0 ]
+    REPOWARDEN_LANG=en run shell 'git commit -m "x'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"unreadable"* ]] || false
+}
+
+@test "garde : les separateurs entre guillemets ne coupent pas la commande" {
+    git switch -q -c feat/essai
+    for c in 'echo "a ; b"' 'grep -E "x|y" fichier' 'echo "a && b"'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refuse : $output"; return 1; }
+    done
+    run shell 'git commit -m "a ; b"'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"les commits passent par l'assistant"* ]] || false
+    run shell 'echo "x" ; git push --force'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"réécrit l'historique"* ]] || false
+}
+
+@test "garde : retour a la ligne entre guillemets ne coupe pas la commande" {
+    git switch -q -c feat/essai
+    for c in 'echo "ligne 1'$'\n''ligne 2"' \
+        'repowarden cc -m "x" --body "a'$'\n''b" --dry-run'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "refuse : $output"; return 1; }
+    done
+    run shell 'echo "a'$'\n''b" ; git push --force'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"réécrit l'historique"* ]] || false
+}
+
 @test "garde : apply_patch d'opencode, chemins lus dans patchText" {
     patch='*** Begin Patch\n*** Add File: src/nouveau.ts\n+x\n*** End Patch'
     run opencode apply_patch "$(jq -n --arg p "$(printf "$patch")" '{patchText: $p}')"
     [ "$status" -eq 2 ]
     git switch -q -c feat/essai
     run opencode apply_patch "$(jq -n --arg p "$(printf "$patch")" '{patchText: $p}')"
+    [ "$status" -eq 0 ]
+}
+
+# Ticket #469 : outils d'opencode 2.x (write/edit à argument path, shell)
+@test "garde : opencode 2.x, write et edit (path) et shell verifies" {
+    run opencode write "$(jq -n --arg f "$PWD/README.md" '{path: $f, content: "x"}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"« main » est une branche protégée"* ]] || false
+    run opencode edit "$(jq -n '{path: "README.md", oldString: "a", newString: "b"}')"
+    [ "$status" -eq 2 ]
+    run opencode shell "$(jq -n '{command: "git commit -m x", workdir: "."}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"repowarden cc"* ]] || false
+    git switch -q -c feat/essai
+    run opencode write "$(jq -n '{path: "nouveau.txt", content: "x"}')"
     [ "$status" -eq 0 ]
 }
 
@@ -380,6 +494,73 @@ GH
     done
 }
 
+@test "garde gh : etiquettes de decision par gh api refusees, meme avec REPOWARDEN_TICKET (#496)" {
+    gh_simule
+    export FAKE_TICKET='OPEN\nvalidé'
+    for c in 'gh api -X POST repos/o/r/issues/7/labels -f "labels[]=validé"' \
+        'gh api repos/o/r/issues/7/labels -f "labels[]=statut: en cours"' \
+        "gh api repos/o/r/issues/7/labels -f 'labels[]=à décider'" \
+        'gh api -X DELETE repos/o/r/issues/7/labels/validé' \
+        'gh api -X DELETE repos/o/r/issues/7/labels/valid%C3%A9' \
+        'gh api --method DELETE "repos/o/r/issues/7/labels/%C3%A0%20d%C3%A9cider"' \
+        'gh api -XDELETE repos/o/r/issues/7/labels/statut:%20backlog' \
+        'gh api -X PUT repos/o/r/issues/7/labels -f "labels[]=type: fix"' \
+        'gh api -X PATCH repos/o/r/issues/7/labels -f "labels[]=validé"' \
+        'gh api -X DELETE repos/o/r/issues/7/labels' \
+        'gh api -X PATCH repos/o/r/issues/7 -f "labels[]=type: fix"' \
+        'gh api repos/o/r/issues/7/labels --input l.json' \
+        'gh api /repos/o/r/issues/7/labels -f labels[]=validé' \
+        'git status && gh api -X DELETE repos/o/r/issues/7/labels/validé'; do
+        for p in '' 'REPOWARDEN_TICKET=12 '; do
+            run shell "$p$c"
+            [ "$status" -eq 2 ] || { echo "$p$c permis"; return 1; }
+            [[ "$output" == *"étiquette de décision"*"décision du mainteneur"* ]] || false
+        done
+    done
+    REPOWARDEN_LANG=en run shell 'REPOWARDEN_TICKET=12 gh api -X DELETE repos/o/r/issues/7/labels/validé'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"maintainer's decision"* ]] || false
+    # Autres étiquettes, titre, lecture : règle habituelle (ticket validé)
+    for c in 'gh api repos/o/r/issues/7/labels -f "labels[]=type: fix"' \
+        'gh api -X DELETE repos/o/r/issues/7/labels/type:%20fix' \
+        'gh api -X PATCH repos/o/r/issues/7 -f title=validé' 'gh api repos/o/r/issues/7/labels'; do
+        run shell "REPOWARDEN_TICKET=12 $c"
+        [ "$status" -eq 0 ] || { echo "REPOWARDEN_TICKET=12 $c refusé : $output"; return 1; }
+    done
+    run shell 'repowarden ticket comment 12 "validé ?"'
+    [ "$status" -eq 0 ]
+}
+
+@test "garde : repowarden ticket nouveau refuse a un agent, sauf agentsTickets (#496)" {
+    # Chemin absolu précédé de cd : sous Git Bash, un argument qui commence par / passé à jq serait converti en chemin Windows
+    for c in 'repowarden ticket nouveau "Essai"' 'repowarden ticket new "Essai" --type fix' \
+        'REPOWARDEN_TICKET=12 repowarden ticket nouveau x' 'git status; repowarden ticket nouveau x' \
+        'cd .; /usr/local/bin/repowarden "ticket" nouveau x'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"créer un ticket est une décision du mainteneur"* ]] || false
+        [[ "$output" == *"agentsTickets"* ]] || false
+    done
+    REPOWARDEN_LANG=en run shell 'repowarden ticket nouveau x'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"creating a ticket is the maintainer's decision"* ]] || false
+    for c in 'repowarden ticket nouveau --help' 'repowarden ticket 12' 'repowarden ticket' 'repowarden tickets sync'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refusé : $output"; return 1; }
+    done
+    git config repowarden.agentsTickets true
+    run shell 'repowarden ticket nouveau x'
+    [ "$status" -eq 0 ]
+    git config --unset repowarden.agentsTickets
+    printf '[repowarden]\n    agentsTickets = true\n' >.repowarden.conf
+    run shell 'repowarden ticket nouveau x'
+    [ "$status" -eq 0 ]
+    # Hors dépôt repowarden : tout est permis
+    git init -q -b main "$BATS_TEST_TMPDIR/libre"
+    run shell "cd $BATS_TEST_TMPDIR/libre && repowarden ticket nouveau x"
+    [ "$status" -eq 0 ]
+}
+
 @test "garde gh : ecriture hors circuit refusee sans ticket" {
     gh_simule
     for c in 'gh api -X PATCH repos/o/r -f allow_auto_merge=true' 'gh api repos/o/r/labels -f name=x' \
@@ -455,4 +636,45 @@ GH
         FAKE_TICKET='OPEN\nvalidé' run shell "REPOWARDEN_TICKET=12 $c"
         [ "$status" -eq 0 ] || { echo "REPOWARDEN_TICKET=12 $c refusé : $output"; return 1; }
     done
+}
+
+@test "garde : refus d'une modification de fichier existant -> rappel de repowarden carte" {
+    mkdir -p lib
+    echo x >lib/outil.sh
+    run edit lib/outil.sh
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"repowarden carte lib/outil.sh"* ]] || false
+    # Chemin lu par jq sous Windows : CR final
+    run claude Edit "$(jq -n --arg f "$PWD/lib/outil.sh"$'\r' '{file_path: $f, old_string: "a", new_string: "b"}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"repowarden carte lib/outil.sh"* ]] || false
+    run claude Write "$(jq -n --arg f "$PWD/nouveau.sh" '{file_path: $f, content: "x"}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" != *"repowarden carte"* ]] || false
+}
+
+@test "garde : valider un ticket (valide, statut) refuse, meme avec REPOWARDEN_TICKET" {
+    gh_simule
+    export FAKE_TICKET='OPEN\nvalidé'
+    for c in 'repowarden ticket label 12 validé' 'repowarden ticket label 12 validé --remove' \
+        'repowarden ticket label 12 "statut: en cours"' "repowarden ticket label 12 'statut: backlog' --remove" \
+        'repowarden ticket label 12 "à décider" --remove' \
+        'repowarden ticket-label 12 validé' 'REPOWARDEN_TICKET=12 repowarden ticket label 12 validé' \
+        'REPOWARDEN_TICKET=12 repowarden ticket label 12 "statut: done"' 'git status && repowarden ticket label 12 validé'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"valider un ticket est une décision du mainteneur"* ]] || false
+    done
+    for c in 'repowarden ticket label 12 "type: fix"' 'repowarden ticket label 12 "type: fix" --remove' \
+        'repowarden ticket label --help' 'repowarden ticket comment 12 "validé ?"'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refusé : $output"; return 1; }
+    done
+    REPOWARDEN_LANG=en run shell 'repowarden ticket label 12 validé'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"validating a ticket is the maintainer's decision"* ]] || false
+    # Hors dépôt repowarden : tout est permis
+    git init -q -b main "$BATS_TEST_TMPDIR/libre"
+    run shell "cd $BATS_TEST_TMPDIR/libre && repowarden ticket label 12 validé"
+    [ "$status" -eq 0 ]
 }
