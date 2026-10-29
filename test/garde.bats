@@ -465,9 +465,10 @@ GH
 }
 
 @test "garde : repowarden ticket nouveau refuse a un agent, sauf agentsTickets (#496)" {
+    # Chemin absolu précédé de cd : sous Git Bash, un argument qui commence par / passé à jq serait converti en chemin Windows
     for c in 'repowarden ticket nouveau "Essai"' 'repowarden ticket new "Essai" --type fix' \
         'REPOWARDEN_TICKET=12 repowarden ticket nouveau x' 'git status; repowarden ticket nouveau x' \
-        '/usr/local/bin/repowarden "ticket" nouveau x'; do
+        'cd .; /usr/local/bin/repowarden "ticket" nouveau x'; do
         run shell "$c"
         [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
         [[ "$output" == *"créer un ticket est une décision du mainteneur"* ]] || false
