@@ -62,6 +62,10 @@ dossier_r() {
     REPLY="$p"
 }
 
+# workdir d'opencode lu une fois : dossier de départ demandé par l'agent pour
+# sa commande ; vide si absent (format Claude) ou non renseigné. #498
+workdir="$(jq -r '.workdir // ""' <<<"$args")"
+
 # Vrai si les hooks repowarden sont actifs dans le dépôt courant : le
 # core.hooksPath en vigueur (local, sinon global) est un dossier de hooks
 # repowarden. Chemin relatif : depuis la racine du dépôt, comme git
@@ -548,7 +552,11 @@ decouper_mots() {
 # circuit des PR)
 verifier_shell() {
     local commande="$1" segment m cmd_cc lignes ticket_gh
-    dir="$cwd"
+    if [ -n "$workdir" ]; then
+        case "$workdir" in /*) dir="$workdir" ;; *) dir="$cwd/$workdir" ;; esac
+    else
+        dir="$cwd"
+    fi
     # Une commande par ligne, en un seul parcours caractère par caractère qui
     # respecte les guillemets (pas de <( … ) : bash 3.2 le lit mal).
     decouper_lignes "$commande"
