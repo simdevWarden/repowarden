@@ -283,11 +283,38 @@ ticket_valide() {
     [ "$(head -n 1 <<<"$lu")" = OPEN ] && grep -qxF "$VALIDE" <<<"$lu"
 }
 
+# Vrai si le texte $1 vise une étiquette de décision du mainteneur (validé,
+# statut: …, à décider), même encodée dans une URL (valid%C3%A9)
+etiquette_decision() {
+    local t
+    t="$(printf '%b' "${1//%/\\x}")"
+    [[ "$t" == *"$VALIDE"* || "$t" == *"statut:"* || "$t" == *"$A_DECIDER"* ]]
+}
+
+# Vrai si l'écriture gh api (méthode $1, chemin $2, mots $3, corps lu d'un
+# fichier si $4) pose, retire ou remplace les étiquettes de décision d'un
+# ticket : refusée même avec un ticket validé (#496). Dans le doute, refuser
+api_etiquettes_decision() {
+    local m="${1:-POST}" re_etiq='/issues/[0-9]+/labels(/|\?|$)' re_ticket='/issues/[0-9]+/?(\?|$)'
+    if [[ "/$2" =~ $re_etiq ]]; then
+        # PUT remplace l'ensemble, DELETE sans nom le vide : validé compris
+        [ "$m" != PUT ] || return 0
+        [ "$m" != DELETE ] || [[ "$2" == */labels/?* ]] || return 0
+        [ -z "$4" ] || return 0
+        etiquette_decision "$2 $3"
+    elif [[ "/$2" =~ $re_ticket ]]; then
+        # PATCH du ticket : un champ labels remplace l'ensemble
+        [ -n "$4" ] || [[ "$3" == *labels* ]]
+    else
+        return 1
+    fi
+}
+
 # Commande gh (mots $@, sans « gh ») lancée depuis $dir, préfixe
 # REPOWARDEN_TICKET=$ticket_gh : lectures connues permises, écritures du circuit
 # par repowarden, décisions au mainteneur, tout le reste avec un ticket validé
 verifier_gh() {
-    local ligne="gh $*" pos=() depot="" methode="" champs="" approuve="" mutation="" ecriture="" hors="" rc
+    local ligne="gh $*" mots="$*" pos=() depot="" methode="" champs="" corps="" approuve="" mutation="" ecriture="" hors="" rc
     while [ $# -gt 0 ]; do
         case "$1" in
             -R | --repo) shift; depot="${1:-}" ;;
@@ -295,7 +322,8 @@ verifier_gh() {
             -X | --method) shift; methode="${1:-}" ;;
             -X?*) methode="${1#-X}" ;;
             --method=*) methode="${1#--method=}" ;;
-            -f | -F | --field | --raw-field | --input | -f?* | -F?* | --field=* | --raw-field=* | --input=*) champs=1 ;;
+            --input | --input=*) champs=1 corps=1 ;;
+            -f | -F | --field | --raw-field | -f?* | -F?* | --field=* | --raw-field=*) champs=1 ;;
             -a | --approve) approuve=1 ;;
             -h | --help) return 0 ;;
             -*) ;;
@@ -330,6 +358,7 @@ verifier_gh() {
             "api "*)
                 [ -n "$ecriture" ] || exit 0
                 [[ "${pos[1]:-}" != *pending_deployments* ]] || refuser garde.gh_mainteneur "$ligne"
+                ! api_etiquettes_decision "$methode" "${pos[1]:-}" "$mots" "$corps" || refuser garde.etiquette_mainteneur "$ligne"
                 hors=1
                 ;;
             # Lectures connues et description de la PR : permises ; tout le
@@ -366,14 +395,33 @@ verifier_ticket_label() {
     # (« statut: en cours » → statut:), dans le doute refuser
     shift
     for mot in "$@"; do
-        case "$mot" in "$VALIDE" | statut:*) decision=1 ;; esac
+        etiquette_decision "$mot" && decision=1
     done
+    # Étiquette de décision en plusieurs mots (« à décider »), découpée par read -a
+    etiquette_decision "$*" && decision=1
     [ -n "$decision" ] || return 0
     dossier_r "$dir"
     (
         cd "$REPLY" 2>/dev/null || exit 0
         depot_repowarden || exit 0
         refuser garde.ticket_mainteneur "$ligne"
+    ) || exit $?
+}
+
+# repowarden ticket nouveau/new (mots $@), depuis $dir : créer un ticket est
+# une décision du mainteneur, sauf agentsTickets ; --help reste permis (#496)
+verifier_ticket_nouveau() {
+    local ligne="repowarden $*"
+    [ "${1:-}" = ticket ] || return 0
+    case "${2:-}" in nouveau | new) ;; *) return 0 ;; esac
+    lecture_seule "$@" && return 0
+    dossier_r "$dir"
+    (
+        cd "$REPLY" 2>/dev/null || exit 0
+        depot_repowarden || exit 0
+        cfg_r agentsTickets false
+        [ "$REPLY" != true ] || exit 0
+        refuser garde.ticket_nouveau "$ligne"
     ) || exit $?
 }
 
@@ -470,6 +518,9 @@ verifier_shell() {
                 verifier_gh "${@//[\"\']/}"
                 ;;
             repowarden | */repowarden)
+                shift
+                verifier_ticket_nouveau "${@//[\"\']/}"
+                set -- repowarden "$@"
                 case "${2//[\"\']/}" in
                     cc | commit)
                         cmd_cc="repowarden ${2//[\"\']/}"
