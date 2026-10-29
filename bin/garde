@@ -57,7 +57,7 @@ refuser() {
 # REPLY = dossier existant le plus proche du chemin $1 (absolu, ou relatif à $cwd)
 dossier_r() {
     local p="$1"
-    case "$p" in /*) ;; *) p="$cwd/$p" ;; esac
+    case "$p" in /* | [A-Za-z]:[/\\]*) ;; *) p="$cwd/$p" ;; esac
     while [ ! -d "$p" ] && [ "$p" != / ] && [ -n "$p" ]; do p="$(dirname "$p")"; done
     REPLY="$p"
 }
@@ -147,6 +147,142 @@ fichier_ignore() {
     git -C "./$cdup" check-ignore -q -- "$prefixe$reste" 2>/dev/null
 }
 
+# Vrai si le nom $1 (relatif à la racine du dépôt) est la configuration d'un
+# outil de vérification : la régler est une décision du mainteneur (#518)
+config_outil() {
+    case "$1" in
+        .github/actionlint.yaml | .github/actionlint.yml | .shellcheckrc | \
+            .markdownlint* | .yamllint* | .gitleaks.toml | .gitleaksignore | \
+            .pre-commit-config.yaml | .repowarden.conf) return 0 ;;
+    esac
+    return 1
+}
+
+# Vrai si le chemin $1 peut être une telle configuration : son nom seul le dit,
+# avant de consulter le dépôt — un fichier ordinaire ne coûte aucune commande
+config_outil_possible() {
+    local n="${1##*/}"
+    config_outil "$n" && return 0
+    config_outil ".github/$n"
+}
+
+# REPLY = chemin $1 relatif à la racine du dépôt : dans un sous-shell on se
+# place dans son dossier existant, et on ajoute le reste au préfixe git ; hors
+# dépôt, chaîne vide (les formes Windows C:/… et D:\… restent lues)
+chemin_racine_r() {
+    local p="${1//\\//}" e prefixe reste
+    dossier_r "$p"
+    e="$REPLY"
+    REPLY="$(
+        cd "$e" 2>/dev/null || exit 0
+        prefixe="$(git rev-parse --show-prefix 2>/dev/null)" || exit 0
+        reste="${p#"$e"}"
+        reste="${reste#/}"
+        printf '%s%s' "$prefixe" "$reste"
+    )"
+}
+
+# Refus si le fichier $1 (depuis le dossier $2) est la configuration d'un outil
+# de vérification : réglage du mainteneur, en tout lieu d'un dépôt repowarden
+verifier_config_cible() {
+    local p="${1%$'\r'}" d
+    case "$p" in /* | [A-Za-z]:[/\\]*) ;; *) p="$2/$p" ;; esac
+    config_outil_possible "$p" || return 0
+    dossier_r "$2"
+    d="$REPLY"
+    (
+        cd "$d" 2>/dev/null || exit 0
+        depot_repowarden || exit 0
+        cfg_r agentsConfig false
+        [ "$REPLY" != true ] || exit 0
+        chemin_racine_r "$p"
+        config_outil "$REPLY" || exit 0
+        refuser garde.config_verification "$REPLY"
+    ) || exit $?
+}
+
+# Cibles de redirection des mots $@ (commande de $dir) : écrire la configuration
+# d'un outil de vérification s'y refuse, comme par un outil d'édition
+verifier_redirections() {
+    local mot cible attendu=""
+    for mot in "$@"; do
+        if [ -n "$attendu" ]; then
+            attendu=""
+            cible="$mot"
+        else
+            # Après le chevron (> et >> y compris) : vide = cible mot suivant
+            cible="${mot#*>}"
+            [ "$cible" != "$mot" ] || continue
+            while [ "${cible#>}" != "$cible" ]; do cible="${cible#>}"; done
+            if [ -z "$cible" ]; then
+                attendu=1
+                continue
+            fi
+        fi
+        verifier_config_cible "$cible" "$dir"
+    done
+}
+
+# Cibles écrites par une commande shell (cp, mv, install, ln, tee, touch,
+# truncate, rm, sed -i, perl -i) : la configuration d'un outil s'y refuse aussi
+verifier_ecriture_fichiers() {
+    local m mot cible="" inplace="" vu="" n d i
+    m="${1//[\"\']/}"
+    m="${m##*/}"
+    m="${m##*\\}"
+    case "$m" in
+        *.exe | *.EXE | *.cmd | *.CMD | *.bat | *.BAT) m="${m%.*}" ;;
+    esac
+    case "$m" in
+        tee | touch | truncate | rm)
+            # Tous les arguments non option sont des fichiers écrits
+            for mot in "${@:2}"; do
+                case "$mot" in -*) continue ;; esac
+                verifier_config_cible "$mot" "$dir"
+            done
+            ;;
+        cp | mv | install | ln)
+            # Le dernier argument non option est la cible ; si c'est un
+            # dossier existant (vu depuis $dir) ou finit par /, chaque source
+            # y est écrite : vérifier alors <cible>/<nom de la source>
+            n=0
+            for mot in "${@:2}"; do
+                case "$mot" in -*) continue ;; esac
+                n=$((n + 1))
+                cible="$mot"
+            done
+            [ "$n" -ne 0 ] || return 0
+            verifier_config_cible "$cible" "$dir"
+            d="$cible"
+            while [ "${d%/}" != "$d" ]; do d="${d%/}"; done
+            [ -n "$d" ] || d=/
+            case "$d" in /* | [A-Za-z]:[/\\]*) ;; *) d="$dir/$d" ;; esac
+            case "$cible" in */) ;; *) [ -d "$d" ] || return 0 ;; esac
+            i=0
+            for mot in "${@:2}"; do
+                case "$mot" in -*) continue ;; esac
+                i=$((i + 1))
+                [ "$i" -lt "$n" ] || break
+                verifier_config_cible "$d/${mot##*/}" "$dir"
+            done
+            ;;
+        sed | perl)
+            # Avec -i (--in-place), les arguments après le script sont modifiés
+            for mot in "${@:2}"; do
+                case "$mot" in
+                    --in-place | --in-place=* | -i* | -[!-]*i*) inplace=1 ;;
+                esac
+            done
+            [ -n "$inplace" ] || return 0
+            for mot in "${@:2}"; do
+                case "$mot" in -*) continue ;; esac
+                if [ -z "$vu" ]; then vu=1; continue; fi
+                verifier_config_cible "$mot" "$dir"
+            done
+            ;;
+    esac
+}
+
 # Modification du fichier $1 : seulement sur une branche de travail (de ticket,
 # si le dépôt suit ses tickets) ; un fichier ignoré par git l'est partout
 verifier_fichier() {
@@ -155,6 +291,8 @@ verifier_fichier() {
     # être en forme Windows (D:/…), absolu lui aussi
     local d="$REPLY" f="${1%$'\r'}"
     case "$f" in /* | [A-Za-z]:[/\\]*) ;; *) f="$cwd/$f" ;; esac
+    # Configuration d'outil de vérification : refusée avant toute autre règle
+    verifier_config_cible "$f" "$d"
     (
         cd "$d" 2>/dev/null || exit 0
         depot_repowarden || exit 0
@@ -577,6 +715,10 @@ verifier_shell() {
             esac
         done
         [ $# -gt 0 ] || continue
+        # Redirection vers la configuration d'un outil de vérification : refusée
+        # comme la modification du fichier, avant même la commande
+        verifier_redirections "$@"
+        verifier_ecriture_fichiers "$@"
         # Commande : dernier élément du chemin (/ ou \), sans .exe/.cmd/.bat
         m="${1//[\"\']/}"
         m="${m##*/}"

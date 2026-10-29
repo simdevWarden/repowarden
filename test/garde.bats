@@ -678,3 +678,122 @@ GH
     run shell "cd $BATS_TEST_TMPDIR/libre && repowarden ticket label 12 validé"
     [ "$status" -eq 0 ]
 }
+
+# Ticket #518 : la configuration des outils de verification (actionlint,
+# shellcheck, gitleaks…) appartient au mainteneur, jamais a un agent
+@test "garde : configuration d un outil de verification refusee (fichier et shell)" {
+    git switch -q -c feat/essai
+    run claude Write "$(jq -n --arg f "$PWD/.github/actionlint.yaml" '{file_path: $f, content: "x"}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"réglage d'un outil de vérification"* ]] || false
+    [[ "$output" == *"décision du mainteneur"* ]] || false
+    [[ "$output" == *"corriger le code plutôt que la règle"* ]] || false
+    run opencode write "$(jq -n '{filePath: ".shellcheckrc", content: "x"}')"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *".shellcheckrc"* ]] || false
+    patch='*** Begin Patch\n*** Add File: .pre-commit-config.yaml\n+repos: []\n*** End Patch'
+    run opencode apply_patch "$(jq -n --arg p "$(printf "$patch")" '{patchText: $p}')"
+    [ "$status" -eq 2 ]
+    for f in .github/actionlint.yml .markdownlint.json .yamllint.yml .gitleaks.toml \
+        .gitleaksignore .pre-commit-config.yaml .repowarden.conf; do
+        run edit "$f"
+        [ "$status" -eq 2 ] || { echo "$f permis"; return 1; }
+    done
+    # Ecriture par le shell : meme refus, meme raison
+    for c in 'echo x > .shellcheckrc' 'printf y >> .gitleaks.toml' \
+        'echo z>.github/actionlint.yaml'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"réglage d'un outil de vérification"* ]] || false
+    done
+    # Fichier ordinaire et redirection ordinaire : la regle habituelle seule
+    run edit "src/normal.ts"
+    [ "$status" -eq 0 ]
+    run shell 'echo x > journal.txt'
+    [ "$status" -eq 0 ]
+    REPOWARDEN_LANG=en run edit ".shellcheckrc"
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"fix the code rather than the rule"* ]] || false
+}
+
+@test "garde : agentsConfig true laisse regler la configuration d un outil" {
+    git switch -q -c feat/essai
+    run edit ".shellcheckrc"
+    [ "$status" -eq 2 ]
+    git config repowarden.agentsConfig true
+    run edit ".shellcheckrc"
+    [ "$status" -eq 0 ]
+    run shell 'echo x > .shellcheckrc'
+    [ "$status" -eq 0 ]
+    run edit ".repowarden.conf"
+    [ "$status" -eq 0 ]
+    git config --unset repowarden.agentsConfig
+    run edit ".repowarden.conf"
+    [ "$status" -eq 2 ]
+    printf '[repowarden]\n    agentsConfig = true\n' >.repowarden.conf
+    run edit ".shellcheckrc"
+    [ "$status" -eq 0 ]
+}
+
+@test "garde : configuration d un outil hors depot repowarden permise" {
+    libre="$BATS_TEST_TMPDIR/libre"
+    git init -q -b main "$libre"
+    run claude Write "$(jq -n --arg f "$libre/.shellcheckrc" '{file_path: $f, content: "x"}')" "$libre"
+    [ "$status" -eq 0 ]
+    run claude Edit "$(jq -n --arg f "$libre/.github/actionlint.yaml" '{file_path: $f, old_string: "a", new_string: "b"}')" "$libre"
+    [ "$status" -eq 0 ]
+    run opencode bash "$(jq -n '{command: "echo x > .shellcheckrc"}')" "$libre"
+    [ "$status" -eq 0 ]
+    hors="$BATS_TEST_TMPDIR/hors-git"
+    mkdir -p "$hors"
+    run claude Write "$(jq -n --arg f "$hors/.shellcheckrc" '{file_path: $f, content: "x"}')" "$hors"
+    [ "$status" -eq 0 ]
+}
+
+@test "garde : configuration d un outil depuis un sous-dossier refusee (#518)" {
+    git switch -q -c feat/essai
+    mkdir -p sub
+    run opencode bash "$(jq -n --arg c 'echo x > ../.shellcheckrc' '{command: $c}')" "$PWD/sub"
+    [ "$status" -eq 2 ] || { echo "parent refuse : $output"; return 1; }
+    [[ "$output" == *".shellcheckrc"* ]] || false
+    racine="$PWD"
+    run opencode bash "$(jq -n --arg c "echo x > $racine/.shellcheckrc" '{command: $c}')" "$PWD/sub"
+    [ "$status" -eq 2 ] || { echo "absolu refuse : $output"; return 1; }
+    [[ "$output" == *".shellcheckrc"* ]] || false
+}
+
+@test "garde : commandes shell qui ecrivent une configuration refusees (#518)" {
+    git switch -q -c feat/essai
+    for c in 'cp a .shellcheckrc' 'mv a .shellcheckrc' 'install a .shellcheckrc' \
+        'ln -s a .shellcheckrc' 'touch .shellcheckrc' 'truncate -s 0 .shellcheckrc' \
+        'rm .shellcheckrc' 'tee .github/actionlint.yaml' 'sed -i s/a/b/ .shellcheckrc' \
+        'perl -i -pe s/a/b/ .shellcheckrc'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"réglage d'un outil de vérification"* ]] || false
+    done
+    for c in 'cat .shellcheckrc' 'cp .shellcheckrc copie.txt' 'cp a b.txt' \
+        'grep x .shellcheckrc'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refuse : $output"; return 1; }
+    done
+    git config repowarden.agentsConfig true
+    run shell 'cp a .shellcheckrc'
+    [ "$status" -eq 0 ]
+}
+
+@test "garde : cp et mv vers un dossier existant ecrivent la configuration dedans (#518)" {
+    git switch -q -c feat/essai
+    echo x >actionlint.yaml
+    mkdir -p x
+    echo y >x/.shellcheckrc
+    run shell 'cp actionlint.yaml .github/'
+    [ "$status" -eq 2 ] || { echo "cp vers dossier permis : $output"; return 1; }
+    [[ "$output" == *"réglage d'un outil de vérification"* ]] || false
+    [[ "$output" == *".github/actionlint.yaml"* ]] || false
+    run shell 'mv x/.shellcheckrc .'
+    [ "$status" -eq 2 ] || { echo "mv vers dossier permis : $output"; return 1; }
+    [[ "$output" == *".shellcheckrc"* ]] || false
+    run shell 'cp a.txt .github/'
+    [ "$status" -eq 0 ] || { echo "cp ordinaire refuse : $output"; return 1; }
+}

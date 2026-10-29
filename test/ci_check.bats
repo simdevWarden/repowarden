@@ -100,6 +100,54 @@ setup() {
     [[ "$output" == *"ci-make"* ]] || false
 }
 
+# Ticket #518 : une PR ne retire pas de tests — le nombre de declarations
+# (bats, pytest, Go, Java, JS/TS) ne baisse pas entre la base et la tete
+@test "ci : une PR ne retire pas de tests, sauf raison ecrite dans la PR" {
+    printf '@test "a" {\n  true\n}\n@test "b" {\n  true\n}\n' >extra.bats
+    git add extra.bats
+    git commit -q --no-verify -m "test: deux tests"
+    # La base de comparaison contient les deux tests
+    export REPOWARDEN_BASE="$(git rev-parse HEAD)"
+    printf '@test "a" {\n  true\n}\n' >extra.bats
+    git add extra.bats
+    git commit -q --no-verify -m "test: un test en moins"
+    run "$CHECK" tests
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"extra.bats : 2 → 1 tests"* ]] || false
+    [[ "$output" == *"ne retire pas de tests"* ]] || false
+    # La raison est ecrite dans la description de la PR : alors c'est permis
+    REPOWARDEN_PR_BODY=$'Corrige x.\n\nTests retirés : doublon' run "$CHECK" tests
+    [ "$status" -eq 0 ]
+    REPOWARDEN_PR_BODY=$'Corrige x.\n\nTests removed: duplicate' run "$CHECK" tests
+    [ "$status" -eq 0 ]
+    # Ajouter un test n'est jamais un echec
+    printf '@test "a" {\n  true\n}\n@test "b" {\n  true\n}\n@test "c" {\n  true\n}\n' >extra.bats
+    git add extra.bats
+    git commit -q --no-verify -m "test: un test de plus"
+    run "$CHECK" tests
+    [ "$status" -eq 0 ]
+}
+
+@test "ci : comptage des tests d autres langages (pytest, js)" {
+    printf 'def test_a():\n    pass\ndef test_b():\n    pass\n' >test_extra.py
+    git add test_extra.py
+    git commit -q --no-verify -m "test: deux tests pytest"
+    export REPOWARDEN_BASE="$(git rev-parse HEAD)"
+    printf 'def test_a():\n    pass\n' >test_extra.py
+    git add test_extra.py
+    git commit -q --no-verify -m "test: un test pytest en moins"
+    run "$CHECK" tests
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"test_extra.py : 2 → 1 tests"* ]] || false
+    # Le test remis, plus des tests js en plus : aucun echec
+    printf 'def test_a():\n    pass\ndef test_b():\n    pass\n' >test_extra.py
+    printf 'it("a", () => {});\ntest("b", () => {});\n' >thing.test.js
+    git add -A
+    git commit -q --no-verify -m "test: tests remis et js ajoutes"
+    run "$CHECK" tests
+    [ "$status" -eq 0 ]
+}
+
 @test "ci : secrets detectes" {
     require gitleaks
     printf 'token = ghp_%s\n' "4Rk9vQ2xLm7TzP0aWc3Ny8BdHs5Ju1Ef6GiX" >config.ini # factice
