@@ -25,6 +25,7 @@ Seulement dans un dépôt repowarden (`.repowarden.conf`, réglage `repowarden.*
 | `git push` forcé : `--force`, `-f` (`-uf`…), `--force-with-lease[=…]`, `--force-if-includes`, refspec `+branche` | toujours : il réécrit l'historique déjà poussé | corriger par un nouveau commit (`repowarden cc …`), puis `git push` sans forcer |
 | `gh issue create` | toujours | `repowarden ticket nouveau "<titre>"` |
 | `repowarden ticket nouveau` | toujours, sauf `repowarden.agentsTickets = true` : créer un ticket est une décision du mainteneur (`--help` reste permis) | signaler le défaut au mainteneur, qui crée le ticket ; ou le noter sur le ticket en cours |
+| **workdir** (format opencode) | l'argument `workdir` présent et non vide devient le dossier de départ de la commande (absolu ou relatif résolu depuis `cwd`) ; dossier inexistant : dossier existant le plus proche (`dossier_r`) | `repowarden ticket <n>` (sans suivi des tickets : `git switch -c <type>/<sujet>`) |
 | `gh issue comment`, `gh issue edit` | toujours | `repowarden ticket comment <n> "…"`, `repowarden ticket label <n> <label>` |
 | `gh pr create` | toujours : la PR brouillon est ouverte par le bot au premier push | `git push -u origin HEAD` |
 | `gh run rerun` | toujours | `repowarden run rerun <id>` |

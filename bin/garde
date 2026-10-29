@@ -57,10 +57,15 @@ refuser() {
 # REPLY = dossier existant le plus proche du chemin $1 (absolu, ou relatif à $cwd)
 dossier_r() {
     local p="$1"
+    # Absolu : /…, ou C:/… et C:\… (Windows, #498)
     case "$p" in /* | [A-Za-z]:[/\\]*) ;; *) p="$cwd/$p" ;; esac
     while [ ! -d "$p" ] && [ "$p" != / ] && [ -n "$p" ]; do p="$(dirname "$p")"; done
     REPLY="$p"
 }
+
+# workdir d'opencode lu une fois : dossier de départ demandé par l'agent pour
+# sa commande ; vide si absent (format Claude) ou non renseigné. #498
+workdir="$(jq -r '.workdir // ""' <<<"$args")"
 
 # Vrai si les hooks repowarden sont actifs dans le dépôt courant : le
 # core.hooksPath en vigueur (local, sinon global) est un dossier de hooks
@@ -686,7 +691,12 @@ decouper_mots() {
 # circuit des PR)
 verifier_shell() {
     local commande="$1" segment m cmd_cc lignes ticket_gh
-    dir="$cwd"
+    if [ -n "$workdir" ]; then
+        # Absolu : /…, ou C:/… et C:\… (Windows, #498)
+        case "$workdir" in /* | [A-Za-z]:[/\\]*) dir="$workdir" ;; *) dir="$cwd/$workdir" ;; esac
+    else
+        dir="$cwd"
+    fi
     # Une commande par ligne, en un seul parcours caractère par caractère qui
     # respecte les guillemets (pas de <( … ) : bash 3.2 le lit mal).
     decouper_lignes "$commande"

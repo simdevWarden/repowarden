@@ -25,6 +25,7 @@ Only in a repowarden repository (`.repowarden.conf`, a `repowarden.*` setting or
 | forced `git push`: `--force`, `-f` (`-uf`…), `--force-with-lease[=…]`, `--force-if-includes`, `+branch` refspec | always: it rewrites the history already pushed | fix it with a new commit (`repowarden cc …`), then `git push` without forcing |
 | `gh issue create` | always | `repowarden ticket nouveau "<title>"` |
 | `repowarden ticket nouveau` | always, unless `repowarden.agentsTickets = true`: creating a ticket is the maintainer's decision (`--help` stays allowed) | report the defect to the maintainer, who creates the ticket; or note it on the current ticket |
+| **workdir** (opencode format) | the `workdir` argument, if present and non-empty, becomes the command's working directory (absolute as-is, relative resolved from `cwd`); non-existent directory: closest existing directory (`dossier_r`) | `repowarden ticket <n>` (without ticket tracking: `git switch -c <type>/<topic>`) |
 | `gh issue comment`, `gh issue edit` | always | `repowarden ticket comment <n> "…"`, `repowarden ticket label <n> <label>` |
 | `gh pr create` | always: the draft PR is opened by the bot on the first push | `git push -u origin HEAD` |
 | `gh run rerun` | always | `repowarden run rerun <id>` |
