@@ -318,6 +318,70 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
     [ "$status" -eq 2 ]
 }
 
+@test "garde : chemin de la commande reconnu (dernier element, .exe/.cmd/.bat)" {
+    for c in 'cd .; "/opt/mon dossier/repowarden" ticket label 12 validé' \
+        'cd .; "/opt/mon dossier/git" commit -m x' \
+        'cd .; "/opt/mon dossier/gh" pr merge 3' \
+        'cd .; "C:/Program Files/Git/cmd/git.exe" push --force' \
+        'cd .; "C:\Program Files\GitHub CLI\gh.exe" pr merge 3' \
+        'git.exe commit -m x' 'repowarden.cmd ticket label 12 validé'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+    done
+    run shell 'cd .; "/opt/mon dossier/repowarden" ticket label 12 validé'
+    [[ "$output" == *"décision du mainteneur"* ]] || false
+    run shell 'cd .; "/opt/mon dossier/git" commit -m x'
+    [[ "$output" == *"les commits passent par l'assistant"* ]] || false
+    run shell 'git.cmd push --force'
+    [[ "$output" == *"réécrit l'historique"* ]] || false
+}
+
+@test "garde : un argument entre guillemets reste un seul mot" {
+    run shell 'cd .; "/opt/mon dossier/git" commit -m "repowarden ticket nouveau"'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"les commits passent par l'assistant"* ]] || false
+    run shell 'cd .; "/opt/mon dossier/git" push origin "ma branche"'
+    [ "$status" -eq 0 ]
+}
+
+@test "garde : guillemet non ferme refuse dans un depot repowarden, permis ailleurs" {
+    run shell 'git commit -m "x'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"illisible"* ]] || false
+    git init -q -b main "$BATS_TEST_TMPDIR/libre"
+    run shell "cd $BATS_TEST_TMPDIR/libre && git commit -m \"x"
+    [ "$status" -eq 0 ]
+    REPOWARDEN_LANG=en run shell 'git commit -m "x'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"unreadable"* ]] || false
+}
+
+@test "garde : les separateurs entre guillemets ne coupent pas la commande" {
+    git switch -q -c feat/essai
+    for c in 'echo "a ; b"' 'grep -E "x|y" fichier' 'echo "a && b"'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refuse : $output"; return 1; }
+    done
+    run shell 'git commit -m "a ; b"'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"les commits passent par l'assistant"* ]] || false
+    run shell 'echo "x" ; git push --force'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"réécrit l'historique"* ]] || false
+}
+
+@test "garde : retour a la ligne entre guillemets ne coupe pas la commande" {
+    git switch -q -c feat/essai
+    for c in 'echo "ligne 1'$'\n''ligne 2"' \
+        'repowarden cc -m "x" --body "a'$'\n''b" --dry-run'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "refuse : $output"; return 1; }
+    done
+    run shell 'echo "a'$'\n''b" ; git push --force'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"réécrit l'historique"* ]] || false
+}
+
 @test "garde : apply_patch d'opencode, chemins lus dans patchText" {
     patch='*** Begin Patch\n*** Add File: src/nouveau.ts\n+x\n*** End Patch'
     run opencode apply_patch "$(jq -n --arg p "$(printf "$patch")" '{patchText: $p}')"
