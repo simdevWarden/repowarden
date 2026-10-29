@@ -427,6 +427,73 @@ GH
     done
 }
 
+@test "garde gh : etiquettes de decision par gh api refusees, meme avec REPOWARDEN_TICKET (#496)" {
+    gh_simule
+    export FAKE_TICKET='OPEN\nvalidé'
+    for c in 'gh api -X POST repos/o/r/issues/7/labels -f "labels[]=validé"' \
+        'gh api repos/o/r/issues/7/labels -f "labels[]=statut: en cours"' \
+        "gh api repos/o/r/issues/7/labels -f 'labels[]=à décider'" \
+        'gh api -X DELETE repos/o/r/issues/7/labels/validé' \
+        'gh api -X DELETE repos/o/r/issues/7/labels/valid%C3%A9' \
+        'gh api --method DELETE "repos/o/r/issues/7/labels/%C3%A0%20d%C3%A9cider"' \
+        'gh api -XDELETE repos/o/r/issues/7/labels/statut:%20backlog' \
+        'gh api -X PUT repos/o/r/issues/7/labels -f "labels[]=type: fix"' \
+        'gh api -X PATCH repos/o/r/issues/7/labels -f "labels[]=validé"' \
+        'gh api -X DELETE repos/o/r/issues/7/labels' \
+        'gh api -X PATCH repos/o/r/issues/7 -f "labels[]=type: fix"' \
+        'gh api repos/o/r/issues/7/labels --input l.json' \
+        'gh api /repos/o/r/issues/7/labels -f labels[]=validé' \
+        'git status && gh api -X DELETE repos/o/r/issues/7/labels/validé'; do
+        for p in '' 'REPOWARDEN_TICKET=12 '; do
+            run shell "$p$c"
+            [ "$status" -eq 2 ] || { echo "$p$c permis"; return 1; }
+            [[ "$output" == *"étiquette de décision"*"décision du mainteneur"* ]] || false
+        done
+    done
+    REPOWARDEN_LANG=en run shell 'REPOWARDEN_TICKET=12 gh api -X DELETE repos/o/r/issues/7/labels/validé'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"maintainer's decision"* ]] || false
+    # Autres étiquettes, titre, lecture : règle habituelle (ticket validé)
+    for c in 'gh api repos/o/r/issues/7/labels -f "labels[]=type: fix"' \
+        'gh api -X DELETE repos/o/r/issues/7/labels/type:%20fix' \
+        'gh api -X PATCH repos/o/r/issues/7 -f title=validé' 'gh api repos/o/r/issues/7/labels'; do
+        run shell "REPOWARDEN_TICKET=12 $c"
+        [ "$status" -eq 0 ] || { echo "REPOWARDEN_TICKET=12 $c refusé : $output"; return 1; }
+    done
+    run shell 'repowarden ticket comment 12 "validé ?"'
+    [ "$status" -eq 0 ]
+}
+
+@test "garde : repowarden ticket nouveau refuse a un agent, sauf agentsTickets (#496)" {
+    # Chemin absolu précédé de cd : sous Git Bash, un argument qui commence par / passé à jq serait converti en chemin Windows
+    for c in 'repowarden ticket nouveau "Essai"' 'repowarden ticket new "Essai" --type fix' \
+        'REPOWARDEN_TICKET=12 repowarden ticket nouveau x' 'git status; repowarden ticket nouveau x' \
+        'cd .; /usr/local/bin/repowarden "ticket" nouveau x'; do
+        run shell "$c"
+        [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
+        [[ "$output" == *"créer un ticket est une décision du mainteneur"* ]] || false
+        [[ "$output" == *"agentsTickets"* ]] || false
+    done
+    REPOWARDEN_LANG=en run shell 'repowarden ticket nouveau x'
+    [ "$status" -eq 2 ]
+    [[ "$output" == *"creating a ticket is the maintainer's decision"* ]] || false
+    for c in 'repowarden ticket nouveau --help' 'repowarden ticket 12' 'repowarden ticket' 'repowarden tickets sync'; do
+        run shell "$c"
+        [ "$status" -eq 0 ] || { echo "$c refusé : $output"; return 1; }
+    done
+    git config repowarden.agentsTickets true
+    run shell 'repowarden ticket nouveau x'
+    [ "$status" -eq 0 ]
+    git config --unset repowarden.agentsTickets
+    printf '[repowarden]\n    agentsTickets = true\n' >.repowarden.conf
+    run shell 'repowarden ticket nouveau x'
+    [ "$status" -eq 0 ]
+    # Hors dépôt repowarden : tout est permis
+    git init -q -b main "$BATS_TEST_TMPDIR/libre"
+    run shell "cd $BATS_TEST_TMPDIR/libre && repowarden ticket nouveau x"
+    [ "$status" -eq 0 ]
+}
+
 @test "garde gh : ecriture hors circuit refusee sans ticket" {
     gh_simule
     for c in 'gh api -X PATCH repos/o/r -f allow_auto_merge=true' 'gh api repos/o/r/labels -f name=x' \
@@ -524,6 +591,7 @@ GH
     export FAKE_TICKET='OPEN\nvalidé'
     for c in 'repowarden ticket label 12 validé' 'repowarden ticket label 12 validé --remove' \
         'repowarden ticket label 12 "statut: en cours"' "repowarden ticket label 12 'statut: backlog' --remove" \
+        'repowarden ticket label 12 "à décider" --remove' \
         'repowarden ticket-label 12 validé' 'REPOWARDEN_TICKET=12 repowarden ticket label 12 validé' \
         'REPOWARDEN_TICKET=12 repowarden ticket label 12 "statut: done"' 'git status && repowarden ticket label 12 validé'; do
         run shell "$c"
