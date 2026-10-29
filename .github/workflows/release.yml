@@ -94,9 +94,10 @@ jobs:
       app-key: ${{ secrets.REPOWARDEN_APP_KEY }}
 
   # Site republié après la release (notes de version de la page Changelog)
+  # Sur main, preversion est sauté : GitHub saute aussi ses descendants sans !cancelled() #514
   docs:
     needs: release
-    if: needs.release.outputs.release_created == 'true'
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.release.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       actions: write
@@ -115,7 +116,7 @@ jobs:
     needs: release
     # Nouvelle release, ou lancement manuel du workflow : rattrape la dernière
     # release si elle n'est pas encore sur npm (sans effet sinon)
-    if: vars.REPOWARDEN_NPM == 'true' && (needs.release.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch')
+    if: ${{ !cancelled() && needs.release.result == 'success' && vars.REPOWARDEN_NPM == 'true' && (needs.release.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch') }}
     uses: ./.github/workflows/npm-publish.yml
     permissions:
       contents: read
@@ -157,7 +158,7 @@ jobs:
   # chaque release, ou à une livraison sans nouvelle version
   tickets:
     needs: release
-    if: needs.release.outputs.release_created == 'true' || needs.release.outputs.delivered_without_version != ''
+    if: ${{ !cancelled() && needs.release.result == 'success' && (needs.release.outputs.release_created == 'true' || needs.release.outputs.delivered_without_version != '') }}
     uses: ./.github/workflows/tickets.yml
     permissions: { contents: write, issues: write, pull-requests: write, statuses: write }
     with:
@@ -172,7 +173,7 @@ jobs:
   # Tag majeur flottant (v1 → dernière v1.x.y) pour `uses: …/repowarden@v1`
   tag-major:
     needs: release
-    if: needs.release.outputs.release_created == 'true'
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.release.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -191,7 +192,7 @@ jobs:
   # vérifiable avec `cosign verify-blob` (voir SECURITY.md)
   sign:
     needs: release
-    if: needs.release.outputs.release_created == 'true'
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.release.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -223,7 +224,7 @@ jobs:
   # propre identité.
   provenance:
     needs: [release, sign]
-    if: needs.release.outputs.release_created == 'true'
+    if: ${{ !cancelled() && needs.release.result == 'success' && needs.sign.result == 'success' && needs.release.outputs.release_created == 'true' }}
     permissions:
       actions: read
       id-token: write

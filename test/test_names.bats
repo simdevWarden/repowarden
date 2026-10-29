@@ -118,6 +118,29 @@ job_release() {
     [ -z "$(grep -n 'prerelease' <<<"$t")" ] || { echo "tickets attend encore une preversion :"; echo "$t"; return 1; }
 }
 
+@test "release : chaque job post-release garde !cancelled et needs.release.result == 'success' (#514)" {
+    # #514 : sur main, preversion est saute : GitHub saute aussi ses descendants sans !cancelled()
+    for j in docs npm tag-major sign provenance tickets; do
+        b="$(job_release "$j")"
+        [ -n "$b" ] || { echo "job $j absent de release.yml"; return 1; }
+        grep -q "^    if: \${{ !cancelled() && needs.release.result == 'success' &&" <<<"$b" || { echo "garde manquante dans $j :"; echo "$b"; return 1; }
+    done
+}
+
+@test "release : le job provenance attend le succes de sign (#514)" {
+    p="$(job_release provenance)"
+    [ -n "$p" ] || { echo "job provenance absent de release.yml"; return 1; }
+    # #514 : la provenance ne tourne que si sign a reussi
+    grep -q "needs.sign.result == 'success'" <<<"$p" || { echo "needs.sign.result manquant :"; echo "$p"; return 1; }
+}
+
+@test "release : aucune configuration actionlint reduite au silence (#514)" {
+    cd "$BATS_TEST_DIRNAME/.."
+    # #514 : pas de regle actionlint qui reduirait les erreurs au silence
+    [[ ! -e .github/actionlint.yaml ]] || false
+    [[ ! -e .github/actionlint.yml ]] || false
+}
+
 @test "scripts : aucun tube vers grep -q ou head (SIGPIPE + pipefail = echec aleatoire)" {
     cd "$BATS_TEST_DIRNAME/.."
     # grep -q et head s'arrêtent avant la fin : la commande qui écrit reçoit
