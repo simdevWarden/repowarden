@@ -703,6 +703,16 @@ GH
     run opencode bash "$(jq -n '{command: "repowarden cc -m x"}')"
     [ "$status" -eq 0 ]
 
+    # Workdir en forme Windows (C:/… ou C:\…) : sous MINGW/MSYS, cygpath -m le
+    # convertit ; ailleurs, le cas absolu existant suffit (#498)
+    case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*)
+        wd_win="$(cygpath -m "$BATS_TEST_TMPDIR/autre")"
+        run opencode bash "$(jq -n --arg w "$wd_win" '{command: "repowarden cc -m x", workdir: $w}')"
+        [ "$status" -eq 2 ]
+        [[ "$output" == *"« main » est une branche protégée, le commit y serait refusé"* ]] || false
+        ;;
+    esac
+
     run opencode bash "$(jq -n --arg w "$BATS_TEST_TMPDIR/hors-depot" '{command: "repowarden cc -m x", workdir: $w}')"
     [ "$status" -eq 0 ]
 }
