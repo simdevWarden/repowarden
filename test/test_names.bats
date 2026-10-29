@@ -58,6 +58,66 @@ PY
     grep -q 'branche="livraison/' .github/workflows/release-auto.yml
 }
 
+# Bloc d'un job de release.yml, de sa clé jusqu'au job suivant (lecture #510)
+job_release() {
+    awk -v cle="  $1:" '
+        $0 == cle { dedans = 1; next }
+        dedans && /^  [A-Za-z0-9_-]+:$/ { exit }
+        dedans' "$BATS_TEST_DIRNAME/../.github/workflows/release.yml"
+}
+
+@test "release : le job preversion appelle release-auto sans livraison" {
+    p="$(job_release preversion)"
+    [ -n "$p" ] || { echo "job preversion absent de release.yml"; return 1; }
+    grep -q '^    uses: ./.github/workflows/release-auto.yml$' <<<"$p"
+    # Aucune approbation à attendre ici : la livraison part du job release
+    grep -q '^      delivery-environment: ""$' <<<"$p"
+    grep -q '^      issues: read' <<<"$p"
+    grep -q '^      app-client-id: ${{ vars.REPOWARDEN_APP_CLIENT_ID }}$' <<<"$p"
+    [ -z "$(grep -n 'delivery-auto' <<<"$p")" ] || { echo "delivery-auto dans preversion :"; echo "$p"; return 1; }
+    # Sur main, seule la release stable tourne : la préversion part de develop
+    grep -q "^    if: github.ref_name == 'develop'" <<<"$p"
+}
+
+@test "release : le job release attend la preversion et ne la republie pas" {
+    r="$(job_release release)"
+    grep -q '^    needs: preversion$' <<<"$r"
+    # Sur main, preversion sauté : la release stable tourne aussi
+    grep -q "^    if: \${{ !cancelled() && needs.preversion.result != 'failure' }}" <<<"$r"
+    grep -q '^      preversion: ""$' <<<"$r"
+    grep -q '^    uses: ./.github/workflows/release-auto.yml$' <<<"$r"
+    grep -q '^      delivery-environment: production$' <<<"$r"
+    # Les suites de la version stable (main) ne dependent que de release
+    for j in docs npm sign tag-major; do
+        grep -q '^    needs: release$' <<<"$(job_release "$j")"
+    done
+    grep -q '^    needs: \[release, sign\]$' <<<"$(job_release provenance)"
+}
+
+@test "release : npm-next publie la preversion sans attendre l'approbation" {
+    n="$(job_release npm-next)"
+    [ -n "$n" ] || { echo "job npm-next absent de release.yml"; return 1; }
+    grep -q '^    needs: preversion$' <<<"$n"
+    grep -q "needs.preversion.outputs.prerelease_created == 'true'" <<<"$n"
+    grep -q 'needs.preversion.outputs.prerelease_tag' <<<"$n"
+    # Surtout pas needs release : qui attend la livraison approuvée (#510)
+    [ -z "$(grep -n 'needs\.release\.' <<<"$n")" ] || { echo "npm-next depend encore de release :"; echo "$n"; return 1; }
+}
+
+@test "release : tickets en preprod sur la preversion, done sur la release" {
+    p="$(job_release tickets-preprod)"
+    [ -n "$p" ] || { echo "job tickets-preprod absent de release.yml"; return 1; }
+    grep -q '^    needs: preversion$' <<<"$p"
+    grep -q "needs.preversion.outputs.prerelease_created == 'true'" <<<"$p"
+    grep -q 'needs.preversion.outputs.prerelease_tag' <<<"$p"
+    grep -q '^      app-key: ${{ secrets.REPOWARDEN_APP_KEY }}$' <<<"$p"
+    t="$(job_release tickets)"
+    grep -q '^    needs: release$' <<<"$t"
+    grep -q "needs.release.outputs.release_created == 'true' || needs.release.outputs.delivered_without_version != ''" <<<"$t"
+    # La preversion est traitée par tickets-preprod : plus ici
+    [ -z "$(grep -n 'prerelease' <<<"$t")" ] || { echo "tickets attend encore une preversion :"; echo "$t"; return 1; }
+}
+
 @test "scripts : aucun tube vers grep -q ou head (SIGPIPE + pipefail = echec aleatoire)" {
     cd "$BATS_TEST_DIRNAME/.."
     # grep -q et head s'arrêtent avant la fin : la commande qui écrit reçoit

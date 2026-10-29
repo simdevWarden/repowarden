@@ -266,6 +266,8 @@ The pre-release is published like a stable version, from the `prerelease_created
       dist-tag: next
 ```
 
+If the prerelease is published by a separate job (`preversion`), `npm-next` depends on that job and reads its `preversion` outputs.
+
 Requirements:
 
 - `.repowarden.conf`: `integrationBranch = develop` (mistargeted PRs retargeted to `develop`);

@@ -266,6 +266,8 @@ La préversion se publie comme une version stable, depuis les sorties `prereleas
       dist-tag: next
 ```
 
+Si la préversion est publiée par un job distinct (`preversion`), `npm-next` dépend de ce job et lit ses sorties `preversion`.
+
 Prérequis :
 
 - `.repowarden.conf` : `integrationBranch = develop` (PR mal ciblées reciblées vers `develop`) ;
