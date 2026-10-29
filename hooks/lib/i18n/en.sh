@@ -552,6 +552,8 @@ _msg_en() {
         tk.automerge_armed) _M="PR #%s: auto-merge armed (squash), as soon as the checks are green." ;;
         tk.automerge_no_app) _M="PR #%s: auto-merge not armed, no GitHub App (repowarden app init): with the Actions token, the merge would trigger no workflow." ;;
         tk.automerge_failed) _M="PR #%s: auto-merge not armed (auto-merge not allowed on the repository: repowarden proteger)." ;;
+        tk.automerge_rules_stale) _M="PR #%s: auto-merge not armed (online rules stale: %s). Run: repowarden proteger --checks \"%s\"." ;;
+        tk.automerge_rules_unread) _M="PR #%s: online rules unreadable (permissions or network): auto-merge armed without comparing requiredChecks." ;;
         app.no_node) _M="node is required (local page creating the App): https://nodejs.org" ;;
         app.step_create) _M="Creating the GitHub App" ;;
         app.exists) _M="App already set up for this repository (client %s): nothing to recreate." ;;
