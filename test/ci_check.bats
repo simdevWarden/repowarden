@@ -148,6 +148,45 @@ setup() {
     [ "$status" -eq 0 ]
 }
 
+@test "ci : retrait de test Java indente detecte" {
+    printf 'class Foo {\n    @Test\n    void a() {}\n    @Test\n    void b() {}\n}\n' >Foo.java
+    git add Foo.java
+    git commit -q --no-verify -m "test: deux tests java"
+    export REPOWARDEN_BASE="$(git rev-parse HEAD)"
+    printf 'class Foo {\n    @Test\n    void a() {}\n}\n' >Foo.java
+    git add Foo.java
+    git commit -q --no-verify -m "test: un test java en moins"
+    run "$CHECK" tests
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Foo.java : 2 → 1 tests"* ]] || false
+}
+
+@test "ci : retrait de test pytest indente detecte" {
+    printf 'class TestFoo:\n    def test_a(self):\n        pass\n    def test_b(self):\n        pass\n' >test_indented.py
+    git add test_indented.py
+    git commit -q --no-verify -m "test: deux tests pytest"
+    export REPOWARDEN_BASE="$(git rev-parse HEAD)"
+    printf 'class TestFoo:\n    def test_a(self):\n        pass\n' >test_indented.py
+    git add test_indented.py
+    git commit -q --no-verify -m "test: un test pytest en moins"
+    run "$CHECK" tests
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"test_indented.py : 2 → 1 tests"* ]] || false
+}
+
+@test "ci : retrait de test js indente detecte" {
+    printf 'describe("x", () => {\n  it("a", () => {});\n  it("b", () => {});\n});\n' >thing.indented.test.js
+    git add thing.indented.test.js
+    git commit -q --no-verify -m "test: deux tests js"
+    export REPOWARDEN_BASE="$(git rev-parse HEAD)"
+    printf 'describe("x", () => {\n  it("a", () => {});\n});\n' >thing.indented.test.js
+    git add thing.indented.test.js
+    git commit -q --no-verify -m "test: un test js en moins"
+    run "$CHECK" tests
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"thing.indented.test.js : 2 → 1 tests"* ]] || false
+}
+
 @test "ci : secrets detectes" {
     require gitleaks
     printf 'token = ghp_%s\n' "4Rk9vQ2xLm7TzP0aWc3Ny8BdHs5Ju1Ef6GiX" >config.ini # factice

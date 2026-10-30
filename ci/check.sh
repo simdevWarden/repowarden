@@ -241,14 +241,16 @@ check_comments() {
 }
 
 # Motif ERE des déclarations de test de $1 (bats, pytest, Go, Java, JS/TS) :
-# le même motif des deux côtés du diff, quel que soit le langage du projet
+# le même motif des deux côtés du diff, quel que soit le langage du projet.
+# bats et Go restent ancrés en colonne 0 ; pytest, Java/Kotlin et JS/TS
+# acceptent une indentation (méthodes dans une classe, tests dans un describe).
 tests_motif_r() {
     case "$1" in
         *.bats) REPLY='^@test "' ;;
-        test_*.py | *_test.py) REPLY='^def test_' ;;
+        test_*.py | *_test.py) REPLY='^[[:space:]]*def test_' ;;
         *_test.go) REPLY='^func Test' ;;
-        *.java | *.kt) REPLY='^@Test' ;;
-        *.test.* | *.spec.*) REPLY='^(it|test)\(' ;;
+        *.java | *.kt) REPLY='^[[:space:]]*@Test' ;;
+        *.test.* | *.spec.*) REPLY='^[[:space:]]*(it|test)\(' ;;
         *) return 1 ;;
     esac
 }
