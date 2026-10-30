@@ -24,6 +24,7 @@ case "$1 $2" in
             *"-q .isDraft"*) echo "${FAKE_DRAFT:-true}" ;;
             *"-q .state"*) echo "${FAKE_PR_STATE:-OPEN}" ;;
             *commits*) cat "$F/pr_commits" 2>/dev/null || true ;;
+            *comments*) cat "$F/pr_comments" 2>/dev/null || true ;;
         esac ;;
     "pr edit")
         # assignation refusée (bot, jeton d'App) : simulée par FAKE_ASSIGN_FAIL
@@ -55,7 +56,9 @@ case "$1 $2" in
             *--disable-auto*) echo "merge-desarme $3" >>"$F/events" ;;
             *"--auto --squash"*) echo "merge-auto $3" >>"$F/events" ;;
         esac ;;
-    "api graphql")
+    "pr comment")
+        echo "pr-commentaire $3" >>"$F/events"
+        while [ $# -gt 0 ]; do [ "$1" = --body ] && printf '%s\n' "$2" >>"$F/pr_comments"; shift; done ;;    "api graphql")
         case "$*" in
             *closer*) printf '%s\n' "${FAKE_CLOSER:-}"; exit 0 ;;
             # adresse du dépôt, puis les branches liées au ticket
@@ -65,6 +68,7 @@ case "$1 $2" in
     "api -X")
         echo "branche-supprimee ${4#repos/o/r/git/refs/heads/}" >>"$F/events" ;;
     "api repos/o/r/git/matching-refs/heads/") cat "$F/refs" 2>/dev/null || true ;;
+    "api repos/o/r/rules/branches/"*) [ -z "${FAKE_RULES_FAIL:-}" ] || exit 1; printf '%s\n' "${FAKE_ONLINE_CHECKS:-}" ;;
     "api repos/o/r") echo R_1 ;;
     "api repos/o/r/git/ref/heads/develop") echo sha0 ;;
     "api repos/o/r/compare/"*)
@@ -851,6 +855,57 @@ EOF
     FAKE_PRS=$'7\tfeat/12-panier\tabc\tdevelop\tfalse' APP_TOKEN=true ISSUE=12 ACTION=labeled LABEL=validé run "$TICKETS" issue
     [ "$status" -eq 0 ]
     grep -qx "merge-auto 7" "$F/events"
+}
+
+@test "tickets : merge auto regles en ligne completes -> arme" {
+    N=12 ticket "validé" "statut: en cours"
+    printf 'Ticket : #12' >"$F/pr_body"
+    git config repowarden.requiredChecks "repowarden,ticket"
+    FAKE_ONLINE_CHECKS=$'repowarden\nticket' APP_TOKEN=true ACTION=ready_for_review DRAFT=false run "$TICKETS" pr
+    [ "$status" -eq 0 ]
+    grep -qx "merge-auto 7" "$F/events"
+    [[ "$output" == *"merge automatique armé"* ]] || false
+}
+
+@test "tickets : merge auto une verification attendue absente -> pas arme, commentaire" {
+    N=12 ticket "validé" "statut: en cours"
+    printf 'Ticket : #12' >"$F/pr_body"
+    git config repowarden.requiredChecks "repowarden,ticket"
+    FAKE_ONLINE_CHECKS="repowarden" APP_TOKEN=true ACTION=ready_for_review DRAFT=false run "$TICKETS" pr
+    [ "$status" -eq 0 ]
+    ! grep -q "merge-auto" "$F/events"
+    grep -qx "pr-commentaire 7" "$F/events"
+    grep -q "regles-perimees" "$F/pr_comments"
+    grep -q "proteger --checks" "$F/pr_comments"
+}
+
+@test "tickets : merge auto second passage -> pas de second commentaire" {
+    N=12 ticket "validé" "statut: en cours"
+    printf 'Ticket : #12' >"$F/pr_body"
+    git config repowarden.requiredChecks "repowarden,ticket"
+    printf '%s\n' '<!-- repowarden:regles-perimees -->' >"$F/pr_comments"
+    FAKE_ONLINE_CHECKS="repowarden" APP_TOKEN=true ACTION=synchronize DRAFT=false run "$TICKETS" pr
+    [ "$status" -eq 0 ]
+    ! grep -q "pr-commentaire 7" "$F/events"
+}
+
+@test "tickets : merge auto sans requiredChecks -> arme" {
+    N=12 ticket "validé" "statut: en cours"
+    printf 'Ticket : #12' >"$F/pr_body"
+    APP_TOKEN=true ACTION=ready_for_review DRAFT=false run "$TICKETS" pr
+    [ "$status" -eq 0 ]
+    grep -qx "merge-auto 7" "$F/events"
+}
+
+@test "tickets : merge auto lecture regles en echec -> arme avec notice" {
+    N=12 ticket "validé" "statut: en cours"
+    printf 'Ticket : #12' >"$F/pr_body"
+    git config repowarden.requiredChecks "repowarden,ticket"
+    FAKE_RULES_FAIL=1 APP_TOKEN=true ACTION=ready_for_review DRAFT=false run "$TICKETS" pr
+    [ "$status" -eq 0 ]
+    grep -qx "merge-auto 7" "$F/events"
+    [[ "$output" == *"merge automatique armé"* ]] || false
+    [[ "$output" == *"règles en ligne illisibles"* ]] || false
 }
 
 @test "tickets : controles (pas des consignes) -> conception, un seul ticket, branche du ticket, commits du meme ticket" {

@@ -553,6 +553,8 @@ _msg_fr() {
         tk.automerge_armed) _M="PR #%s : merge automatique armé (squash), dès que les vérifications sont vertes." ;;
         tk.automerge_no_app) _M="PR #%s : merge automatique non armé, pas de GitHub App (repowarden app init) : avec le jeton des Actions, le merge ne déclencherait aucun workflow." ;;
         tk.automerge_failed) _M="PR #%s : merge automatique non armé (dépôt sans merge automatique autorisé : repowarden proteger)." ;;
+        tk.automerge_rules_stale) _M="PR #%s : merge automatique non armé (règles en ligne périmées : %s). Lancer : repowarden proteger --checks \"%s\"." ;;
+        tk.automerge_rules_unread) _M="PR #%s : règles en ligne illisibles (droits ou réseau) : merge automatique armé sans comparer requiredChecks." ;;
         app.no_node) _M="node est nécessaire (page locale de création de l'App) : https://nodejs.org" ;;
         app.step_create) _M="Création de la GitHub App" ;;
         app.exists) _M="App déjà configurée pour ce dépôt (client %s) : rien à recréer." ;;
