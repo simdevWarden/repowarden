@@ -436,6 +436,9 @@ _msg_fr() {
         dc.knip_file) _M="fichier jamais importé" ;;
         dc.knip_export) _M="export jamais importé :" ;;
         dc.knip_dep) _M="dépendance jamais importée :" ;;
+        # Tests retirés par une PR (vérification tests)
+        ci.check.tests_down) _M="%s : %s → %s tests (avant → après) ; une PR ne retire pas de tests." ;;
+        ci.check.tests_fix) _M="  Corriger : remettre les tests retirés, ou l'écrire dans la description de la PR (ligne « Tests retirés : <raison> », « Tests removed: … » en anglais)." ;;
         # Fonctions ajoutées sans commentaire
         cm.section) _M="Fonctions sans commentaire (nouveau code uniquement)" ;;
         cm.no_base) _M="Pas de base : contrôle des commentaires ignoré." ;;
@@ -752,6 +755,7 @@ _msg_fr() {
         garde.detache) _M="modification refusée : HEAD détaché dans %s.\n  → Se placer sur la branche d'un ticket : repowarden ticket <n>" ;;
         garde.protegee) _M="modification refusée : « %s » est une branche protégée.\n  → Travailler sur la branche d'un ticket : repowarden ticket <n>" ;;
         garde.protegee_libre) _M="modification refusée : « %s » est une branche protégée.\n  → Créer une branche de travail : git switch -c <type>/<sujet>" ;;
+        garde.config_verification) _M="réglage d'un outil de vérification : décision du mainteneur ; corriger le code plutôt que la règle (« %s »).\n  → Corriger le code, jamais la règle ; seul le mainteneur règle l'outil (réglage repowarden.agentsConfig = true)." ;;
         garde.carte) _M="  → Avant de modifier %s, une fois sur la bonne branche : repowarden carte %s (fonctions, tests, tickets)" ;;
         garde.hors_ticket) _M="modification refusée : la branche « %s » n'est pas celle d'un ticket (<type>/<n>-<sujet>).\n  → Prendre le ticket : repowarden ticket <n>" ;;
         garde.branche) _M="commande refusée : « %s » crée une branche ; ici, la branche naît du ticket.\n  → repowarden ticket <n>" ;;

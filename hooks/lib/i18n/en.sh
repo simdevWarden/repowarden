@@ -435,6 +435,9 @@ _msg_en() {
         dc.knip_file) _M="file never imported" ;;
         dc.knip_export) _M="export never imported:" ;;
         dc.knip_dep) _M="dependency never imported:" ;;
+        # Tests removed by a PR (tests check)
+        ci.check.tests_down) _M="%s: %s → %s tests (before → after); a PR does not remove tests." ;;
+        ci.check.tests_fix) _M="  Fix: restore the removed tests, or write it in the PR description (line \"Tests removed: <reason>\", \"Tests retirés : …\" also accepted)." ;;
         # Functions added without a comment
         cm.section) _M="Functions without a comment (new code only)" ;;
         cm.no_base) _M="No base: comment check skipped." ;;
@@ -751,6 +754,7 @@ _msg_en() {
         garde.detache) _M="change refused: detached HEAD in %s.\n  → Switch to a ticket's branch: repowarden ticket <n>" ;;
         garde.protegee) _M="change refused: \"%s\" is a protected branch.\n  → Work on a ticket's branch: repowarden ticket <n>" ;;
         garde.protegee_libre) _M="change refused: \"%s\" is a protected branch.\n  → Create a work branch: git switch -c <type>/<topic>" ;;
+        garde.config_verification) _M="tool verification setting: the maintainer's decision; fix the code rather than the rule (\"%s\").\n  → Fix the code, never the rule; only the maintainer sets the tool (setting repowarden.agentsConfig = true)." ;;
         garde.carte) _M="  → Before changing %s, once on the right branch: repowarden carte %s (functions, tests, tickets)" ;;
         garde.hors_ticket) _M="change refused: branch \"%s\" is not a ticket's branch (<type>/<n>-<topic>).\n  → Take the ticket: repowarden ticket <n>" ;;
         garde.branche) _M="command refused: \"%s\" creates a branch; here, branches come from tickets.\n  → repowarden ticket <n>" ;;
