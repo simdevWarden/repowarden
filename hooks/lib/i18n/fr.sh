@@ -411,7 +411,7 @@ _msg_fr() {
         ci.livraison.maintenance) _M="Maintenance seule : aucune version à publier" ;;
         ci.livraison.non_exigee) _M="%s : préversion non exigée" ;;
         ci.livraison.ok) _M="%s : préversion testée, livrable" ;;
-        ci.livraison.preversion) _M="%s : aucune préversion %s ; attendre celle du soir, ou Actions → release → Run workflow sur %s" ;;
+        ci.livraison.preversion) _M="%s : en attente de préversion : aucune %s ne contient ce commit" ;;
         ci.install_tool.os) _M="Système non supporté : %s" ;;
         ci.install_tool.arch) _M="Architecture non supportée : %s" ;;
         ci.install_tool.unknown) _M="Outil inconnu : %s" ;;

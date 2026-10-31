@@ -42,7 +42,7 @@ etat_r() {
     elif [ "${OBLIGATOIRE:-true}" != true ] || [ -z "${ID:-}" ]; then
         t ci.livraison.non_exigee "v$version"
         REPLY="success	$REPLY"
-    elif [ -n "${PREVERSION_CREEE:-}" ] || [ -n "$(git tag --list "v$version-$ID.*")" ]; then
+    elif [ -n "${PREVERSION_CREEE:-}" ] || [ -n "$(git tag --contains HEAD --list "v$version-$ID.*")" ]; then
         t ci.livraison.ok "v$version"
         REPLY="success	$REPLY"
     else

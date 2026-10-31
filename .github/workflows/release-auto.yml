@@ -551,6 +551,15 @@ jobs:
             echo "::notice::Demande de livraison : $title ($branche)"
             exit 0
           fi
+          # Une seule demande de livraison ouverte à la fois : si une demande
+          # (instantané livraison/*) est déjà en attente d'approbation, ce merge
+          # partira à la livraison suivante ; pas de PR develop → main.
+          livraison_en_attente="$(gh pr list --base "$MAIN" --state open --json number,headRefName             -q '.[] | select(.headRefName | startswith("livraison/")) | .number' | head -n 1)"
+          if [ -n "$livraison_en_attente" ]; then
+            echo "::notice::demande de livraison #$livraison_en_attente en attente (instantané) : ce merge partira à la livraison suivante"
+            echo "pr=" >>"$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ -n "$pr" ]; then
             gh pr edit "$pr" --title "$title" --body "$body" >/dev/null
             echo "::notice::PR #$pr : $title"
@@ -693,7 +702,7 @@ jobs:
           fi
           # Aucune version stable sans préversion testée sur la branche
           # d'intégration (une majeure passe par ses vX.0.0-next.N)
-          if [ "$OBLIGATOIRE" = true ] && [ -n "$ID" ] && [ -z "$(git tag --list "$tag-$ID.*")" ]; then
+          if [ "$OBLIGATOIRE" = true ] && [ -n "$ID" ] && [ -z "$(git tag --contains HEAD --list "$tag-$ID.*")" ]; then
             echo "::error::$tag refusée : aucune préversion $tag-$ID.N publiée depuis $INTEGRATION. Livrer depuis $INTEGRATION (préversion testée), ou désactiver preversion-obligatoire."
             exit 1
           fi

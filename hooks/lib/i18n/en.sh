@@ -410,7 +410,7 @@ _msg_en() {
         ci.livraison.maintenance) _M="Maintenance only: no version to publish" ;;
         ci.livraison.non_exigee) _M="%s: prerelease not required" ;;
         ci.livraison.ok) _M="%s: prerelease tested, deliverable" ;;
-        ci.livraison.preversion) _M="%s: no prerelease %s; wait for the evening one, or Actions → release → Run workflow on %s" ;;
+        ci.livraison.preversion) _M="%s: pending prerelease: no %s contains this commit" ;;
         ci.install_tool.os) _M="Unsupported system: %s" ;;
         ci.install_tool.arch) _M="Unsupported architecture: %s" ;;
         ci.install_tool.unknown) _M="Unknown tool: %s" ;;

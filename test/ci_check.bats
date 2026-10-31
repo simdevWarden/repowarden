@@ -1338,7 +1338,7 @@ GH
     c "feat: panier"
     run "$LIVRAISON"
     [ "$status" -eq 0 ]
-    [[ "$output" == failure*"v1.1.0 : aucune préversion v1.1.0-next.N"*"Run workflow sur develop"* ]] || false
+    [[ "$output" == failure*"v1.1.0 : en attente de préversion"*"ne contient ce commit"* ]] || false
     # publiée dans le même run, ou déjà taguée
     PREVERSION_CREEE=v1.1.0-next.3 run "$LIVRAISON"
     [[ "$output" == success*"v1.1.0 : préversion testée"* ]] || false
@@ -1357,8 +1357,8 @@ GH
 @test "livraison : protection du flux develop absente -> en echec, repowarden proteger" {
     fake_gh_livraison
     git tag v1.0.0
-    git tag v1.1.0-next.1
     c "feat: panier"
+    git tag v1.1.0-next.1
     GH_REGLES="pull_request" run "$LIVRAISON"
     [[ "$output" == failure*"repowarden proteger"* ]] || false
     GH_REGLAGES="false false" run "$LIVRAISON"
@@ -1378,6 +1378,25 @@ GH
     GH_REGLES="pull_request" run "$LIVRAISON" poster abc123
     grep -q "^api repos/moi/projet/statuses/abc123 -f state=failure -f context=livraison -f description=" "$GH_LOG"
     [[ "$output" == *"::warning::livraison"* ]] || false
+}
+
+@test "livraison : preversion du meme numero qui ne contient pas HEAD -> en attente, qui contient -> livrable" {
+    fake_gh_livraison
+    git tag v1.0.0
+    c "feat: panier"
+    # preversion taggee sur un commit anterieur : ne contient pas HEAD
+    git tag v1.1.0-next.1 v1.0.0
+    run "$LIVRAISON"
+    [ "$status" -eq 0 ]
+    [[ "$output" == failure*"v1.1.0 : en attente de préversion"*"ne contient ce commit"* ]] || false
+    # preversion taggee sur HEAD : livrable
+    git tag v1.1.0-next.2 HEAD
+    run "$LIVRAISON"
+    [[ "$output" == success*"v1.1.0 : préversion testée"* ]] || false
+    # PREVERSION_CREEE (publiee dans le meme run) : livrable sans tag
+    git tag -d v1.1.0-next.2 >/dev/null
+    PREVERSION_CREEE=v1.1.0-next.3 run "$LIVRAISON"
+    [[ "$output" == success*"v1.1.0 : préversion testée"* ]] || false
 }
 
 # --- ci/instantanes.sh (instantanés livraison/* abandonnés) : gh simulé ---------
@@ -1780,3 +1799,4 @@ GH
         bash -c "source '$HOOKS/lib/ui.sh'; source '$HOOKS/lib/i18n.sh'; echo \$REPOWARDEN_LANG"
     [ "$output" = fr ]
 }
+
