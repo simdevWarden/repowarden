@@ -475,6 +475,7 @@ jobs:
         if: github.ref_name == inputs.integration-branch
         env:
           GH_TOKEN: ${{ steps.app.outputs.token || github.token }}
+          GH_REPO: ${{ github.repository }}
           APP_TOKEN: ${{ steps.app.outputs.token != '' }}
           INTEGRATION: ${{ inputs.integration-branch }}
           MAIN: ${{ inputs.main-branch }}
@@ -549,6 +550,15 @@ jobs:
             url="$(gh pr create --head "$branche" --base "$MAIN" --title "$title" --body "$body")"
             echo "pr=${url##*/}" >>"$GITHUB_OUTPUT"
             echo "::notice::Demande de livraison : $title ($branche)"
+            exit 0
+          fi
+          # Une seule demande de livraison ouverte à la fois : si une demande
+          # (instantané livraison/*) est déjà en attente d'approbation, ce merge
+          # partira à la livraison suivante ; pas de PR develop → main.
+          livraison_en_attente="$(bash .repowarden-ci/ci/livraison.sh en-attente)"
+          if [ -n "$livraison_en_attente" ]; then
+            echo "::notice::demande de livraison #$livraison_en_attente en attente (instantané) : ce merge partira à la livraison suivante"
+            echo "pr=" >>"$GITHUB_OUTPUT"
             exit 0
           fi
           if [ -n "$pr" ]; then
@@ -683,6 +693,7 @@ jobs:
         if: inputs.mode == 'tag' && github.ref_name == inputs.main-branch
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           INITIAL_VERSION: ${{ inputs.initial-version }}
           OBLIGATOIRE: ${{ inputs.preversion-obligatoire }}
           ID: ${{ inputs.preversion }}
@@ -705,8 +716,11 @@ jobs:
             exit 0
           fi
           # Aucune version stable sans préversion testée sur la branche
-          # d'intégration (une majeure passe par ses vX.0.0-next.N)
-          if [ "$OBLIGATOIRE" = true ] && [ -n "$ID" ] && [ -z "$(git tag --list "$tag-$ID.*")" ]; then
+          # d'intégration (une majeure passe par ses vX.0.0-next.N). Sur main,
+          # HEAD est le merge commit de la livraison, qu'aucune préversion ne
+          # contient : vérifier le commit livré (son second parent).
+          livre="$(bash .repowarden-ci/ci/livraison.sh commit-livre)"
+          if [ "$OBLIGATOIRE" = true ] && [ -n "$ID" ] && [ -z "$(git tag --contains "$livre" --list "$tag-$ID.*")" ]; then
             echo "::error::$tag refusée : aucune préversion $tag-$ID.N publiée depuis $INTEGRATION. Livrer depuis $INTEGRATION (préversion testée), ou désactiver preversion-obligatoire."
             exit 1
           fi

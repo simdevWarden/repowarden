@@ -5,9 +5,14 @@
 # si la version annoncée existe en préversion (sinon la release la refuse).
 #   ci/livraison.sh             « success|failure<TAB>description »
 #   ci/livraison.sh poster SHA  idem, posté en statut « livraison » du commit SHA
+#   ci/livraison.sh en-attente  numéro de la PR de livraison ouverte vers MAIN,
+#                               rien s'il n'y en a pas
+#   ci/livraison.sh commit-livre
+#                               commit livré par HEAD : second parent d'un merge
+#                               de livraison, sinon HEAD
 # Variables : GH_REPO, INTEGRATION, ID (identifiant des préversions, vide :
 # aucune), OBLIGATOIRE (true : préversion exigée), PREVERSION_CREEE (tag publié
-# dans le même run), INITIAL_VERSION.
+# dans le même run), INITIAL_VERSION, MAIN (en-attente).
 set -euo pipefail
 
 REPOWARDEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
@@ -42,7 +47,7 @@ etat_r() {
     elif [ "${OBLIGATOIRE:-true}" != true ] || [ -z "${ID:-}" ]; then
         t ci.livraison.non_exigee "v$version"
         REPLY="success	$REPLY"
-    elif [ -n "${PREVERSION_CREEE:-}" ] || [ -n "$(git tag --list "v$version-$ID.*")" ]; then
+    elif [ -n "${PREVERSION_CREEE:-}" ] || [ -n "$(git tag --contains HEAD --list "v$version-$ID.*")" ]; then
         t ci.livraison.ok "v$version"
         REPLY="success	$REPLY"
     else
@@ -51,18 +56,37 @@ etat_r() {
     fi
 }
 
-etat_r
-etat="${REPLY%%	*}"
-description="${REPLY#*	}"
+# Première demande de livraison ouverte vers MAIN (une seule à la fois) : sa
+# tête est un instantané livraison/*. Les PR de tête develop sont ignorées.
+en_attente() {
+    gh pr list --base "${MAIN:?}" --state open --json number,headRefName \
+        --jq '[.[] | select(.headRefName | startswith("livraison/")) | .number][0] // empty'
+}
+
+# Commit livré par HEAD : sur la branche principale, HEAD est le merge commit
+# de la livraison, qu'aucune préversion ne contient ; le commit livré est son
+# second parent. Sur la branche d'intégration (ou hors merge), c'est HEAD.
+commit_livre() {
+    git rev-parse --verify -q 'HEAD^2' || git rev-parse HEAD
+}
+
 case "${1:-}" in
-    poster)
-        gh api "repos/$GH_REPO/statuses/${2:?SHA}" -f state="$etat" -f context=livraison \
-            -f description="${description:0:140}" >/dev/null
-        if [ "$etat" = success ]; then
-            echo "::notice::livraison : $description"
+    en-attente) en_attente ;;
+    commit-livre) commit_livre ;;
+    *)
+        etat_r
+        etat="${REPLY%%	*}"
+        description="${REPLY#*	}"
+        if [ "${1:-}" = poster ]; then
+            gh api "repos/$GH_REPO/statuses/${2:?SHA}" -f state="$etat" -f context=livraison \
+                -f description="${description:0:140}" >/dev/null
+            if [ "$etat" = success ]; then
+                echo "::notice::livraison : $description"
+            else
+                echo "::warning::livraison : $description"
+            fi
         else
-            echo "::warning::livraison : $description"
+            printf '%s\t%s\n' "$etat" "$description"
         fi
         ;;
-    *) printf '%s\t%s\n' "$etat" "$description" ;;
 esac
