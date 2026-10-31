@@ -240,9 +240,73 @@ check_comments() {
     [ "$REPLY" != 0 ] || ok_t cm.none
 }
 
+# Motif ERE des déclarations de test de $1 (bats, pytest, Go, Java, JS/TS) :
+# le même motif des deux côtés du diff, quel que soit le langage du projet.
+# bats et Go restent ancrés en colonne 0 ; pytest, Java/Kotlin et JS/TS
+# acceptent une indentation (méthodes dans une classe, tests dans un describe).
+tests_motif_r() {
+    case "$1" in
+        *.bats) REPLY='^@test "' ;;
+        test_*.py | *_test.py) REPLY='^[[:space:]]*def test_' ;;
+        *_test.go) REPLY='^func Test' ;;
+        *.java | *.kt) REPLY='^[[:space:]]*@Test' ;;
+        *.test.* | *.spec.*) REPLY='^[[:space:]]*(it|test)\(' ;;
+        *) return 1 ;;
+    esac
+}
+
+# REPLY = déclarations de test du fichier $1 à la révision $2 (0 si le fichier
+# n'y existe pas ou n'a pas de tests reconnus : un ajout n'est jamais une perte)
+tests_nombre() {
+    local motif
+    if ! tests_motif_r "$1"; then
+        REPLY=0
+        return 0
+    fi
+    motif="$REPLY"
+    if git cat-file -e "$2:$1" 2>/dev/null; then
+        REPLY="$(git show "$2:$1" | grep -acE "$motif" || true)"
+    else
+        REPLY=0
+    fi
+}
+
+# Une PR ne retire pas de tests : le nombre de déclarations d'un fichier ne
+# baisse pas entre la base et la tête, sauf raison écrite dans la PR (#518)
+tests_declares_check() {
+    [ -n "$BASE" ] || return 0
+    # La raison est déjà donnée dans la description : permis, mais dit
+    if grep -qE '^Tests (retirés|removed) *: .' <<<"${REPOWARDEN_PR_BODY:-${CI_MERGE_REQUEST_DESCRIPTION:-}}"; then
+        return 0
+    fi
+    local st a b anc nou av ap baisse=0
+    while IFS=$'\t' read -r st a b; do
+        [ -n "$st" ] || continue
+        case "$st" in
+            R* | C*) anc="$a" nou="$b" ;;
+            *) anc="$a" nou="$a" ;;
+        esac
+        if is_excluded "$nou"; then continue; fi
+        tests_nombre "$anc" "$BASE"; av="$REPLY"
+        tests_nombre "$nou" HEAD; ap="$REPLY"
+        if [ "$ap" -lt "$av" ]; then
+            ci_error_t ci.check.tests_down "$nou" "$av" "$ap"
+            baisse=1
+        fi
+    done < <(git diff --name-status --diff-filter=ACDMR "$BASE" HEAD)
+    if [ "$baisse" = 0 ]; then return 0; fi
+    echo_t ci.check.tests_fix
+    return 1
+}
+
+# Tests des projets touchés, puis déclarations de test (aucun retrait silencieux)
 check_tests() {
     section_t ci.section.tests
-    changed_files | without_excluded | test_projects
+    local baisse=0
+    changed_files | without_excluded | test_projects || baisse=1
+    tests_declares_check || baisse=1
+    if [ "$baisse" = 0 ]; then return 0; fi
+    return 1
 }
 
 # --- Exécution ---------------------------------------------------------------------

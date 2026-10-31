@@ -1,5 +1,7 @@
 # Contributing
 
+Working rules (tickets, commits, prohibitions): [`AGENTS.md`](https://github.com/simdevWarden/repowarden/blob/develop/AGENTS.md), read before any change.
+
 ## Setup
 
 ```bash
@@ -10,7 +12,7 @@ brew install bats-core shellcheck actionlint gitleaks   # or apt / winget equiva
 ## Before each PR
 
 ```bash
-shellcheck bin/* ci/*.sh hooks/pre-commit hooks/prepare-commit-msg hooks/commit-msg hooks/pre-push hooks/post-checkout hooks/post-merge hooks/lib/*.sh hooks/lang/*.sh install.sh
+shellcheck bin/* ci/*.sh ci/tickets/*.sh hooks/pre-commit hooks/prepare-commit-msg hooks/commit-msg hooks/pre-push hooks/post-checkout hooks/post-merge hooks/lib/*.sh hooks/lib/i18n/*.sh hooks/lang/*.sh install.sh
 actionlint .github/workflows/*.yml
 bats test/                      # unit and integration tests
 test/e2e/run.sh python go       # real-world tests (languages whose tooling is installed)
@@ -18,7 +20,7 @@ test/e2e/run.sh python go       # real-world tests (languages whose tooling is i
 
 The CI re-runs everything on Linux, macOS and Windows, plus one e2e job per language with its real tooling.
 
-Touched tests also run under **bash 3.2** (macOS `/bin/bash` first in `PATH`). Without bash 3.2 on the machine (Linux, devzone container), the CI's macOS jobs cover it: watch them (`repowarden pr checks <n>`) and only call the work done once they are green. Optional, to try before the CI, bash 3.2 built locally (checked on Ubuntu 24.04, gcc 13; `bison` required, the shipped parser is outdated):
+Touched tests also run under **bash 3.2** (`/bin/bash` of macOS first in `PATH`). Without bash 3.2 on the machine (Linux, devzone container), the CI's macOS jobs cover it: watch them (`repowarden pr checks <n>`) and only call the work done once they are green. Optional, to try before the CI, bash 3.2 built locally (checked on Ubuntu 24.04, gcc 13; `bison` required, the shipped parser is outdated):
 
 ```bash
 curl -fsSLO https://ftp.gnu.org/gnu/bash/bash-3.2.57.tar.gz && tar xzf bash-3.2.57.tar.gz && cd bash-3.2.57
@@ -32,10 +34,18 @@ PATH="$HOME/bash32:$PATH" bats test/<file>.bats   # bats follows the bash in PAT
 
 - **Branches**: `<type>/<topic>` (`feat/helm-unittest`, `fix/windows-paths`).
 - **Commits**: [Conventional Commits](https://www.conventionalcommits.org). The type determines the published version: `fix` → patch, `feat` → minor, `!` → major.
-- **Bash 3.2** (macOS): no associative arrays and no `mapfile`. In functions called per file, no subprocesses (`$(…)`): return the result in `REPLY`.
+- **Bash 3.2** (macOS): no associative arrays and no `mapfile`. In functions called per file, no subprocesses (`$(…)`): return the result in `REPLY`. In a bats test, a condition is written `[[ … ]] || false` (otherwise `set -e` ignores its failure under bash 3.2 and the test passes wrongly; checked by `test/test_names.bats`).
 - **ASCII bats test names** (bats on Windows ignores others). In `languages.bats`, the name starts with a prefix covered by the Windows filters in `ci.yml` (`detection`, `format`, `pre-push`…): a test checks that none is missed.
 - **Performance**: each process creation costs 20 to 50 ms on Windows. Read the config with `cfg_r` (no subshell), reuse `GIT_TOPLEVEL`, avoid `$(…)` in loops.
 - A missing tool is **never blocking** on the developer machine (`warn` / `tool_missing`); the CI's strict mode makes it blocking.
+
+## Tests against GitHub
+
+`test/gh/` runs for real every command calling `gh` (`ticket`, `tickets sync`, `pr`, `run`) against a test repo, reset each time (tickets and PR closed, branches deleted). Workflow `integration-gh.yml`: on `develop` and on demand, never on a PR; skipped (green job) until nothing is configured.
+
+- **Test repo**: initialized (README), topic `repowarden-it` (without it, nothing is done); a trivial workflow (`on: [push, pull_request]`, one step `run: "true"`) gives runs to `run list`.
+- **Variable** `REPOWARDEN_IT_REPO` (`owner/name`) and **secret** `REPOWARDEN_IT_TOKEN`: fine-grained token limited to the test repo (Contents, Issues, Pull requests write; Actions read).
+- Locally, `gh` connected: `REPOWARDEN_IT_REPO=owner/name bats test/gh/`.
 
 ## Adding a language or a tool
 
@@ -46,7 +56,6 @@ PATH="$HOME/bash32:$PATH" bats test/<file>.bats   # bats follows the bash in PAT
 
 ## Branches and releases
 
-- PRs target **`develop`** (default branch); a PR opened against `main` is retargeted automatically. Only urgent fixes (`hotfix/…`) may target `main`.
+- PRs target **`develop`** (default branch); a PR opened against `main` is retargeted automatically. Only `develop` enters `main`, through the delivery PR, always with human approval.
 - On every merge into `develop`: a **pre-release** `vX.Y.Z-next.N` (npm `next`) and the **delivery PR** `develop` → `main` kept up to date (upcoming version, notes). Merging it, as a merge commit, publishes: `vX.Y.Z` tag, GitHub release (release notes), `v4`, npm `latest`, site. No file is written: the version is carried by the tag.
-- An urgent fix (`hotfix/…`) merged into `main` flows back into `develop` on its own.
-- Details: [Versions and releases, tag mode](releases.md#develop-main-flow-tag-mode-recommended).
+- Details: [Versions and releases, tag mode](https://simdevwarden.github.io/repowarden/releases/#flux-develop-main-mode-tag-recommande).

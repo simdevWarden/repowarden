@@ -100,6 +100,93 @@ setup() {
     [[ "$output" == *"ci-make"* ]] || false
 }
 
+# Ticket #518 : une PR ne retire pas de tests — le nombre de declarations
+# (bats, pytest, Go, Java, JS/TS) ne baisse pas entre la base et la tete
+@test "ci : une PR ne retire pas de tests, sauf raison ecrite dans la PR" {
+    printf '@test "a" {\n  true\n}\n@test "b" {\n  true\n}\n' >extra.bats
+    git add extra.bats
+    git commit -q --no-verify -m "test: deux tests"
+    # La base de comparaison contient les deux tests
+    export REPOWARDEN_BASE="$(git rev-parse HEAD)"
+    printf '@test "a" {\n  true\n}\n' >extra.bats
+    git add extra.bats
+    git commit -q --no-verify -m "test: un test en moins"
+    run "$CHECK" tests
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"extra.bats : 2 → 1 tests"* ]] || false
+    [[ "$output" == *"ne retire pas de tests"* ]] || false
+    # La raison est ecrite dans la description de la PR : alors c'est permis
+    REPOWARDEN_PR_BODY=$'Corrige x.\n\nTests retirés : doublon' run "$CHECK" tests
+    [ "$status" -eq 0 ]
+    REPOWARDEN_PR_BODY=$'Corrige x.\n\nTests removed: duplicate' run "$CHECK" tests
+    [ "$status" -eq 0 ]
+    # Ajouter un test n'est jamais un echec
+    printf '@test "a" {\n  true\n}\n@test "b" {\n  true\n}\n@test "c" {\n  true\n}\n' >extra.bats
+    git add extra.bats
+    git commit -q --no-verify -m "test: un test de plus"
+    run "$CHECK" tests
+    [ "$status" -eq 0 ]
+}
+
+@test "ci : comptage des tests d autres langages (pytest, js)" {
+    printf 'def test_a():\n    pass\ndef test_b():\n    pass\n' >test_extra.py
+    git add test_extra.py
+    git commit -q --no-verify -m "test: deux tests pytest"
+    export REPOWARDEN_BASE="$(git rev-parse HEAD)"
+    printf 'def test_a():\n    pass\n' >test_extra.py
+    git add test_extra.py
+    git commit -q --no-verify -m "test: un test pytest en moins"
+    run "$CHECK" tests
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"test_extra.py : 2 → 1 tests"* ]] || false
+    # Le test remis, plus des tests js en plus : aucun echec
+    printf 'def test_a():\n    pass\ndef test_b():\n    pass\n' >test_extra.py
+    printf 'it("a", () => {});\ntest("b", () => {});\n' >thing.test.js
+    git add -A
+    git commit -q --no-verify -m "test: tests remis et js ajoutes"
+    run "$CHECK" tests
+    [ "$status" -eq 0 ]
+}
+
+@test "ci : retrait de test Java indente detecte" {
+    printf 'class Foo {\n    @Test\n    void a() {}\n    @Test\n    void b() {}\n}\n' >Foo.java
+    git add Foo.java
+    git commit -q --no-verify -m "test: deux tests java"
+    export REPOWARDEN_BASE="$(git rev-parse HEAD)"
+    printf 'class Foo {\n    @Test\n    void a() {}\n}\n' >Foo.java
+    git add Foo.java
+    git commit -q --no-verify -m "test: un test java en moins"
+    run "$CHECK" tests
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Foo.java : 2 → 1 tests"* ]] || false
+}
+
+@test "ci : retrait de test pytest indente detecte" {
+    printf 'class TestFoo:\n    def test_a(self):\n        pass\n    def test_b(self):\n        pass\n' >test_indented.py
+    git add test_indented.py
+    git commit -q --no-verify -m "test: deux tests pytest"
+    export REPOWARDEN_BASE="$(git rev-parse HEAD)"
+    printf 'class TestFoo:\n    def test_a(self):\n        pass\n' >test_indented.py
+    git add test_indented.py
+    git commit -q --no-verify -m "test: un test pytest en moins"
+    run "$CHECK" tests
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"test_indented.py : 2 → 1 tests"* ]] || false
+}
+
+@test "ci : retrait de test js indente detecte" {
+    printf 'describe("x", () => {\n  it("a", () => {});\n  it("b", () => {});\n});\n' >thing.indented.test.js
+    git add thing.indented.test.js
+    git commit -q --no-verify -m "test: deux tests js"
+    export REPOWARDEN_BASE="$(git rev-parse HEAD)"
+    printf 'describe("x", () => {\n  it("a", () => {});\n});\n' >thing.indented.test.js
+    git add thing.indented.test.js
+    git commit -q --no-verify -m "test: un test js en moins"
+    run "$CHECK" tests
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"thing.indented.test.js : 2 → 1 tests"* ]] || false
+}
+
 @test "ci : secrets detectes" {
     require gitleaks
     printf 'token = ghp_%s\n' "4Rk9vQ2xLm7TzP0aWc3Ny8BdHs5Ju1Ef6GiX" >config.ini # factice
@@ -1238,6 +1325,12 @@ case "$*" in
     "api repos/moi/projet/rules/branches/develop"*) echo "${GH_REGLES-deletion non_fast_forward pull_request}" ;;
     "api repos/moi/projet/rulesets") [ -z "${GH_RULESETS_403:-}" ] || { echo '{"message":"Upgrade to GitHub Pro","status":"403"}'; exit 1; } ;;
     "api repos/moi/projet --jq"*) echo "${GH_REGLAGES:-true false}" ;;
+    "pr list --base main "*)
+        # GH_PR_HEADS : « numéro:tête … » ; applique le filtre --jq de gh
+        json="$(for p in ${GH_PR_HEADS:-}; do printf '{"number":%s,"headRefName":"%s"},' "${p%%:*}" "${p#*:}"; done)"
+        filtre="" precedent=""
+        for a in "$@"; do [ "$precedent" = --jq ] && filtre="$a"; precedent="$a"; done
+        printf '%s' "[${json%,}]" | jq -r "$filtre" ;;
 esac
 GH
     chmod +x "$BATS_TEST_TMPDIR/bin/gh"
@@ -1251,7 +1344,7 @@ GH
     c "feat: panier"
     run "$LIVRAISON"
     [ "$status" -eq 0 ]
-    [[ "$output" == failure*"v1.1.0 : aucune préversion v1.1.0-next.N"*"Run workflow sur develop"* ]] || false
+    [[ "$output" == failure*"v1.1.0 : en attente de préversion : aucune v1.1.0-next.N ne contient ce commit ; attendre celle du soir, ou Actions → release → Run workflow sur develop"* ]] || false
     # publiée dans le même run, ou déjà taguée
     PREVERSION_CREEE=v1.1.0-next.3 run "$LIVRAISON"
     [[ "$output" == success*"v1.1.0 : préversion testée"* ]] || false
@@ -1270,8 +1363,8 @@ GH
 @test "livraison : protection du flux develop absente -> en echec, repowarden proteger" {
     fake_gh_livraison
     git tag v1.0.0
-    git tag v1.1.0-next.1
     c "feat: panier"
+    git tag v1.1.0-next.1
     GH_REGLES="pull_request" run "$LIVRAISON"
     [[ "$output" == failure*"repowarden proteger"* ]] || false
     GH_REGLAGES="false false" run "$LIVRAISON"
@@ -1291,6 +1384,56 @@ GH
     GH_REGLES="pull_request" run "$LIVRAISON" poster abc123
     grep -q "^api repos/moi/projet/statuses/abc123 -f state=failure -f context=livraison -f description=" "$GH_LOG"
     [[ "$output" == *"::warning::livraison"* ]] || false
+}
+
+@test "livraison : preversion du meme numero qui ne contient pas HEAD -> en attente, qui contient -> livrable" {
+    fake_gh_livraison
+    git tag v1.0.0
+    c "feat: panier"
+    # preversion taggee sur un commit anterieur : ne contient pas HEAD
+    git tag v1.1.0-next.1 v1.0.0
+    run "$LIVRAISON"
+    [ "$status" -eq 0 ]
+    [[ "$output" == failure*"v1.1.0 : en attente de préversion : aucune v1.1.0-next.N ne contient ce commit"* ]] || false
+    # preversion taggee sur HEAD : livrable
+    git tag v1.1.0-next.2 HEAD
+    run "$LIVRAISON"
+    [[ "$output" == success*"v1.1.0 : préversion testée"* ]] || false
+    # PREVERSION_CREEE (publiee dans le meme run) : livrable sans tag
+    git tag -d v1.1.0-next.2 >/dev/null
+    PREVERSION_CREEE=v1.1.0-next.3 run "$LIVRAISON"
+    [[ "$output" == success*"v1.1.0 : préversion testée"* ]] || false
+}
+
+@test "livraison : commit livre = second parent d'un merge, sinon HEAD" {
+    fake_gh_livraison
+    git tag v1.0.0
+    c "feat: panier"
+    tete="$(git rev-parse HEAD)"
+    run "$LIVRAISON" commit-livre
+    [ "$status" -eq 0 ]
+    [ "$output" = "$tete" ]
+    # merge d'une demande livraison/* : le commit livré est son second parent
+    git switch -q -c livraison/v1.1.0
+    c "fix: retouche"
+    livre="$(git rev-parse HEAD)"
+    git switch -q -
+    git merge -q --no-ff --no-edit livraison/v1.1.0 >/dev/null
+    run "$LIVRAISON" commit-livre
+    [ "$status" -eq 0 ]
+    [ "$output" = "$livre" ]
+}
+
+@test "livraison : demande en attente = PR ouverte vers main de tete livraison/*, rien sinon" {
+    fake_gh_livraison
+    # une demande de livraison ouverte : son numéro
+    GH_PR_HEADS="42:livraison/v1.1.0 7:develop" MAIN=main run "$LIVRAISON" en-attente
+    [ "$status" -eq 0 ]
+    [ "$output" = 42 ]
+    # seulement une PR de tête develop : aucune demande
+    GH_PR_HEADS="7:develop" MAIN=main run "$LIVRAISON" en-attente
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
 # --- ci/instantanes.sh (instantanés livraison/* abandonnés) : gh simulé ---------

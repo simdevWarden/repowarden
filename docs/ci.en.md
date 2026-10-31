@@ -10,7 +10,7 @@ The CI re-runs all the hook checks on each PR / MR: **it is the authoritative so
 | `branch` | the branch name does not follow `<type>/<topic>` (outside the exceptions) |
 | `secrets` | gitleaks finds a secret in the branch's commits |
 | `format` | a modified file is not formatted (the formatter is run, nothing is committed) |
-| `tests` | the tests of an affected project fail (monorepo: only the modified projects) |
+| `tests` | the tests of an affected project fail (monorepo: only the modified projects); a PR **removes tests**: a test file's declaration count drops between base and head (bats `@test`, pytest `def test_`, Go `func Test`, Java `@Test`, JS/TS `it(` and `test(`), unless a line `Tests removed: <reason>` is in the PR description |
 
 Errors appear as annotations on GitHub and in the job log on GitLab, with the command to fix them.
 

@@ -410,7 +410,7 @@ _msg_en() {
         ci.livraison.maintenance) _M="Maintenance only: no version to publish" ;;
         ci.livraison.non_exigee) _M="%s: prerelease not required" ;;
         ci.livraison.ok) _M="%s: prerelease tested, deliverable" ;;
-        ci.livraison.preversion) _M="%s: no prerelease %s; wait for the evening one, or Actions → release → Run workflow on %s" ;;
+        ci.livraison.preversion) _M="%s: waiting for a prerelease: no %s contains this commit; wait for the evening one, or Actions → release → Run workflow on %s" ;;
         ci.install_tool.os) _M="Unsupported system: %s" ;;
         ci.install_tool.arch) _M="Unsupported architecture: %s" ;;
         ci.install_tool.unknown) _M="Unknown tool: %s" ;;
@@ -435,6 +435,9 @@ _msg_en() {
         dc.knip_file) _M="file never imported" ;;
         dc.knip_export) _M="export never imported:" ;;
         dc.knip_dep) _M="dependency never imported:" ;;
+        # Tests removed by a PR (tests check)
+        ci.check.tests_down) _M="%s: %s → %s tests (before → after); a PR does not remove tests." ;;
+        ci.check.tests_fix) _M="  Fix: restore the removed tests, or write it in the PR description (line \"Tests removed: <reason>\", \"Tests retirés : …\" also accepted)." ;;
         # Functions added without a comment
         cm.section) _M="Functions without a comment (new code only)" ;;
         cm.no_base) _M="No base: comment check skipped." ;;
@@ -552,6 +555,8 @@ _msg_en() {
         tk.automerge_armed) _M="PR #%s: auto-merge armed (squash), as soon as the checks are green." ;;
         tk.automerge_no_app) _M="PR #%s: auto-merge not armed, no GitHub App (repowarden app init): with the Actions token, the merge would trigger no workflow." ;;
         tk.automerge_failed) _M="PR #%s: auto-merge not armed (auto-merge not allowed on the repository: repowarden proteger)." ;;
+        tk.automerge_rules_stale) _M="PR #%s: auto-merge not armed (online rules stale: %s). Run: repowarden proteger --checks \"%s\"." ;;
+        tk.automerge_rules_unread) _M="PR #%s: online rules unreadable (permissions or network): auto-merge armed without comparing requiredChecks." ;;
         app.no_node) _M="node is required (local page creating the App): https://nodejs.org" ;;
         app.step_create) _M="Creating the GitHub App" ;;
         app.exists) _M="App already set up for this repository (client %s): nothing to recreate." ;;
@@ -749,6 +754,7 @@ _msg_en() {
         garde.detache) _M="change refused: detached HEAD in %s.\n  → Switch to a ticket's branch: repowarden ticket <n>" ;;
         garde.protegee) _M="change refused: \"%s\" is a protected branch.\n  → Work on a ticket's branch: repowarden ticket <n>" ;;
         garde.protegee_libre) _M="change refused: \"%s\" is a protected branch.\n  → Create a work branch: git switch -c <type>/<topic>" ;;
+        garde.config_verification) _M="tool verification setting: the maintainer's decision; fix the code rather than the rule (\"%s\").\n  → Fix the code, never the rule; only the maintainer sets the tool (setting repowarden.agentsConfig = true)." ;;
         garde.carte) _M="  → Before changing %s, once on the right branch: repowarden carte %s (functions, tests, tickets)" ;;
         garde.hors_ticket) _M="change refused: branch \"%s\" is not a ticket's branch (<type>/<n>-<topic>).\n  → Take the ticket: repowarden ticket <n>" ;;
         garde.branche) _M="command refused: \"%s\" creates a branch; here, branches come from tickets.\n  → repowarden ticket <n>" ;;

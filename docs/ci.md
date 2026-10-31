@@ -10,7 +10,7 @@ La CI refait toutes les vérifications des hooks sur chaque PR / MR : **c'est el
 | `branch` | le nom de branche ne respecte pas `<type>/<sujet>` (hors exceptions) |
 | `secrets` | gitleaks trouve un secret dans les commits de la branche |
 | `format` | un fichier modifié n'est pas formaté (le formateur est lancé, rien n'est committé) |
-| `tests` | les tests d'un projet touché échouent (monorepo : seulement les projets modifiés) |
+| `tests` | les tests d'un projet touché échouent (monorepo : seulement les projets modifiés) ; une PR **retire des tests** : le nombre de déclarations d'un fichier test baisse entre la base et la tête (bats `@test`, pytest `def test_`, Go `func Test`, Java `@Test`, JS/TS `it(` et `test(`), sauf ligne `Tests retirés : <raison>` dans la description de la PR |
 
 Les erreurs apparaissent en annotations sur GitHub et dans le log du job sur GitLab, avec la commande de correction.
 

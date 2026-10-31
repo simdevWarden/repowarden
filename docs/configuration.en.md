@@ -19,6 +19,7 @@ Versioned at the project root, in `git config` format, read **by the hooks and b
     exclude = vendor/* generated/*      # paths neither formatted nor tested
     allowAgentSignatures = false        # AI agents (author, Co-Authored-By) refused; default false
     agentsTickets = false               # an AI agent may create a ticket (repowarden ticket nouveau); default false
+    agentsConfig = false                # an AI agent may set a tool verification setting; default false
     releaseUpdate = npm update -g my-tool     # "Update" command in the release notes
     sensitiveFiles = .env .env.* *.pem  # names reported when neither tracked nor ignored (see Hooks)
     # Organization bot (repowarden bot)
@@ -30,6 +31,8 @@ Versioned at the project root, in `git config` format, read **by the hooks and b
 `version`: if repowarden is older on a machine, the hooks say so with the update command (`npm update -g repowarden`, or `git pull` for a clone). It is a warning only: the CI checks every PR at its own version.
 
 `agentsTickets`: when `true`, the guard lets an AI agent create a ticket (`repowarden ticket nouveau`); by default it refuses and asks to report the defect to the maintainer, who creates the ticket, or to note it on the current ticket.
+
+`agentsConfig`: when `true`, the guard lets an AI agent change a tool verification setting (`.github/actionlint.yaml`/`.yml`, `.shellcheckrc`, `.markdownlint*`, `.yamllint*`, `.gitleaks.toml`, `.gitleaksignore`, `.pre-commit-config.yaml`, `.repowarden.conf`), by editing as well as by shell redirection; by default it refuses: setting a tool is the maintainer's decision, the code is fixed rather than the rule.
 
 ## Integration branch flow (`develop`)
 
