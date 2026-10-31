@@ -475,6 +475,7 @@ jobs:
         if: github.ref_name == inputs.integration-branch
         env:
           GH_TOKEN: ${{ steps.app.outputs.token || github.token }}
+          GH_REPO: ${{ github.repository }}
           APP_TOKEN: ${{ steps.app.outputs.token != '' }}
           INTEGRATION: ${{ inputs.integration-branch }}
           MAIN: ${{ inputs.main-branch }}
