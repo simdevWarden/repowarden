@@ -298,3 +298,20 @@ GH
     grep -q -- '--jq' "$GH_LOG"
     ! grep -q -- '--template' "$GH_LOG"
 }
+
+@test "doc : commandes shellcheck et bats comparees entre fr, en et AGENTS" {
+    cd "$BATS_TEST_DIRNAME/.."
+    sc_fr="$(grep '^shellcheck ' CONTRIBUTING.md)"
+    sc_en="$(grep '^shellcheck ' docs/contribuer.en.md)"
+    sc_agents="$(grep '^shellcheck ' AGENTS.md)"
+    [[ -n "$sc_fr" ]] || false
+    [[ -n "$sc_en" ]] || false
+    [[ -n "$sc_agents" ]] || false
+    [[ "$sc_fr" == "$sc_en" ]] || false
+    [[ "$sc_fr" == "$sc_agents" ]] || false
+    bats_fr="$(grep '^bats ' CONTRIBUTING.md | sed 's/#.*//' | sed 's/[[:space:]]*$//')"
+    bats_en="$(grep '^bats ' docs/contribuer.en.md | sed 's/#.*//' | sed 's/[[:space:]]*$//')"
+    [[ -n "$bats_fr" ]] || false
+    [[ -n "$bats_en" ]] || false
+    [[ "$bats_fr" == "$bats_en" ]] || false
+}
