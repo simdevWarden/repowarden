@@ -554,7 +554,7 @@ jobs:
           # Une seule demande de livraison ouverte à la fois : si une demande
           # (instantané livraison/*) est déjà en attente d'approbation, ce merge
           # partira à la livraison suivante ; pas de PR develop → main.
-          livraison_en_attente="$(gh pr list --base "$MAIN" --state open --json number,headRefName             -q '.[] | select(.headRefName | startswith("livraison/")) | .number' | head -n 1)"
+          livraison_en_attente="$(bash .repowarden-ci/ci/livraison.sh en-attente)"
           if [ -n "$livraison_en_attente" ]; then
             echo "::notice::demande de livraison #$livraison_en_attente en attente (instantané) : ce merge partira à la livraison suivante"
             echo "pr=" >>"$GITHUB_OUTPUT"
@@ -679,6 +679,7 @@ jobs:
         if: inputs.mode == 'tag' && github.ref_name == inputs.main-branch
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           INITIAL_VERSION: ${{ inputs.initial-version }}
           OBLIGATOIRE: ${{ inputs.preversion-obligatoire }}
           ID: ${{ inputs.preversion }}
@@ -701,8 +702,11 @@ jobs:
             exit 0
           fi
           # Aucune version stable sans préversion testée sur la branche
-          # d'intégration (une majeure passe par ses vX.0.0-next.N)
-          if [ "$OBLIGATOIRE" = true ] && [ -n "$ID" ] && [ -z "$(git tag --contains HEAD --list "$tag-$ID.*")" ]; then
+          # d'intégration (une majeure passe par ses vX.0.0-next.N). Sur main,
+          # HEAD est le merge commit de la livraison, qu'aucune préversion ne
+          # contient : vérifier le commit livré (son second parent).
+          livre="$(bash .repowarden-ci/ci/livraison.sh commit-livre)"
+          if [ "$OBLIGATOIRE" = true ] && [ -n "$ID" ] && [ -z "$(git tag --contains "$livre" --list "$tag-$ID.*")" ]; then
             echo "::error::$tag refusée : aucune préversion $tag-$ID.N publiée depuis $INTEGRATION. Livrer depuis $INTEGRATION (préversion testée), ou désactiver preversion-obligatoire."
             exit 1
           fi

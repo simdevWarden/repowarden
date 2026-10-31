@@ -1325,6 +1325,12 @@ case "$*" in
     "api repos/moi/projet/rules/branches/develop"*) echo "${GH_REGLES-deletion non_fast_forward pull_request}" ;;
     "api repos/moi/projet/rulesets") [ -z "${GH_RULESETS_403:-}" ] || { echo '{"message":"Upgrade to GitHub Pro","status":"403"}'; exit 1; } ;;
     "api repos/moi/projet --jq"*) echo "${GH_REGLAGES:-true false}" ;;
+    "pr list --base main "*)
+        # GH_PR_HEADS : « numéro:tête … » ; applique le filtre --jq de gh
+        json="$(for p in ${GH_PR_HEADS:-}; do printf '{"number":%s,"headRefName":"%s"},' "${p%%:*}" "${p#*:}"; done)"
+        filtre="" precedent=""
+        for a in "$@"; do [ "$precedent" = --jq ] && filtre="$a"; precedent="$a"; done
+        printf '%s' "[${json%,}]" | jq -r "$filtre" ;;
 esac
 GH
     chmod +x "$BATS_TEST_TMPDIR/bin/gh"
@@ -1338,7 +1344,7 @@ GH
     c "feat: panier"
     run "$LIVRAISON"
     [ "$status" -eq 0 ]
-    [[ "$output" == failure*"v1.1.0 : en attente de préversion"*"ne contient ce commit"* ]] || false
+    [[ "$output" == failure*"v1.1.0 : en attente de préversion : aucune v1.1.0-next.N ne contient ce commit ; attendre celle du soir, ou Actions → release → Run workflow sur develop"* ]] || false
     # publiée dans le même run, ou déjà taguée
     PREVERSION_CREEE=v1.1.0-next.3 run "$LIVRAISON"
     [[ "$output" == success*"v1.1.0 : préversion testée"* ]] || false
@@ -1388,7 +1394,7 @@ GH
     git tag v1.1.0-next.1 v1.0.0
     run "$LIVRAISON"
     [ "$status" -eq 0 ]
-    [[ "$output" == failure*"v1.1.0 : en attente de préversion"*"ne contient ce commit"* ]] || false
+    [[ "$output" == failure*"v1.1.0 : en attente de préversion : aucune v1.1.0-next.N ne contient ce commit"* ]] || false
     # preversion taggee sur HEAD : livrable
     git tag v1.1.0-next.2 HEAD
     run "$LIVRAISON"
@@ -1397,6 +1403,37 @@ GH
     git tag -d v1.1.0-next.2 >/dev/null
     PREVERSION_CREEE=v1.1.0-next.3 run "$LIVRAISON"
     [[ "$output" == success*"v1.1.0 : préversion testée"* ]] || false
+}
+
+@test "livraison : commit livre = second parent d'un merge, sinon HEAD" {
+    fake_gh_livraison
+    git tag v1.0.0
+    c "feat: panier"
+    tete="$(git rev-parse HEAD)"
+    run "$LIVRAISON" commit-livre
+    [ "$status" -eq 0 ]
+    [ "$output" = "$tete" ]
+    # merge d'une demande livraison/* : le commit livré est son second parent
+    git switch -q -c livraison/v1.1.0
+    c "fix: retouche"
+    livre="$(git rev-parse HEAD)"
+    git switch -q -
+    git merge -q --no-ff --no-edit livraison/v1.1.0 >/dev/null
+    run "$LIVRAISON" commit-livre
+    [ "$status" -eq 0 ]
+    [ "$output" = "$livre" ]
+}
+
+@test "livraison : demande en attente = PR ouverte vers main de tete livraison/*, rien sinon" {
+    fake_gh_livraison
+    # une demande de livraison ouverte : son numéro
+    GH_PR_HEADS="42:livraison/v1.1.0 7:develop" MAIN=main run "$LIVRAISON" en-attente
+    [ "$status" -eq 0 ]
+    [ "$output" = 42 ]
+    # seulement une PR de tête develop : aucune demande
+    GH_PR_HEADS="7:develop" MAIN=main run "$LIVRAISON" en-attente
+    [ "$status" -eq 0 ]
+    [ -z "$output" ]
 }
 
 # --- ci/instantanes.sh (instantanés livraison/* abandonnés) : gh simulé ---------
@@ -1799,4 +1836,3 @@ GH
         bash -c "source '$HOOKS/lib/ui.sh'; source '$HOOKS/lib/i18n.sh'; echo \$REPOWARDEN_LANG"
     [ "$output" = fr ]
 }
-
