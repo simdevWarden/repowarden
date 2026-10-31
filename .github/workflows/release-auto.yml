@@ -665,6 +665,19 @@ jobs:
           gh pr merge "$PR" --auto --merge || gh pr merge "$PR" --merge
           echo "::notice::Livraison automatique : PR #$PR mergée dès que les vérifications exigées sont vertes, puis tag et release."
 
+      # Mode tag : seuls develop et ses instantanés livraison/* entrent dans
+      # main (vérification de branche), qui n'a donc jamais de contenu propre.
+      # Si c'est le cas malgré tout, ce n'est pas rapporté automatiquement dans
+      # develop (squash seul) : signalé, à reporter par une PR de travail.
+      - name: Contenu propre à la branche principale
+        if: inputs.mode == 'tag' && github.ref_name == inputs.main-branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INTEGRATION: ${{ inputs.integration-branch }}
+          MAIN: ${{ inputs.main-branch }}
+        run: bash .repowarden-ci/ci/contenu-main.sh
+
       - name: Tag et release
         id: publier
         if: inputs.mode == 'tag' && github.ref_name == inputs.main-branch
@@ -729,29 +742,6 @@ jobs:
           GH_REPO: ${{ github.repository }}
           INTEGRATION: ${{ inputs.integration-branch }}
         run: bash .repowarden-ci/ci/instantanes.sh
-
-      # Mode tag : seuls develop et ses instantanés livraison/* entrent dans
-      # main (vérification de branche), qui n'a donc jamais de contenu propre.
-      # Si c'est le cas malgré tout, ce n'est pas rapporté automatiquement dans
-      # develop (squash seul) : signalé, à reporter par une PR de travail.
-      - name: Contenu propre à la branche principale
-        if: inputs.mode == 'tag' && github.ref_name == inputs.main-branch
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          INTEGRATION: ${{ inputs.integration-branch }}
-          MAIN: ${{ inputs.main-branch }}
-        run: |
-          # Contenus comparés, pas les historiques : une livraison squashée puis
-          # réunie dans la branche d'intégration n'est pas du contenu propre
-          git -c credential.helper= -c 'credential.helper=!gh auth git-credential' fetch -q origin "$INTEGRATION"
-          fichiers="$(git diff --name-only "origin/$INTEGRATION" HEAD | paste -sd, - | sed 's/,/, /g')"
-          if [ -z "$fichiers" ]; then
-            echo "$INTEGRATION contient déjà tout le contenu de $MAIN."
-            exit 0
-          fi
-          echo "::error::$MAIN contient du contenu absent de $INTEGRATION ($fichiers) : seuls $INTEGRATION et ses instantanés livraison/* devraient y entrer. Le reporter dans $INTEGRATION par une PR de travail (squashée), et chercher comment il est arrivé sur $MAIN."
-          exit 1
 
   # Canal de l'équipe (optionnel) : release publiée, PR de release à approuver,
   # échec. Sans secret webhook, rien n'est envoyé. Message dans la langue du projet.
