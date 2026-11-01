@@ -307,12 +307,15 @@ forge_mr_list_r() {
     esac
 }
 
-# forge_mr_create_r titre corps [source_branch] [--draft] : REPLY = JSON/URL de la MR créée.
+# forge_mr_create_r titre corps [--draft] [source] [cible] : REPLY = JSON/URL de la MR créée.
 forge_mr_create_r() {
     local titre="$1" corps="$2"; shift 2
     local draft=""
     [ "${1:-}" = "--draft" ] && { draft="true"; shift; }
-    local source="${1:-}"; shift
+    local source="${1:-}"
+    [ $# -gt 0 ] && shift
+    local cible="${1:-}"
+    [ $# -gt 0 ] && shift
     case "$FORGE" in
         github)
             if [ -n "$draft" ]; then
@@ -321,9 +324,15 @@ forge_mr_create_r() {
                 REPLY="$(gh pr create --title "$titre" --body "$corps" --head "$source" 2>/dev/null)"
             fi ;;
         gitlab)
-            local args=(-d "title=${titre}" -d "description=${corps}" -d "source_branch=${source}"
-                -d "squash=true" -d "remove_source_branch=true")
+            local args=(-d "title=${titre}" -d "description=${corps}" -d "source_branch=${source}")
             [ -n "$draft" ] && args+=(-d "draft=true")
+            local cible_finale="$cible"
+            if [ -z "$cible_finale" ]; then
+                forge_default_branch_r
+                cible_finale="$REPLY"
+            fi
+            args+=(-d "target_branch=${cible_finale}")
+            args+=(-d "squash=true" -d "remove_source_branch=true")
             forge_post "projects/${FORGE_PROJECT}/merge_requests" "${args[@]}" || return 1 ;;
         *)
             err_t bot.no_glab; return 1 ;;
@@ -411,7 +420,9 @@ forge_branch_delete() {
         github)
             gh api "repos/${GITHUB_REPOSITORY:-}/git/refs/heads/${nom}" -X DELETE >/dev/null 2>&1 ;;
         gitlab)
-            forge_delete "projects/${FORGE_PROJECT}/repository/branches/${nom}" >/dev/null ;;
+            local enc_nom
+            enc_nom="$(printf '%s' "$nom" | sed 's|/|%2F|g')"
+            forge_delete "projects/${FORGE_PROJECT}/repository/branches/${enc_nom}" >/dev/null ;;
         *)
             err_t bot.no_glab; return 1 ;;
     esac
@@ -424,7 +435,10 @@ forge_compare_ahead_r() {
         github)
             REPLY="$(gh api "repos/${GITHUB_REPOSITORY:-}/compare/${base}...${head}" -q '.ahead_by // 0' 2>/dev/null || echo 0)" ;;
         gitlab)
-            forge_get "projects/${FORGE_PROJECT}/repository/compare?from=${base}&to=${head}" || return 1
+            local enc_base enc_head
+            enc_base="$(printf '%s' "$base" | sed 's|/|%2F|g')"
+            enc_head="$(printf '%s' "$head" | sed 's|/|%2F|g')"
+            forge_get "projects/${FORGE_PROJECT}/repository/compare?from=${enc_base}&to=${enc_head}" || return 1
             REPLY="$(printf '%s' "$REPLY" | jq -r '.commits | length // 0' 2>/dev/null || echo 0)" ;;
         *)
             err_t bot.no_glab; return 1 ;;
@@ -461,7 +475,7 @@ forge_notes_r() {
 
 # forge_est_mainteneur_r user : REPLY = true si l'utilisateur a le droit de
 # merger (GitHub collaborators/permission dans admin|maintain|write,
-# GitLab access_level >= 40 de members/all/:id).
+# GitLab : users?username= puis members/all/:id, access_level >= 40).
 forge_est_mainteneur_r() {
     local user="$1"
     case "$FORGE" in
@@ -471,19 +485,23 @@ forge_est_mainteneur_r() {
             perm="$(gh api "repos/${GITHUB_REPOSITORY:-}/collaborators/${user}/permission" 2>/dev/null | jq -r '.permission // "none"')"
             case "$perm" in admin | maintain | write) REPLY=true ;; *) REPLY=false ;; esac ;;
         gitlab)
-            # GET /projects/:id/members/all?username= (tableau) pour tirer
-            # l'identifiant, puis GET /members/all/:id : objet, .access_level.
-            forge_get "projects/${FORGE_PROJECT}/members/all?username=${user}" || return 1
+            # GET /users?username= (tableau) pour tirer l'identifiant, puis
+            # GET /projects/:id/members/all/:id : objet, .access_level.
+            forge_get "users?username=${user}" || { REPLY=false; return 0; }
             local id
             id="$(printf '%s' "$REPLY" | jq -r '.[0].id // empty' 2>/dev/null || true)"
-            if [ -n "$id" ]; then
-                local niveau
-                forge_get "projects/${FORGE_PROJECT}/members/all/${id}" || return 1
-                niveau="$(printf '%s' "$REPLY" | jq -r '.access_level // 0' 2>/dev/null || echo 0)"
-                [ "$niveau" -ge 40 ] 2>/dev/null && REPLY=true || REPLY=false
-            else
+            if [ -z "$id" ]; then
                 REPLY=false
-            fi ;;
+                return 0
+            fi
+            local niveau
+            if ! forge_get "projects/${FORGE_PROJECT}/members/all/${id}"; then
+                REPLY=false
+                return 0
+            fi
+            niveau="$(printf '%s' "$REPLY" | jq -r '.access_level // 0' 2>/dev/null || echo 0)"
+            [ "$niveau" -ge 40 ] 2>/dev/null && REPLY=true || REPLY=false
+            return 0 ;;
         *)
             err_t bot.no_glab; return 1 ;;
     esac

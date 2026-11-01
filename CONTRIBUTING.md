@@ -47,6 +47,21 @@ PATH="$HOME/bash32:$PATH" bats test/<fichier>.bats   # bats suit le bash du PATH
 - **Variable** `REPOWARDEN_IT_REPO` (`propriétaire/nom`) et **secret** `REPOWARDEN_IT_TOKEN` : jeton fine-grained limité au dépôt de test (Contents, Issues, Pull requests en écriture ; Actions en lecture).
 - En local, `gh` connecté : `REPOWARDEN_IT_REPO=propriétaire/nom bats test/gh/`.
 
+## Tests contre GitLab
+
+`test/gitlab/` lance pour de vrai chaque commande qui parle à GitLab via la couche forge (`forge.bats`), contre un projet de test sur une instance GitLab dédiée. S'exécute avec :
+
+```bash
+REPOWARDEN_IT_GITLAB_URL=http://gitlab.localhost:8929
+REPOWARDEN_IT_GITLAB_TOKEN=jeton-root bats test/gitlab/
+```
+
+- **Module devzone** : instance GitLab http://gitlab.localhost:8929, jeton root dans les secrets du module, rien laissé sur l'instance à la fin de chaque passage (teardown_file supprime le projet créé).
+- **Variables** `REPOWARDEN_IT_GITLAB_URL` et **secret** `REPOWARDEN_IT_GITLAB_TOKEN` : l'URL peut commencer par `http://` (alors `REPOWARDEN_GITLAB_INSECURE_HTTP=1`) ou `https://` ; le jeton doit avoir accès aux projets Issues, MR, branches.
+- En local, la variable d'environnement doit être déclarée : `REPOWARDEN_IT_GITLAB_URL=… REPOWARDEN_IT_GITLAB_TOKEN=… bats test/gitlab/`.
+
+Chaque PR d'une étape de #531 fait passer `bats test/gitlab/` et note le résultat sur la PR. Si docs/ a une page sur les tests d'intégration (cherche « test/gh »), même ajout.
+
 ## Ajouter un langage ou un outil
 
 1. `hooks/lang/<nom>.sh` : `register`, `<nom>_format`, `<nom>_test` (voir `docs/technologies.md`).
