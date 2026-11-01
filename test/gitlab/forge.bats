@@ -1,333 +1,236 @@
 #!/usr/bin/env bats
-# shellcheck disable=SC2030,SC2031,SC2181
-# Tests d'intégration GitLab pour la couche forge.
+# Tests d'intégration GitLab pour la couche forge (ticket #533).
 # S'exécute avec : REPOWARDEN_IT_GITLAB_URL=http://gitlab.localhost:8929
-# REPOWARDEN_IT_GITLAB_TOKEN=root tokens bats test/gitlab/forge.bats
-# Voir CONTRIBUTING.md pour la configuration devzone.
+# REPOWARDEN_IT_GITLAB_TOKEN=jeton-root bats test/gitlab/forge.bats
+# Voir CONTRIBUTING.md ("Tests contre GitLab").
+#
+# Un projet "repowarden-it-<date>-<alea>" est cree en setup_file, et supprime
+# en teardown_file (jamais de jeton en clair dans la sortie).
+# Sans REPOWARDEN_IT_GITLAB_URL / REPOWARDEN_IT_GITLAB_TOKEN, tout est saute.
 
-# Un fichier « pret » est créé en setup_file et supprimé en teardown_file.
-# En l'absence des variables d'environnement, tous les tests sont sautés
-# (skip) et le fichier de sortie vaut 0.
+load ../helpers
 
-# keybase: JSON lu avec jq, transport curl + PRIVATE-TOKEN,
-# jeton jamais affiché (même en cas d'erreur 404).
+# helpers.bash calcule HOOKS depuis BATS_TEST_DIRNAME/../hooks, juste pour un
+# fichier de test directement dans test/ ; depuis test/gitlab/ il faut remonter
+# jusqu'a la racine du depot pour trouver hooks/.
+HOOKS=""
+_d="$BATS_TEST_DIRNAME"
+while [ -n "$_d" ] && [ "$_d" != "/" ]; do
+    if [ -d "$_d/hooks" ]; then HOOKS="$_d/hooks"; break; fi
+    _d="$(cd "$_d/.." 2>/dev/null && pwd -P)"
+done
+unset _d
+[ -n "$HOOKS" ] || { echo "dossier hooks introuvable" >&2; exit 1; }
 
-# Design : chaque point du ticket #533 a un test dédié en français.
+# Configure l'acces forge GitLab depuis les variables d'integration.
+# (appele dans setup_file, setup et teardown_file : bats isole chaque
+# etape dans son propre processus, rien n'y survit d'une etape a l'autre).
+forge_env() {
+    hote="${REPOWARDEN_IT_GITLAB_URL#*://}"
+    hote="${hote%%/*}"
+    export FORGE=gitlab
+    export FORGE_URL="$hote"
+    export REPOWARDEN_GITLAB_HOST="$hote"
+    export REPOWARDEN_GITLAB_TOKEN="$REPOWARDEN_IT_GITLAB_TOKEN"
+    case "${REPOWARDEN_IT_GITLAB_URL}" in
+        http://*) export REPOWARDEN_GITLAB_INSECURE_HTTP=1 ;;
+    esac
+}
+
+charger_forge() {
+    source "$HOOKS/lib/common.sh"
+    source "$HOOKS/lib/forge.sh"
+}
 
 setup_file() {
-    [ -n "${REPOWARDEN_IT_GITLAB_URL:-}" ] || skip "REPOWARDEN_IT_GITLAB_URL absent : tests GitLab sautés"
-    [ -n "${REPOWARDEN_IT_GITLAB_TOKEN:-}" ] || skip "REPOWARDEN_IT_GITLAB_TOKEN absent : tests GitLab sautés"
-
-    # Source de la couche forge (comme test/forge.bats)
-    source "$HOOKS/lib/forge.sh"
-
-    FORGE=gitlab
-
-    # Extraire l'hôte:port depuis l'URL
-    case "${REPOWARDEN_IT_GITLAB_URL}" in
-        *://*) url="${REPOWARDEN_IT_GITLAB_URL#*://}"; url="${url#*/}" ;;
-        *@*:*) url="${url#*:}" ;;
-    esac
-    url="${url%.git}"
-    FORCE_URL="$url"
-
-    # Insecure HTTP si l'URL commence par http://
-    case "${REPOWARDEN_IT_GITLAB_URL}" in
-        http://*) REPOWARDEN_GITLAB_INSECURE_HTTP=1 ;;
-        *)          REPOWARDEN_GITLAB_INSECURE_HTTP=0 ;;
-    esac
-
-    # Le jeton
-    export REPOWARDEN_GITLAB_TOKEN="${REPOWARDEN_IT_GITLAB_TOKEN}"
-
-    # Calculer FORGE_PROJECT (chemin encodé %2F)
-    # Utiliser la même logique que forge_project_id_r
-    url_for_encoding="${REPOWARDEN_IT_GITLAB_URL}"
-    case "$url_for_encoding" in
-        *://*) url_for_encoding="${url_for_encoding#*://}"; url_for_encoding="${url_for_encoding#*/}" ;;
-        *@*:*) url_for_encoding="${url_for_encoding#*:}" ;;
-    esac
-    url_for_encoding="${url_for_encoding%.git}"
-    FORCE_PROJECT="$(printf '%s' "$url_for_encoding" | sed 's|/|%2F|g')"
-
-    # Créer le projet GitLab : repowarden-it-<timestamp>-<random>
-    TIMESTAMP="$(date +%s)"
-    RANDOM_SUFFIX="$$"
-    GITLAB_PROJECT_NAME="repowarden-it-${TIMESTAMP}-${RANDOM_SUFFIX}"
-
-    # Vérifier jq disponible (déjà requis par repowarden)
-    command -v jq >/dev/null 2>&1 || { echo "jq absent"; return 1; }
-
-    # Créer le projet via l'API GitLab (curl + PRIVATE-TOKEN)
-    # POST /projects avec initialize_readme=true
-    forge_post "/projects" \
-        -d "name=${GITLAB_PROJECT_NAME}" \
-        -d "visibility=internal" \
-        -d "initialize_with_readme=true" \
-        -d "description='Projet de test repowarden #533'" \
-        || true
-
-    # Récupérer le path_with_namespace depuis la réponse
-    # Essayer avec une requête GET
-    FORCE_PROJECT="$(forge_get "/projects/${GITLAB_PROJECT_NAME}" 2>/dev/null | jq -r '.path_with_namespace // empty' 2>/dev/null || echo "")"
-
-    # Si toujours vide, essayer avec l'URL encodée
-    if [ -z "$FORCE_PROJECT" ]; then
-        # shellcheck disable=SC2153
-    FORCE_PROJECT="$FORGE_PROJECT"
+    if [ -z "${REPOWARDEN_IT_GITLAB_URL:-}" ] || [ -z "${REPOWARDEN_IT_GITLAB_TOKEN:-}" ]; then
+        skip "REPOWARDEN_IT_GITLAB_URL ou REPOWARDEN_IT_GITLAB_TOKEN absent : tests GitLab sautes"
     fi
+    charger_forge
+    forge_env
+    command -v jq >/dev/null 2>&1 || { echo "jq absent" >&2; exit 1; }
 
-    # Exporter les variables pour les tests
-    export FORGE FORCE_URL FORCE_PROJECT REPOWARDEN_GITLAB_TOKEN REPOWARDEN_GITLAB_INSECURE_HTTP
+    nom="repowarden-it-$(date +%s)-$RANDOM"
+    forge_post projects -d "name=$nom" -d "initialize_with_readme=true" -d "default_branch=main"
+    IT_CHEMIN="$(printf '%s' "$REPLY" | jq -r '.path_with_namespace // empty')"
+    [ -n "$IT_CHEMIN" ] || { echo "projet non cree : $REPLY" >&2; exit 1; }
+    IT_NOM="$nom"
+    export IT_NOM
+    FORGE_PROJECT="$(printf '%s' "$IT_CHEMIN" | sed 's|/|%2F|g')"
+    export FORGE_PROJECT
+    printf '%s\n' "$IT_CHEMIN" >"$BATS_FILE_TMPDIR/pret"
+    printf '%s\n' "$IT_CHEMIN" >"$BATS_FILE_TMPDIR/chemin"
+    printf '%s\n' "$FORGE_PROJECT" >"$BATS_FILE_TMPDIR/projet"
+    printf '%s\n' "$nom" >"$BATS_FILE_TMPDIR/nom"
 
-    # Créer le fichier « pret » pour le teardown
-    touch "$BATS_FILE_TMPDIR/pret"
+    forge_get "projects/$FORGE_PROJECT/repository/branches/main"
+    IT_SHA="$(printf '%s' "$REPLY" | jq -r '.commit.id // empty')"
+    [ -n "$IT_SHA" ] || { echo "sha de main introuvable : $REPLY" >&2; exit 1; }
+    export IT_SHA
+    printf '%s\n' "$IT_SHA" >"$BATS_FILE_TMPDIR/sha"
+}
+
+setup() {
+    charger_forge
+    forge_env
+    if [ -f "$BATS_FILE_TMPDIR/chemin" ]; then
+        IT_CHEMIN="$(cat "$BATS_FILE_TMPDIR/chemin")"
+        export IT_CHEMIN
+    fi
+    if [ -f "$BATS_FILE_TMPDIR/projet" ]; then
+        FORGE_PROJECT="$(cat "$BATS_FILE_TMPDIR/projet")"
+        export FORGE_PROJECT
+    fi
+    if [ -f "$BATS_FILE_TMPDIR/nom" ]; then
+        IT_NOM="$(cat "$BATS_FILE_TMPDIR/nom")"
+        export IT_NOM
+    fi
+    if [ -f "$BATS_FILE_TMPDIR/sha" ]; then
+        IT_SHA="$(cat "$BATS_FILE_TMPDIR/sha")"
+        export IT_SHA
+    fi
 }
 
 teardown_file() {
-    [ ! -f "$BATS_FILE_TMPDIR/pret" ] || {
-
-        # Vérifier que le nom du projet commence par repowarden-it-
-        pret_name=""
-        cat "$BATS_FILE_TMPDIR/pret" 2>/dev/null || true
-        case "$pret_name" in
-            repowarden-it-*) ;;
-            *) echo "Nom de projet invalide dans pret : $pret_name (doit commencer par repowarden-it-)" >&2 ; rm -f "$BATS_FILE_TMPDIR/pret"; return 0 ;;
-        esac
-
-        # Extraire le nom du projet depuis le fichier pret ou FORCE_PROJECT
-        project_to_delete="${pret_name:-}"
-        # full_path utilisé plus bas dans la suppression différée
-        :
-
-        # Première tentative de suppression (sans permanently_remove)
-        if [ -n "$project_to_delete" ]; then
-            forge_delete "/projects/${project_to_delete}" \
-                -d "personal_access_token=${REPOWARDEN_GITLAB_TOKEN}" 2>/dev/null || true
-        fi
-
-        # Deuxièmement: suppression différée avec permanently_remove=true
-        # si le projet existe toujours (on ne fait pas échouer la suite)
-        # shellcheck disable=SC2050
-    if true; then
-            forge_delete "/projects/${project_to_delete}?permanently_remove=true&full_path=${project_to_delete}" \
-                2>/dev/null || true
-        fi
-
-        # Nettoyer le fichier pret sans faire échouer la suite
-        rm -f "$BATS_FILE_TMPDIR/pret"
-    } || true
+    [ -f "$BATS_FILE_TMPDIR/pret" ] || return 0
+    charger_forge
+    forge_env
+    chemin="$(cat "$BATS_FILE_TMPDIR/pret")"
+    case "${chemin##*/}" in
+        repowarden-it-*) ;;
+        *) echo "refus de supprimer $chemin" >&2; return 1 ;;
+    esac
+    enc="$(printf '%s' "$chemin" | sed 's|/|%2F|g')"
+    forge_delete "projects/$enc" >/dev/null 2>&1 || true
+    forge_delete "projects/$enc?permanently_remove=true&full_path=$enc" >/dev/null 2>&1 || true
 }
 
-# --- Tests des issues ---
+# --- issue ---
 
-@test "issues : lister les issues d'un projet GitLab" {
-    forge_issue_list_r
-    [ "$REPLY" != '' ] || { echo "REPLY vide"; exit 1; }
-    echo "$REPLY" | jq -e . >/dev/null 2>&1 || { echo "JSON invalide"; exit 1; }
-}
+@test "issue : creer puis lire une issue" {
+    forge_issue_create_r "titre-it" "corps-it"
+    iid="$(printf '%s' "$REPLY" | jq -r '.iid // empty')"
+    [ -n "$iid" ] || { echo "iid manquant : $REPLY" >&2; exit 1; }
+    printf '%s\n' "$iid" >"$BATS_FILE_TMPDIR/iid"
 
-@test "issues : créer une issue dans le projet" {
-    titre="test issue $(date +%s)"
-    forge_issue_create_r "$titre" "Description de test"
-    echo "$REPLY" | jq -e . >/dev/null 2>&1 || { echo "JSON invalide"; exit 1; }
-}
-
-@test "issues : ajouter un label à une issue" {
-    # Créer d'abord une issue
-    titre="test label issue $(date +%s)"
-    iid="$(forge_issue_create_r "$titre" "Corps label test" | jq -r '.iid // empty' 2>/dev/null || echo "")"
-    [ -n "$iid" ] || { echo "Impossible de créer l'issue"; exit 1; }
-
-    # Ajouter un label
-    forge_issue_labels_add "$iid" "test-label"
     forge_issue_view_r "$iid"
-    echo "$REPLY" | jq -e . >/dev/null 2>&1 || { echo "JSON invalide"; exit 1; }
+    [ "$(printf '%s' "$REPLY" | jq -r '.title')" = "titre-it" ] || { echo "titre : $REPLY" >&2; exit 1; }
+    [ "$(printf '%s' "$REPLY" | jq -r '.state')" = opened ] || { echo "etat : $REPLY" >&2; exit 1; }
 }
 
-@test "issues : retirer un label d'une issue" {
-    local titre
-    titre="test remove label issue $(date +%s)"
-    local iid
-    iid="$(forge_issue_create_r "$titre" "Corps remove label test" | jq -r '.iid // empty' 2>/dev/null || echo "")"
-    [ -n "$iid" ] || { echo "Impossible de créer l'issue"; exit 1; }
+# --- commentaire ---
 
-    forge_issue_labels_add "$iid" "test-remove-label"
-    forge_issue_labels_remove "$iid" "test-remove-label"
-    forge_issue_view_r "$iid"
-    echo "$REPLY" | jq -e . >/dev/null 2>&1 || { echo "JSON invalide"; exit 1; }
-}
+@test "commentaire : ajouter une note puis la relire" {
+    forge_issue_create_r "titre-com" "corps-com"
+    iid="$(printf '%s' "$REPLY" | jq -r '.iid // empty')"
+    [ -n "$iid" ] || { echo "iid manquant : $REPLY" >&2; exit 1; }
 
-@test "issues : récupérer les notes/commentaires d'une issue" {
-    titre="test notes issue $(date +%s)"
-    iid="$(forge_issue_create_r "$titre" "Corps notes test" | jq -r '.iid // empty' 2>/dev/null || echo "")"
-    [ -n "$iid" ] || { echo "Impossible de créer l'issue"; exit 1; }
-
+    forge_issue_comment "$iid" "note-it"
     forge_notes_r "$iid"
-    [ "$REPLY" != '' ] || { echo "REPLY vide"; exit 1; }
-    echo "$REPLY" | jq -e . >/dev/null 2>&1 || { echo "JSON invalide"; exit 1; }
+    [ "$(printf '%s' "$REPLY" | jq -r '.[] | select(.body=="note-it") | .body')" = "note-it" ] || { echo "note absente : $REPLY" >&2; exit 1; }
 }
 
-@test "issues : afficher une issue détaillée" {
-    titre="test show issue $(date +%s)"
-    iid="$(forge_issue_create_r "$titre" "Corps show test" | jq -r '.iid // empty' 2>/dev/null || echo "")"
-    [ -n "$iid" ] || { echo "Impossible de créer l'issue"; exit 1; }
+# --- labels ---
 
-    forge_issue_view_r "$iid"
-    [ "$REPLY" != '' ] || { echo "REPLY vide"; exit 1; }
-    echo "$REPLY" | jq -e . >/dev/null 2>&1 || { echo "JSON invalide"; exit 1; }
+@test "labels : ajouter it-a it-b, puis retirer it-a" {
+    forge_issue_create_r "titre-lab" "corps-lab"
+    iid="$(printf '%s' "$REPLY" | jq -r '.iid // empty')"
+    [ -n "$iid" ] || { echo "iid manquant : $REPLY" >&2; exit 1; }
+
+    forge_issue_labels_add "$iid" it-a it-b
+    forge_issue_labels_r "$iid"
+    lab="$(printf '%s' "$REPLY")"
+    [[ "$lab" == *it-a* ]] || { echo "it-a absent : $REPLY" >&2; exit 1; }
+    [[ "$lab" == *it-b* ]] || { echo "it-b absent : $REPLY" >&2; exit 1; }
+
+    forge_issue_labels_remove "$iid" it-a
+    forge_issue_labels_r "$iid"
+    lab="$(printf '%s' "$REPLY")"
+    [[ "$lab" != *it-a* ]] || { echo "it-a encore present : $REPLY" >&2; exit 1; }
+    [[ "$lab" == *it-b* ]] || { echo "it-b disparu : $REPLY" >&2; exit 1; }
 }
 
-# --- Tests des labels ---
+# --- liste ---
 
-@test "labels : lister les labels du projet" {
+@test "liste : les issues du projet contiennent l'iid cree" {
+    [ -f "$BATS_FILE_TMPDIR/iid" ] || skip "issue precedente non creee"
+    iid="$(cat "$BATS_FILE_TMPDIR/iid")"
     forge_issue_list_r
-    [ "$REPLY" != '' ] || { echo "REPLY vide"; exit 1; }
+    [[ "$REPLY" == *"\"iid\":$iid"* ]] || { echo "iid $iid absent de la liste : $REPLY" >&2; exit 1; }
 }
 
-@test "labels : ajouter un label à une issue" {
-    titre="test label ajout $(date +%s)"
-    iid="$(forge_issue_create_r "$titre" "Corps" | jq -r '.iid // empty' 2>/dev/null || echo "")"
-    [ -n "$iid" ] || { echo "Impossible de créer l'issue"; exit 1; }
+# --- statut de commit ---
 
-    forge_issue_labels_add "$iid" "new-label"
-    forge_issue_view_r "$iid"
-    echo "$REPLY" | jq -e . >/dev/null 2>&1 || { echo "JSON invalide"; exit 1; }
+@test "statut : publier un statut puis le relire sur le commit" {
+    forge_status_post "$IT_SHA" it/contexte success "statut-it"
+    forge_get "projects/$FORGE_PROJECT/repository/commits/$IT_SHA/statuses"
+    [ "$(printf '%s' "$REPLY" | jq -r '.[] | select(.name=="it/contexte") | .status')" = success ] || { echo "statut : $REPLY" >&2; exit 1; }
 }
 
-@test "labels : retirer un label d'une issue" {
-    titre="test label retrait $(date +%s)"
-    iid="$(forge_issue_create_r "$titre" "Corps" | jq -r '.iid // empty' 2>/dev/null || echo "")"
-    [ -n "$iid" ] || { echo "Impossible de créer l'issue"; exit 1; }
+# --- branche + MR ---
 
-    forge_issue_labels_add "$iid" "to-remove"
-    forge_issue_labels_remove "$iid" "to-remove"
-    forge_issue_view_r "$iid"
-    echo "$REPLY" | jq -e . >/dev/null 2>&1 || { echo "JSON invalide"; exit 1; }
-}
+@test "branche et MR : creer la branche it/mr, y committer, creer et clore la MR" {
+    forge_branch_create it/mr main
+    forge_post "projects/$FORGE_PROJECT/repository/files/it.txt" -d branch=it/mr -d content=x -d "commit_message=test: it"
 
-# --- Tests des merge requests ---
+    forge_compare_ahead_r main it/mr
+    [ "$REPLY" = 1 ] || { echo "compare : $REPLY" >&2; exit 1; }
 
-@test "MR : créer une merge request dans le projet" {
-    titre="test MR $(date +%s)"
-    corps="Description MR test"
-    source_branch="feature/test-$(date +%s)"
-    forge_mr_create_r "$titre" "$corps" "$source_branch"
-    echo "$REPLY" | jq -e . >/dev/null 2>&1 || { echo "JSON invalide"; exit 1; }
-}
+    forge_mr_create_r "mr-it" "corps" it/mr
+    miid="$(printf '%s' "$REPLY" | jq -r '.iid // empty')"
+    [ -n "$miid" ] || { echo "iid MR manquant : $REPLY" >&2; exit 1; }
+    printf '%s\n' "$miid" >"$BATS_FILE_TMPDIR/miid"
 
-@test "MR : lister les mergeouvertes" {
     forge_mr_list_r
-    [ "$REPLY" != '' ] || { echo "REPLY vide"; exit 1; }
-    echo "$REPLY" | jq -e . >/dev/null 2>&1 || { echo "JSON invalide"; exit 1; }
+    [[ "$REPLY" == *"\"iid\":$miid"* ]] || { echo "MR $miid absente de la liste : $REPLY" >&2; exit 1; }
+
+    forge_mr_view_r "$miid"
+    [ "$(printf '%s' "$REPLY" | jq -r '.title')" = "mr-it" ] || { echo "titre MR : $REPLY" >&2; exit 1; }
+
+    forge_mr_close "$miid" "fermee"
+    forge_mr_view_r "$miid"
+    [ "$(printf '%s' "$REPLY" | jq -r '.state')" = closed ] || { echo "etat MR : $REPLY" >&2; exit 1; }
 }
 
-@test "MR : afficher une merge request" {
-    # Créer d'abord une MR
-    titre="test MR show $(date +%s)"
-    iid="$(forge_mr_create_r "$titre" "Corps show" "feature/show-test" | jq -r '.iid // empty' 2>/dev/null || echo "")"
-    [ -n "$iid" ] || { echo "Impossible de créer la MR"; exit 1; }
+# --- suppression de branche ---
 
-    forge_mr_view_r "$iid"
-    [ "$REPLY" != '' ] || { echo "REPLY vide"; exit 1; }
-    echo "$REPLY" | jq -e . >/dev/null 2>&1 || { echo "JSON invalide"; exit 1; }
-}
-
-@test "MR : fermer une merge request" {
-    titre="test MR close $(date +%s)"
-    iid="$(forge_mr_create_r "$titre" "Corps close" "feature/close-test" | jq -r '.iid // empty' 2>/dev/null || echo "")"
-    [ -n "$iid" ] || { echo "Impossible de créer la MR"; exit 1; }
-
-    forge_mr_close "$iid" "Fermeture de test"
-    # Vérifier que la MR est fermée
-    forge_mr_view_r "$iid"
-    echo "$REPLY" | jq -e . >/dev/null 2>&1 || { echo "JSON invalide"; exit 1; }
-}
-
-@test "MR : comparer deux branches" {
-    forge_compare_ahead_r "main" "feature/compare-test"
-    [ "$REPLY" -ge 0 ] || { echo "REPLY invalide"; exit 1; }
-}
-
-# --- Tests de statut de commit ---
-
-@test "commit status : publier un statut de commit" {
-    sha="abc123def456"
-    forge_status_post "$sha" "contexte-test" "success" "Description du statut"
-    # shellcheck disable=SC2050
-    [ "$?" -eq 0 ] || { echo "Échec publish statut"; exit 1; }
-}
-
-# --- Tests de branches ---
-
-@test "branches : créer une branche via l'API" {
-    nom_branch="feature/branch-test-$(date +%s)"
-    ref="abc123def456"
-    forge_branch_create "$nom_branch" "$ref"
-    # Vérifier que la branche existe
-    forge_branch_delete "$nom_branch" >/dev/null 2>&1 || true
-}
-
-@test "branches : supprimer une branche" {
-    nom_branch="branch-a-supprimer-$(date +%s)"
-    # Créer d'abord
-    forge_branch_create "$nom_branch" "abc123"
-    # Supprimer
-    forge_branch_delete "$nom_branch"
-    [ "$?" -eq 0 ] || { echo "Échec suppression branche"; exit 1; }
-}
-
-# --- Tests de mainteneur ---
-
-@test "mainteneur : vérifier qu'un membre est mainteneur" {
-    forge_est_mainteneur_r "root"
-    [ "$REPLY" = true ] || [ "$REPLY" = false ] || { echo "REPLY invalide"; exit 1; }
-}
-
-@test "mainteneur : accès niveau 30 n'est pas mainteneur" {
-    fake_access=30
-    # On teste la fonction avec une valeur FAKE_ACCESS via la variable d'environnement
-    export FAKE_ACCESS="$fake_access"
-    forge_est_mainteneur_r "membre-standard"
-    [ "$REPLY" = false ] || { echo "Expected false, got $REPLY"; exit 1; }
-    unset FAKE_ACCESS
-}
-
-# --- Tests de branche par défaut ---
-
-@test "branche par défaut : récupérer la branche par défaut du projet" {
-    forge_default_branch_r
-    [ "$REPLY" = main ] || [ "$REPLY" = master ] || [ "$REPLY" = develop ] || { echo "Branche par défaut inattendue: $REPLY"; exit 1; }
-}
-
-# --- Tests de sécurité : jeton jamais affiché ---
-
-@test "jeton jamais affiché dans les appels API" {
-    # Le jeton ne doit jamais apparaître dans la sortie standard
-    # Tester avec une issue inexistante (provocera 404 mais le jeton ne doit pas fuiter)
-    old_token="${REPOWARDEN_GITLAB_TOKEN:-}"
-    # On fait un appel qui va échouer (404) et on vérifie que le token n'est pas dans la sortie
-    forge_issue_view_r 99999 2>/dev/null || true
-    # Vérifier que le log ne contient pas le jeton en clair
-    # (cette vérification est principalement pour le transport curl)
-    if [ "${REPOWARDEN_GITLAB_INSECURE_HTTP:-}" = 1 ]; then
-        # En mode HTTP, le jeton est quand même dans l'en-tête, jamais dans la sortie
-        :
+@test "branche : creer it/sup puis la supprimer" {
+    forge_branch_create it/sup main
+    forge_branch_delete it/sup
+    if forge_get "projects/$FORGE_PROJECT/repository/branches/it%2Fsup" >/dev/null 2>&1; then
+        echo "branche it/sup encore presente" >&2; exit 1
     fi
-    # Restaurer le token
-    export REPOWARDEN_GITLAB_TOKEN="$old_token"
 }
 
-@test "jeton affiché erreur 404 provoqué" {
-    # shellcheck disable=SC2030,SC2031,SC2181
-    # Vérifier qu'en cas d'erreur 404, le jeton n'est pas affiché en sortie
-    # et que la fonction retourne un code d'erreur attendu
-    saved_token="${REPOWARDEN_GITLAB_TOKEN:-}"
-    unset REPOWARDEN_GITLAB_TOKEN
-    # Essayer de visualiser une issue inexistante
-    result=0
-    forge_issue_view_r 99999 2>/dev/null || result=$?
-    # Le résultat ne doit pas être une fuite de token
-    export REPOWARDEN_GITLAB_TOKEN="$saved_token"
-    [ "$result" -eq 0 ] || { echo "Erreur attendue pour issue inexistante"; exit 1; }
+# --- mainteneur ---
+
+@test "mainteneur : le jeton est mainteneur, un inconnu ne l'est pas" {
+    forge_get user
+    utilisateur="$(printf '%s' "$REPLY" | jq -r '.username // empty')"
+    [ -n "$utilisateur" ] || { echo "utilisateur du jeton : $REPLY" >&2; exit 1; }
+
+    forge_est_mainteneur_r "$utilisateur"
+    [ "$REPLY" = true ] || { echo "$utilisateur mainteneur : $REPLY" >&2; exit 1; }
+
+    forge_est_mainteneur_r "inexistant-$RANDOM"
+    [ "$REPLY" = false ] || { echo "inconnu mainteneur : $REPLY" >&2; exit 1; }
+}
+
+# --- branche par defaut ---
+
+@test "branche par defaut : main exactement" {
+    forge_default_branch_r
+    [ "$REPLY" = main ] || { echo "branche par defaut : $REPLY" >&2; exit 1; }
+}
+
+# --- jeton jamais affiche ---
+
+@test "jeton : jamais affiche, ni en 404 ni en succes" {
+    run forge_get "projects/$FORGE_PROJECT/issues/999999"
+    [ "$status" -ne 0 ] || { echo "404 attendu, status=$status" >&2; exit 1; }
+    [[ "$output" != *"$REPOWARDEN_GITLAB_TOKEN"* ]] || { echo "token fuit (404)" >&2; exit 1; }
+
+    run forge_get "projects/$FORGE_PROJECT/issues"
+    [ "$status" -eq 0 ] || { echo "appel reussi attendu, status=$status" >&2; exit 1; }
+    [[ "$output" != *"$REPOWARDEN_GITLAB_TOKEN"* ]] || { echo "token fuit (succes)" >&2; exit 1; }
 }
