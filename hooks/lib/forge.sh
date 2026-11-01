@@ -4,8 +4,8 @@
 # sinon variables de la CI, sinon adresse du remote origin (domaine interne
 # reconnu s'il contient gitlab, gitea…). Résultat mémorisé : FORGE.
 # Vocabulaire : FORGE_PR (PR / MR), FORGE_REFS (exemple de références).
-# GitLab : FORGE_URL (hôte), FORGE_PROJECT (chemin, / encode en %2F),
-# transport par curl + PRIVATE-TOKEN (ou glab). Couche d'accès commune :
+# GitLab : FORGE_URL (hôte), FORGE_PROJECT (chemin, / encodé en %2F),
+# transport par curl + PRIVATE-TOKEN ou par glab api. Couche d'accès commune :
 # forge_get/post/put/delete + fonctions sémantiques issues/MR/branches/statuts/membres.
 # shellcheck disable=SC2034 # variables utilisées par les scripts qui sourcent ce fichier
 
@@ -53,7 +53,7 @@ forge_init() {
             cfg_r gitlabHost ""
             FORGE_URL="${REPLY:-gitlab.com}"
         fi
-        forge_project_id_r
+        forge_project_id_r ""
         FORGE_PROJECT="$REPLY"
     fi
 }
@@ -90,7 +90,7 @@ gh_ready() {
 # Contrôle du transport forge : github = gh_ready ; gitlab = glab connecté
 # ou REPOWARDEN_GITLAB_TOKEN exploitable ; autre plateforme = refus.
 # Messages : bot.no_glab (glab absent, pas de jeton), gl.not_token
-# (glab présent mais non connecte, sans jeton de secours).
+# (glab présent mais non connecté, sans jeton de secours).
 forge_ready() {
     case "$FORGE" in
         github) gh_ready ;;
@@ -113,7 +113,7 @@ forge_ready() {
     esac
 }
 
-# REPLY = chemin du projet GitLab tire du remote origin, / encode en %2F
+# REPLY = chemin du projet GitLab tiré du remote origin, / encodé en %2F
 # (bash 3.2 : pas de tableau associatif, sed fait l'encodage manuel).
 # Accepte une URL en argument, sinon utilise remote.origin.url.
 forge_project_id_r() {
@@ -129,18 +129,36 @@ forge_project_id_r() {
 
 # forge_api <verbe> <chemin> [args…] : transport forge.
 #   github : gh api -X VERBE chemin args…  (comportement inchangé)
-#   gitlab : curl --fail --silent --show-error -H "PRIVATE-TOKEN: $REPOWARDEN_GITLAB_TOKEN"
-#            "${CI_API_V4_URL:-https://$FORGE_URL/api/v4}/chemin" args…  (http si INSECURE_HTTP)
-# JSON sur stdout ; sortie non nulle en cas d'erreur. Le jeton n'est jamais affiche.
+#   gitlab : REPOWARDEN_GITLAB_TOKEN défini -> curl + PRIVATE-TOKEN (CI et
+#            poste) sur /api/v4 ; sinon glab connecté -> glab api --hostname
+#            (chemin relatif à /api/v4, champs -f) ; sinon gl.not_token.
+# Les champs -d des appelants deviennent -f pour glab api.
+# JSON sur stdout ; sortie non nulle en cas d'erreur. Le jeton n'est jamais affiché.
 forge_api() {
     local verbe="$1" chemin="$2"; shift 2
     case "$FORGE" in
         github)
             gh api -X "$verbe" "$chemin" "$@" ;;
         gitlab)
-            local base="${CI_API_V4_URL:-https://${FORGE_URL:-gitlab.com}/api/v4}"
-            [ "${REPOWARDEN_GITLAB_INSECURE_HTTP:-}" = 1 ] && base="${base/https:/http:}"
-            curl --fail --silent --show-error -H "PRIVATE-TOKEN: $REPOWARDEN_GITLAB_TOKEN" -X "$verbe" "$base/$chemin" "$@" ;;
+            if [ -n "${REPOWARDEN_GITLAB_TOKEN:-}" ]; then
+                local base="${CI_API_V4_URL:-https://${FORGE_URL:-gitlab.com}/api/v4}"
+                [ "${REPOWARDEN_GITLAB_INSECURE_HTTP:-}" = 1 ] && base="${base/https:/http:}"
+                curl --fail --silent --show-error -H "PRIVATE-TOKEN: $REPOWARDEN_GITLAB_TOKEN" -X "$verbe" "$base/$chemin" "$@"
+            elif command -v glab >/dev/null 2>&1 && glab auth status >/dev/null 2>&1; then
+                local args=()
+                while [ $# -gt 0 ]; do
+                    case "$1" in
+                        -d)
+                            if [ $# -ge 2 ]; then args+=(-f "$2"); shift 2; else shift; fi ;;
+                        *)
+                            args+=("$1"); shift ;;
+                    esac
+                done
+                glab api --hostname "${FORGE_URL:-gitlab.com}" -X "$verbe" "$chemin" "${args[@]+"${args[@]}"}"
+            else
+                err_t gl.not_token
+                return 1
+            fi ;;
         *)
             err_t bot.no_glab
             return 1 ;;
@@ -149,14 +167,14 @@ forge_api() {
 
 # forge_get|forge_post|forge_put|forge_delete <chemin> [args…]
 forge_get()    { REPLY="$(forge_api GET    "$@")" || return 1; }
-# forge_post <chemin> [args…] : POST via le transport forge (gh api ou curl PRIVATE-TOKEN).
+# forge_post <chemin> [args…] : POST via le transport forge (gh api, curl ou glab api).
 forge_post()   { REPLY="$(forge_api POST   "$@")" || return 1; }
-# forge_put <chemin> [args…] : PUT via le transport forge (gh api ou curl PRIVATE-TOKEN).
+# forge_put <chemin> [args…] : PUT via le transport forge (gh api, curl ou glab api).
 forge_put()    { REPLY="$(forge_api PUT    "$@")" || return 1; }
-# forge_delete <chemin> [args…] : DELETE via le transport forge (gh api ou curl PRIVATE-TOKEN).
+# forge_delete <chemin> [args…] : DELETE via le transport forge (gh api, curl ou glab api).
 forge_delete() { REPLY="$(forge_api DELETE "$@")" || return 1; }
 
-# --- Fonctions semantiques (issues) ---
+# --- Fonctions sémantiques (issues) ---
 
 # forge_issue_view_r n : REPLY = JSON de l'issue $n (iid sur GitLab).
 forge_issue_view_r() {
@@ -171,7 +189,7 @@ forge_issue_view_r() {
     esac
 }
 
-# forge_issue_create_r titre corps [labels…] : REPLY = JSON/URL de l'issue creee.
+# forge_issue_create_r titre corps [labels…] : REPLY = JSON/URL de l'issue créée.
 forge_issue_create_r() {
     local titre="$1" corps="$2"; shift 2
     case "$FORGE" in
@@ -188,7 +206,7 @@ forge_issue_create_r() {
     esac
 }
 
-# forge_issue_comment n texte : ajoute un commentaire a l'issue $n.
+# forge_issue_comment n texte : ajoute un commentaire à l'issue $n.
 forge_issue_comment() {
     local n="$1" texte="$2"; shift 2
     case "$FORGE" in
@@ -215,27 +233,29 @@ forge_issue_labels_r() {
     esac
 }
 
-# forge_issue_labels_add n label…
+# forge_issue_labels_add n label… : ajoute les labels (noms, séparés par virgule).
 forge_issue_labels_add() {
-    local n="$1"; shift
+    local n="$1" labels="" label; shift
     case "$FORGE" in
         github)
             gh issue edit "$n" --add-label "$@" >/dev/null 2>&1 ;;
         gitlab)
-            forge_post "projects/${FORGE_PROJECT}/issues/${n}/add_labels" -d "label_ids[]=$*" >/dev/null ;;
+            for label in "$@"; do labels="${labels:+$labels,}$label"; done
+            forge_put "projects/${FORGE_PROJECT}/issues/${n}" -d "add_labels=${labels}" >/dev/null ;;
         *)
             err_t bot.no_glab; return 1 ;;
     esac
 }
 
-# forge_issue_labels_remove n label…
+# forge_issue_labels_remove n label… : retire les labels (noms, séparés par virgule).
 forge_issue_labels_remove() {
-    local n="$1"; shift
+    local n="$1" labels="" label; shift
     case "$FORGE" in
         github)
             gh issue edit "$n" --remove-label "$@" >/dev/null 2>&1 ;;
         gitlab)
-            forge_delete "projects/${FORGE_PROJECT}/issues/${n}/remove_labels" -d "label_ids[]=$*" >/dev/null ;;
+            for label in "$@"; do labels="${labels:+$labels,}$label"; done
+            forge_put "projects/${FORGE_PROJECT}/issues/${n}" -d "remove_labels=${labels}" >/dev/null ;;
         *)
             err_t bot.no_glab; return 1 ;;
     esac
@@ -253,7 +273,7 @@ forge_issue_list_r() {
     esac
 }
 
-# --- Fonctions semantiques (merge requests) ---
+# --- Fonctions sémantiques (merge requests) ---
 
 # forge_mr_view_r iid : REPLY = JSON de la MR $iid.
 forge_mr_view_r() {
@@ -280,7 +300,7 @@ forge_mr_list_r() {
     esac
 }
 
-# forge_mr_create_r titre corps [source_branch] [--draft] : REPLY = JSON/URL de la MR creee.
+# forge_mr_create_r titre corps [source_branch] [--draft] : REPLY = JSON/URL de la MR créée.
 forge_mr_create_r() {
     local titre="$1" corps="$2"; shift 2
     local draft=""
@@ -294,10 +314,10 @@ forge_mr_create_r() {
                 REPLY="$(gh pr create --title "$titre" --body "$corps" --head "$source" 2>/dev/null)"
             fi ;;
         gitlab)
-            local data="title=${titre}&description=${corps}&source_branch=${source}"
-            [ -n "$draft" ] && data="${data}&draft=true"
-            data="${data}&squash=true&remove_source_branch=true"
-            forge_post "projects/${FORGE_PROJECT}/merge_requests" -d "$data" || return 1 ;;
+            local args=(-d "title=${titre}" -d "description=${corps}" -d "source_branch=${source}"
+                -d "squash=true" -d "remove_source_branch=true")
+            [ -n "$draft" ] && args+=(-d "draft=true")
+            forge_post "projects/${FORGE_PROJECT}/merge_requests" "${args[@]}" || return 1 ;;
         *)
             err_t bot.no_glab; return 1 ;;
     esac
@@ -343,7 +363,7 @@ forge_mr_close() {
     esac
 }
 
-# --- Fonctions semantiques (statuts de commit) ---
+# --- Fonctions sémantiques (statuts de commit) ---
 
 # forge_status_post sha contexte etat description : publie un statut externe.
 forge_status_post() {
@@ -360,9 +380,9 @@ forge_status_post() {
     esac
 }
 
-# --- Fonctions semantiques (branches) ---
+# --- Fonctions sémantiques (branches) ---
 
-# forge_branch_create nom ref : cree la branche $nom sur $ref.
+# forge_branch_create nom ref : crée la branche $nom sur $ref.
 forge_branch_create() {
     local nom="$1" ref="$2"; shift 2
     case "$FORGE" in
@@ -430,9 +450,9 @@ forge_notes_r() {
     esac
 }
 
-# --- Fonctions semantiques (membres / depot) ---
+# --- Fonctions sémantiques (membres / dépôt) ---
 
-# forge_est_mainteneur_r user : REPLY = true si l'utilisateur est mainteneur (acces >= 40).
+# forge_est_mainteneur_r user : REPLY = true si l'utilisateur est mainteneur (accès >= 40).
 forge_est_mainteneur_r() {
     local user="$1"
     case "$FORGE" in
@@ -442,7 +462,7 @@ forge_est_mainteneur_r() {
             assoc="$(gh api "repos/${GITHUB_REPOSITORY:-}" 2>/dev/null | jq -r ".permissions.${user}.authorAssociation // \"NONE\"" || echo NONE)"
             case "$assoc" in OWNER | MEMBER | COLLABORATOR) REPLY=true ;; *) REPLY=false ;; esac ;;
         gitlab)
-            # GET /projects/:id/members/all/:user_id ; acces >= 40 (Maintainer)
+            # GET /projects/:id/members/all/:user_id ; accès >= 40 (Maintainer)
             forge_get "projects/${FORGE_PROJECT}/members/all?username=${user}" || return 1
             local id
             id="$(printf '%s' "$REPLY" | jq -r '.[0].id // empty' 2>/dev/null || true)"
@@ -459,7 +479,7 @@ forge_est_mainteneur_r() {
     esac
 }
 
-# forge_repo_admin_r : REPLY = true si l'utilisateur est administrateur du depot.
+# forge_repo_admin_r : REPLY = true si l'utilisateur est administrateur du dépôt.
 forge_repo_admin_r() {
     case "$FORGE" in
         github)
@@ -476,7 +496,7 @@ forge_repo_admin_r() {
     esac
 }
 
-# forge_default_branch_r : REPLY = branche par defaut du depot.
+# forge_default_branch_r : REPLY = branche par défaut du dépôt.
 forge_default_branch_r() {
     case "$FORGE" in
         github)
@@ -489,7 +509,7 @@ forge_default_branch_r() {
     esac
 }
 
-# forge_labels_ajouter_si_absentes label… : cree les labels manquants sur le depot.
+# forge_labels_ajouter_si_absentes label… : crée les labels manquants sur le dépôt.
 forge_labels_ajouter_si_absentes() {
     local label
     for label in "$@"; do

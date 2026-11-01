@@ -1,7 +1,7 @@
 #!/usr/bin/env bats
-# Couche d'acces forge : dispatch GitHub vs GitLab verifie ligne a ligne
-# (chemin d'API, en-tete PRIVATE-TOKEN, jeton jamais affiche, encodage du projet).
-# Faux gh et faux curl dans le PATH (technique test/bots.bats).
+# Couche d'accès forge : dispatch GitHub vs GitLab vérifié ligne à ligne
+# (chemin d'API, en-tête PRIVATE-TOKEN, jeton jamais affiché, encodage du projet).
+# Faux gh, faux curl et faux glab dans le PATH (technique test/bots.bats).
 
 load helpers
 
@@ -62,6 +62,27 @@ case "$*" in
 esac
 exit 0
 CURL
+}
+
+create_fake_glab() {
+    cat >"$F/bin/glab" <<'GLAB'
+#!/usr/bin/env bash
+echo "glab $*" >>"$FAKE/log"
+case "$*" in
+    "auth status"*) exit 0 ;;
+esac
+case "$*" in
+    *issues*) echo '[{"id":1,"iid":12,"title":"titre","state":"opened","labels":[]}]' ;;
+    *merge_requests*) echo '[{"id":1,"iid":34,"title":"MR","state":"opened"}]' ;;
+    *statuses*) echo '{}' ;;
+    *repository/branches*) echo '{}' ;;
+    *repository/compare*) echo '{"commits":[]}' ;;
+    *members/all*) echo '[{"id":1,"access_level":40}]' ;;
+    *) echo '{}' ;;
+esac
+exit 0
+GLAB
+    chmod +x "$F/bin/glab"
 }
 
 # --- forge_init : FORGE_URL, ordre de priorite ---
@@ -157,7 +178,7 @@ CURL
     (
         export GITHUB_ACTIONS=1
         source "$HOOKS/lib/common.sh"
-        forge_ready || { echo "forge_ready echec github"; exit 1; }
+        forge_ready || { echo "forge_ready échec github"; exit 1; }
     ) || false
 }
 
@@ -166,7 +187,7 @@ CURL
         export GITLAB_CI=1
         export REPOWARDEN_GITLAB_TOKEN=jeton-test
         source "$HOOKS/lib/common.sh"
-        forge_ready || { echo "forge_ready echec gitlab"; exit 1; }
+        forge_ready || { echo "forge_ready échec gitlab"; exit 1; }
     ) || false
 }
 
@@ -239,7 +260,7 @@ CURL
     ) || false
     grep -q "projects/groupe%2Fprojet/issues/12" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
     grep -q "PRIVATE-TOKEN" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
-    ! grep -q "jeton-secret" "$output" || { echo "jeton affiche : $output"; return 1; }
+    ! grep -q "jeton-secret" "$output" || { echo "jeton affiché : $output"; return 1; }
 }
 
 @test "forge_post gitlab : curl, PRIVATE-TOKEN presente, jeton jamais affiche" {
@@ -251,7 +272,7 @@ CURL
         forge_post "projects/groupe%2Fprojet/issues" -d title=t -d description=b
     ) || false
     grep -q "PRIVATE-TOKEN" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
-    ! grep -q "jeton-secret" "$output" || { echo "jeton affiche : $output"; return 1; }
+    ! grep -q "jeton-secret" "$output" || { echo "jeton affiché : $output"; return 1; }
 }
 
 @test "forge_delete gitlab : curl, chemin encode %2F" {
@@ -278,7 +299,46 @@ CURL
     grep -q "http://gitlab.com/api/v4/projects/groupe%2Fprojet/issues/12" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
 }
 
-# --- Fonctions semantiques : dispatch GitHub vs GitLab ---
+# --- forge_api gitlab : transport glab quand aucun jeton ---
+
+@test "forge_api gitlab : sans jeton, glab connecte -> glab api avec le chemin" {
+    create_fake_glab
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        unset REPOWARDEN_GITLAB_TOKEN
+        source "$HOOKS/lib/common.sh"
+        forge_post "projects/groupe%2Fprojet/issues" -d title=t -d description=corps
+    ) || false
+    grep -q "glab api --hostname gitlab.com -X POST projects/groupe%2Fprojet/issues -f title=t -f description=corps" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
+    ! grep -q "^curl " "$FAKE/log" || { echo "curl appelé : $(cat "$FAKE/log")"; return 1; }
+}
+
+@test "forge_api gitlab : jeton present -> curl meme si glab est connecte" {
+    create_fake_glab
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_get "projects/groupe%2Fprojet/issues/12"
+    ) || false
+    grep -q "^curl " "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
+    ! grep -q "^glab " "$FAKE/log" || { echo "glab appelé : $(cat "$FAKE/log")"; return 1; }
+}
+
+@test "forge_api gitlab : ni jeton ni glab connecte -> erreur, aucun appel" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        unset REPOWARDEN_GITLAB_TOKEN
+        source "$HOOKS/lib/common.sh"
+        ! forge_get "projects/groupe%2Fprojet/issues/12" || { echo "forge_get aurait dû échouer"; exit 1; }
+    ) || false
+    [ ! -s "$FAKE/log" ] || { echo "appel inattendu : $(cat "$FAKE/log")"; return 1; }
+}
+
+# --- Fonctions sémantiques : dispatch GitHub vs GitLab ---
 
 @test "forge_issue_view_r github : gh issue view --json" {
     (
