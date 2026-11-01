@@ -176,12 +176,18 @@ forge_delete() { REPLY="$(forge_api DELETE "$@")" || return 1; }
 
 # --- Fonctions sémantiques (issues) ---
 
-# forge_issue_view_r n : REPLY = JSON de l'issue $n (iid sur GitLab).
+# forge_issue_view_r n [champs…] : REPLY = JSON de l'issue $n (iid sur GitLab,
+# champs GitHub par defaut : number,title,state,body).
 forge_issue_view_r() {
     local n="$1"; shift
     case "$FORGE" in
         github)
-            REPLY="$(gh issue view "$n" --json "$@" 2>/dev/null)" ;;
+            # --json sans champs est une erreur gh : champs par defaut
+            if [ $# -gt 0 ]; then
+                REPLY="$(gh issue view "$n" --json "$@" 2>/dev/null)"
+            else
+                REPLY="$(gh issue view "$n" --json number,title,state,body 2>/dev/null)"
+            fi ;;
         gitlab)
             forge_get "projects/${FORGE_PROJECT}/issues/${n}" || return 1 ;;
         *)
@@ -200,7 +206,8 @@ forge_issue_create_r() {
                 REPLY="$(gh issue create --title "$titre" --body "$corps" 2>/dev/null)"
             fi ;;
         gitlab)
-            REPLY="$(forge_post "projects/${FORGE_PROJECT}/issues" -d "title=${titre}" -d "description=${corps}" "$@")" ;;
+            # forge_get/forge_post remplissent REPLY : tout capture la vide
+            forge_post "projects/${FORGE_PROJECT}/issues" -d "title=${titre}" -d "description=${corps}" "$@" || return 1 ;;
         *)
             err_t bot.no_glab; return 1 ;;
     esac
@@ -267,7 +274,7 @@ forge_issue_list_r() {
         github)
             REPLY="$(gh issue list --json "$@" 2>/dev/null)" ;;
         gitlab)
-            REPLY="$(forge_get "projects/${FORGE_PROJECT}/issues" "$@")" ;;
+            forge_get "projects/${FORGE_PROJECT}/issues" "$@" || return 1 ;;
         *)
             err_t bot.no_glab; return 1 ;;
     esac
@@ -280,9 +287,9 @@ forge_mr_view_r() {
     local iid="$1"
     case "$FORGE" in
         github)
-            REPLY="$(gh pr view "$iid" --json 2>/dev/null)" ;;
+            REPLY="$(gh pr view "$iid" --json number,title,state 2>/dev/null)" ;;
         gitlab)
-            REPLY="$(forge_get "projects/${FORGE_PROJECT}/merge_requests/${iid}")" ;;
+            forge_get "projects/${FORGE_PROJECT}/merge_requests/${iid}" || return 1 ;;
         *)
             err_t bot.no_glab; return 1 ;;
     esac
@@ -431,7 +438,7 @@ forge_mr_commits_r() {
         github)
             REPLY="$(gh pr view "$iid" --json commits 2>/dev/null)" ;;
         gitlab)
-            REPLY="$(forge_get "projects/${FORGE_PROJECT}/merge_requests/${iid}/commits")" ;;
+            forge_get "projects/${FORGE_PROJECT}/merge_requests/${iid}/commits" || return 1 ;;
         *)
             err_t bot.no_glab; return 1 ;;
     esac
@@ -444,7 +451,7 @@ forge_notes_r() {
         github)
             REPLY="$(gh issue view "$n" --json comments 2>/dev/null)" ;;
         gitlab)
-            REPLY="$(forge_get "projects/${FORGE_PROJECT}/issues/${n}/notes")" ;;
+            forge_get "projects/${FORGE_PROJECT}/issues/${n}/notes" || return 1 ;;
         *)
             err_t bot.no_glab; return 1 ;;
     esac
@@ -452,24 +459,27 @@ forge_notes_r() {
 
 # --- Fonctions sémantiques (membres / dépôt) ---
 
-# forge_est_mainteneur_r user : REPLY = true si l'utilisateur est mainteneur (accès >= 40).
+# forge_est_mainteneur_r user : REPLY = true si l'utilisateur a le droit de
+# merger (GitHub collaborators/permission dans admin|maintain|write,
+# GitLab access_level >= 40 de members/all/:id).
 forge_est_mainteneur_r() {
     local user="$1"
     case "$FORGE" in
         github)
-            # authorAssociation : OWNER / MEMBER / COLLABORATOR
-            local assoc
-            assoc="$(gh api "repos/${GITHUB_REPOSITORY:-}" 2>/dev/null | jq -r ".permissions.${user}.authorAssociation // \"NONE\"" || echo NONE)"
-            case "$assoc" in OWNER | MEMBER | COLLABORATOR) REPLY=true ;; *) REPLY=false ;; esac ;;
+            # Permission du collaborateur : admin / maintain / write
+            local perm
+            perm="$(gh api "repos/${GITHUB_REPOSITORY:-}/collaborators/${user}/permission" 2>/dev/null | jq -r '.permission // "none"')"
+            case "$perm" in admin | maintain | write) REPLY=true ;; *) REPLY=false ;; esac ;;
         gitlab)
-            # GET /projects/:id/members/all/:user_id ; accès >= 40 (Maintainer)
+            # GET /projects/:id/members/all?username= (tableau) pour tirer
+            # l'identifiant, puis GET /members/all/:id : objet, .access_level.
             forge_get "projects/${FORGE_PROJECT}/members/all?username=${user}" || return 1
             local id
             id="$(printf '%s' "$REPLY" | jq -r '.[0].id // empty' 2>/dev/null || true)"
             if [ -n "$id" ]; then
                 local niveau
                 forge_get "projects/${FORGE_PROJECT}/members/all/${id}" || return 1
-                niveau="$(printf '%s' "$REPLY" | jq -r '.[0].access_level // 0' 2>/dev/null || echo 0)"
+                niveau="$(printf '%s' "$REPLY" | jq -r '.access_level // 0' 2>/dev/null || echo 0)"
                 [ "$niveau" -ge 40 ] 2>/dev/null && REPLY=true || REPLY=false
             else
                 REPLY=false
@@ -500,10 +510,10 @@ forge_repo_admin_r() {
 forge_default_branch_r() {
     case "$FORGE" in
         github)
-            REPLY="$(gh api "repos/${GITHUB_REPOSITORY:-}" -q '.default_branch // main' 2>/dev/null || echo main)" ;;
+            REPLY="$(gh api "repos/${GITHUB_REPOSITORY:-}" -q '.default_branch // "main"' 2>/dev/null || echo main)" ;;
         gitlab)
             forge_get "projects/${FORGE_PROJECT}" || return 1
-            REPLY="$(printf '%s' "$REPLY" | jq -r '.default_branch // main' 2>/dev/null || echo main)" ;;
+            REPLY="$(printf '%s' "$REPLY" | jq -r '.default_branch // "main"' 2>/dev/null || echo main)" ;;
         *)
             REPLY="main" ;;
     esac

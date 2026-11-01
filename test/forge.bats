@@ -26,39 +26,60 @@ create_fake_gh() {
     cat >"$F/bin/gh" <<'GH'
 #!/usr/bin/env bash
 echo "gh $*" >>"$FAKE/log"
+out=""
 case "$*" in
     "auth status"*) exit 0 ;;
-    "issue view"*) echo '{"id":1,"iid":12,"title":"titre","state":"opened","labels":[]}' ;;
-    "issue create"*) echo "https://github.com/o/r/issues/12" ;;
+    "issue view"*) out='{"number":12,"title":"titre","state":"opened","labels":[{"name":"bug"}]}' ;;
+    "issue create"*) out="https://github.com/o/r/issues/12" ;;
     "issue comment"*) exit 0 ;;
     "issue edit"*) exit 0 ;;
-    "issue list"*) echo '[]' ;;
-    "pr view"*) echo '{"id":1,"number":34,"title":"MR","state":"opened"}' ;;
-    "pr create"*) echo "https://github.com/o/r/pull/34" ;;
+    "issue list"*) out='[{"number":12,"title":"titre","state":"opened"}]' ;;
+    "pr view"*) out='{"number":34,"title":"MR","state":"opened","commits":[{"oid":"abc123","messageHeadline":"c1"}]}' ;;
+    "pr create"*) out="https://github.com/o/r/pull/34" ;;
     "pr edit"*) exit 0 ;;
-    "pr list"*) echo '[]' ;;
+    "pr list"*) out='[{"number":34,"title":"MR","state":"opened"}]' ;;
     "pr merge"*) exit 0 ;;
     "pr close"*) exit 0 ;;
     "label create"*) exit 0 ;;
-    "api repos/o/r"*) echo '{"permissions":{"moi":{"authorAssociation":"MEMBER"}},"default_branch":"main"}' ;;
-    "api"*) echo '{}' ;;
+    "api repos/o/r/collaborators"*)
+        out='{"permission":"admin"}'
+        [ -n "${FAKE_PERMISSION:-}" ] && out='{"permission":"'"$FAKE_PERMISSION"'"}' ;;
+    "api repos/o/r"*) out='{"permissions":{"admin":true},"default_branch":"main"}' ;;
+    "api"*) out='{}' ;;
 esac
+# Emulation de gh api -q <expression> : le filtre jq applique a la sortie
+prev=""
+for a in "$@"; do
+    if [ "$prev" = -q ]; then out="$(printf '%s' "$out" | jq -r "$a" 2>/dev/null)"; fi
+    prev="$a"
+done
+[ -n "$out" ] && printf '%s\n' "$out"
 exit 0
 GH
 }
 
+# JSON par point d'entrée : objet pour une création, tableau pour une liste,
+# OBJET pour members/all/:id (GitLab), chaîne pour usernames= (liste).
+# FAKE_ACCESS : access_level des membres (50 par défaut, 30 pour un simple dev).
 create_fake_curl() {
     cat >"$F/bin/curl" <<'CURL'
 #!/usr/bin/env bash
 echo "curl $*" >>"$FAKE/log"
 case "$*" in
-    *issues*) echo '[{"id":1,"iid":12,"title":"titre","state":"opened","labels":[]}]' ;;
-    *merge_requests*) echo '[{"id":1,"iid":34,"title":"MR","state":"opened"}]' ;;
-    *statuses*) echo '{}' ;;
-    *repository/branches*) echo '{}' ;;
-    *repository/compare*) echo '{"commits":[]}' ;;
-    *members/all*) echo '[{"id":1,"access_level":40}]' ;;
-    *) echo '{}' ;;
+    */notes*) echo '[{"id":1,"body":"premier commentaire"}]' ;;
+    *-X\ POST*issues*) echo '{"iid":7,"title":"x"}' ;;
+    */issues/[0-9]*) echo '{"iid":12,"title":"titre","state":"opened","labels":["bug"]}' ;;
+    */issues*) echo '[{"id":1,"iid":12,"title":"titre","state":"opened","labels":["bug"]}]' ;;
+    *merge_requests*commits*) echo '[{"id":"abc123","messageHeadline":"c1"}]' ;;
+    *-X\ POST*merge_requests*) echo '{"iid":34,"title":"MR"}' ;;
+    */merge_requests/[0-9]*) echo '{"iid":34,"title":"MR","state":"opened"}' ;;
+    */merge_requests*) echo '[{"id":1,"iid":34,"title":"MR","state":"opened"}]' ;;
+    *statuses*) echo '{"status":"success"}' ;;
+    */repository/branches*) echo '{"name":"feat/12"}' ;;
+    */repository/compare*) echo '{"commits":[{"id":"c1"}]}' ;;
+    *username=*) echo '[{"id":2,"username":"moi","access_level":'"${FAKE_ACCESS:-50}"'}]' ;;
+    *members/all*) echo '{"id":2,"username":"moi","access_level":'"${FAKE_ACCESS:-50}"'}' ;;
+    *) echo '{"default_branch":"main","project_access":{"access_level":'"${FAKE_ACCESS:-50}"'}}' ;;
 esac
 exit 0
 CURL
@@ -451,8 +472,21 @@ GLAB
     grep -q "PRIVATE-TOKEN" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
 }
 
-@test "forge_est_mainteneur_r github : authorAssociation" {
+@test "forge_est_mainteneur_r github : collaborators/permission admin" {
     (
+        export GITHUB_ACTIONS=1
+        export GITHUB_REPOSITORY=o/r
+        git remote set-url origin https://github.com/o/r.git
+        source "$HOOKS/lib/common.sh"
+        forge_est_mainteneur_r moi
+        [ "$REPLY" = true ] || { echo "REPLY=$REPLY"; exit 1; }
+    ) || false
+    grep -q "gh api repos/o/r/collaborators/moi/permission" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
+}
+
+@test "forge_est_mainteneur_r github : permission write -> mainteneur" {
+    (
+        export FAKE_PERMISSION=write
         export GITHUB_ACTIONS=1
         export GITHUB_REPOSITORY=o/r
         git remote set-url origin https://github.com/o/r.git
@@ -462,7 +496,19 @@ GLAB
     ) || false
 }
 
-@test "forge_est_mainteneur_r gitlab : access_level >= 40" {
+@test "forge_est_mainteneur_r github : permission read -> pas mainteneur" {
+    (
+        export FAKE_PERMISSION=read
+        export GITHUB_ACTIONS=1
+        export GITHUB_REPOSITORY=o/r
+        git remote set-url origin https://github.com/o/r.git
+        source "$HOOKS/lib/common.sh"
+        forge_est_mainteneur_r moi
+        [ "$REPLY" = false ] || { echo "REPLY=$REPLY"; exit 1; }
+    ) || false
+}
+
+@test "forge_est_mainteneur_r gitlab : access_level 50 -> mainteneur" {
     (
         export GITLAB_CI=1
         git remote set-url origin https://gitlab.com/groupe/projet.git
@@ -474,6 +520,18 @@ GLAB
     grep -q "projects/groupe%2Fprojet/members/all" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
 }
 
+@test "forge_est_mainteneur_r gitlab : access_level 30 -> pas mainteneur" {
+    (
+        export FAKE_ACCESS=30
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_est_mainteneur_r moi
+        [ "$REPLY" = false ] || { echo "REPLY=$REPLY"; exit 1; }
+    ) || false
+}
+
 @test "forge_default_branch_r gitlab : default_branch du projet" {
     (
         export GITLAB_CI=1
@@ -482,5 +540,213 @@ GLAB
         source "$HOOKS/lib/common.sh"
         forge_default_branch_r
         [ "$REPLY" = main ] || { echo "REPLY=$REPLY"; exit 1; }
+    ) || false
+}
+
+# --- Valeurs rendues : JSON connu du faux transport, asserte sur REPLY ---
+
+@test "forge_issue_view_r github : REPLY = JSON de l'issue" {
+    (
+        export GITHUB_ACTIONS=1
+        source "$HOOKS/lib/common.sh"
+        forge_issue_view_r 12
+        case "$REPLY" in *'"title":"titre"'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_issue_create_r github : REPLY = URL de l'issue creee" {
+    (
+        export GITHUB_ACTIONS=1
+        source "$HOOKS/lib/common.sh"
+        forge_issue_create_r 'titre' 'corps'
+        case "$REPLY" in */issues/12*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_issue_list_r github : REPLY = JSON des issues" {
+    (
+        export GITHUB_ACTIONS=1
+        source "$HOOKS/lib/common.sh"
+        forge_issue_list_r number,title,state
+        case "$REPLY" in *'"number":12'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_mr_list_r github : REPLY = JSON des PR" {
+    (
+        export GITHUB_ACTIONS=1
+        source "$HOOKS/lib/common.sh"
+        forge_mr_list_r number,title,state
+        case "$REPLY" in *'"number":34'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_mr_view_r github : REPLY = JSON de la PR" {
+    (
+        export GITHUB_ACTIONS=1
+        source "$HOOKS/lib/common.sh"
+        forge_mr_view_r 34
+        case "$REPLY" in *'"number":34'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_mr_commits_r github : REPLY = JSON des commits" {
+    (
+        export GITHUB_ACTIONS=1
+        source "$HOOKS/lib/common.sh"
+        forge_mr_commits_r 34
+        case "$REPLY" in *'"oid":"abc123"'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_issue_labels_r github : REPLY = noms des labels" {
+    (
+        export GITHUB_ACTIONS=1
+        source "$HOOKS/lib/common.sh"
+        forge_issue_labels_r 12
+        [ "$REPLY" = bug ] || { echo "REPLY=$REPLY"; exit 1; }
+    ) || false
+}
+
+@test "forge_repo_admin_r github : permissions.admin du depot" {
+    (
+        export GITHUB_ACTIONS=1
+        export GITHUB_REPOSITORY=o/r
+        git remote set-url origin https://github.com/o/r.git
+        source "$HOOKS/lib/common.sh"
+        forge_repo_admin_r
+        [ "$REPLY" = true ] || { echo "REPLY=$REPLY"; exit 1; }
+    ) || false
+}
+
+@test "forge_default_branch_r github : default_branch du depot" {
+    (
+        export GITHUB_ACTIONS=1
+        export GITHUB_REPOSITORY=o/r
+        git remote set-url origin https://github.com/o/r.git
+        source "$HOOKS/lib/common.sh"
+        forge_default_branch_r
+        [ "$REPLY" = main ] || { echo "REPLY=$REPLY"; exit 1; }
+    ) || false
+}
+
+@test "forge_issue_create_r gitlab : REPLY = JSON de l'issue creee (iid)" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_issue_create_r 'titre' 'corps'
+        case "$REPLY" in *'"iid":7'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_issue_view_r gitlab : REPLY = JSON de l'issue (iid)" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_issue_view_r 12
+        case "$REPLY" in *'"iid":12'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_issue_list_r gitlab : REPLY = JSON des issues" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_issue_list_r
+        case "$REPLY" in *'"iid":12'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_issue_labels_r gitlab : REPLY = noms des labels" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_issue_labels_r 12
+        [ "$REPLY" = bug ] || { echo "REPLY=$REPLY"; exit 1; }
+    ) || false
+}
+
+@test "forge_mr_create_r gitlab : REPLY = JSON de la MR creee (iid)" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_mr_create_r 'titre' 'corps' 'feature/12'
+        case "$REPLY" in *'"iid":34'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_mr_view_r gitlab : REPLY = JSON de la MR (iid)" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_mr_view_r 34
+        case "$REPLY" in *'"iid":34'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_mr_list_r gitlab : REPLY = JSON des MR" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_mr_list_r
+        case "$REPLY" in *'"iid":34'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_mr_commits_r gitlab : REPLY = JSON des commits de la MR" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_mr_commits_r 34
+        case "$REPLY" in *'"id":"abc123"'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_notes_r gitlab : REPLY = JSON des commentaires" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_notes_r 12
+        case "$REPLY" in *'premier commentaire'*) ;; *) { echo "REPLY=$REPLY"; exit 1; } ;; esac
+    ) || false
+}
+
+@test "forge_compare_ahead_r gitlab : REPLY = nombre de commits d'avance" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_compare_ahead_r main feat/12
+        [ "$REPLY" = 1 ] || { echo "REPLY=$REPLY"; exit 1; }
+    ) || false
+}
+
+@test "forge_repo_admin_r gitlab : project_access >= 40 -> admin" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_repo_admin_r
+        [ "$REPLY" = true ] || { echo "REPLY=$REPLY"; exit 1; }
     ) || false
 }
