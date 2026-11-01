@@ -475,6 +475,9 @@ _msg_fr() {
         # GitHub CLI
         bot.no_gh) _M="GitHub CLI (gh) requis : https://cli.github.com" ;;
         gh.not_logged) _M="gh non connecté : gh auth login -s workflow" ;;
+        # GitLab CLI / jeton
+        bot.no_glab) _M="GitLab CLI (glab) requis, ou exportez REPOWARDEN_GITLAB_TOKEN" ;;
+        gl.not_token) _M="glab non connecté et aucun jeton : glab auth login, ou REPOWARDEN_GITLAB_TOKEN" ;;
         # Paquet npm
         npm.npx_global) _M="npx utilise un dossier temporaire : des hooks globaux pointeraient vers un dossier effacé. Installe d'abord le paquet : npm install -g repowarden, puis repowarden install --global." ;;
         npm.no_npm) _M="npm requis : https://nodejs.org" ;;
