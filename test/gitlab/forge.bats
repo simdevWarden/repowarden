@@ -8,19 +8,9 @@
 # en teardown_file (jamais de jeton en clair dans la sortie).
 # Sans REPOWARDEN_IT_GITLAB_URL / REPOWARDEN_IT_GITLAB_TOKEN, tout est saute.
 
-load ../helpers
-
-# helpers.bash calcule HOOKS depuis BATS_TEST_DIRNAME/../hooks, juste pour un
-# fichier de test directement dans test/ ; depuis test/gitlab/ il faut remonter
-# jusqu'a la racine du depot pour trouver hooks/.
-HOOKS=""
-_d="$BATS_TEST_DIRNAME"
-while [ -n "$_d" ] && [ "$_d" != "/" ]; do
-    if [ -d "$_d/hooks" ]; then HOOKS="$_d/hooks"; break; fi
-    _d="$(cd "$_d/.." 2>/dev/null && pwd -P)"
-done
-unset _d
-[ -n "$HOOKS" ] || { echo "dossier hooks introuvable" >&2; exit 1; }
+HOOKS="$(cd "$BATS_TEST_DIRNAME/../../hooks" && pwd -P)"
+export REPOWARDEN_LANG=fr
+exec </dev/null
 
 # Configure l'acces forge GitLab depuis les variables d'integration.
 # (appele dans setup_file, setup et teardown_file : bats isole chaque
@@ -54,6 +44,9 @@ setup_file() {
     forge_post projects -d "name=$nom" -d "initialize_with_readme=true" -d "default_branch=main"
     IT_CHEMIN="$(printf '%s' "$REPLY" | jq -r '.path_with_namespace // empty')"
     [ -n "$IT_CHEMIN" ] || { echo "projet non cree : $REPLY" >&2; exit 1; }
+    IT_ID="$(printf '%s' "$REPLY" | jq -r '.id // empty')"
+    [ -n "$IT_ID" ] || { echo "id projet manquant : $REPLY" >&2; exit 1; }
+    export IT_ID
     IT_NOM="$nom"
     export IT_NOM
     FORGE_PROJECT="$(printf '%s' "$IT_CHEMIN" | sed 's|/|%2F|g')"
@@ -62,6 +55,7 @@ setup_file() {
     printf '%s\n' "$IT_CHEMIN" >"$BATS_FILE_TMPDIR/chemin"
     printf '%s\n' "$FORGE_PROJECT" >"$BATS_FILE_TMPDIR/projet"
     printf '%s\n' "$nom" >"$BATS_FILE_TMPDIR/nom"
+    printf '%s\n' "$IT_ID" >"$BATS_FILE_TMPDIR/id"
 
     forge_get "projects/$FORGE_PROJECT/repository/branches/main"
     IT_SHA="$(printf '%s' "$REPLY" | jq -r '.commit.id // empty')"
@@ -93,6 +87,7 @@ setup() {
 
 teardown_file() {
     [ -f "$BATS_FILE_TMPDIR/pret" ] || return 0
+    [ -f "$BATS_FILE_TMPDIR/id" ] || return 0
     charger_forge
     forge_env
     chemin="$(cat "$BATS_FILE_TMPDIR/pret")"
@@ -100,9 +95,17 @@ teardown_file() {
         repowarden-it-*) ;;
         *) echo "refus de supprimer $chemin" >&2; return 1 ;;
     esac
-    enc="$(printf '%s' "$chemin" | sed 's|/|%2F|g')"
-    forge_delete "projects/$enc" >/dev/null 2>&1 || true
-    forge_delete "projects/$enc?permanently_remove=true&full_path=$enc" >/dev/null 2>&1 || true
+    id="$(cat "$BATS_FILE_TMPDIR/id")"
+    forge_delete "projects/$id" >/dev/null 2>&1 || true
+    if forge_get "projects/$id" >/dev/null 2>&1; then
+        nouveau_chemin="$(printf '%s' "$REPLY" | jq -r '.path_with_namespace // empty')"
+        case "$nouveau_chemin" in
+            */repowarden-it-*) ;;
+            *) echo "refus de purger $nouveau_chemin" >&2; return 1 ;;
+        esac
+        nouvel_enc="$(printf '%s' "$nouveau_chemin" | sed 's|/|%2F|g')"
+        forge_delete "projects/$id?permanently_remove=true&full_path=$nouvel_enc" >/dev/null 2>&1 || true
+    fi
 }
 
 # --- issue ---
@@ -176,7 +179,7 @@ teardown_file() {
     forge_compare_ahead_r main it/mr
     [ "$REPLY" = 1 ] || { echo "compare : $REPLY" >&2; exit 1; }
 
-    forge_mr_create_r "mr-it" "corps" it/mr
+    forge_mr_create_r "mr-it" "corps" it/mr main
     miid="$(printf '%s' "$REPLY" | jq -r '.iid // empty')"
     [ -n "$miid" ] || { echo "iid MR manquant : $REPLY" >&2; exit 1; }
     printf '%s\n' "$miid" >"$BATS_FILE_TMPDIR/miid"

@@ -77,7 +77,13 @@ case "$*" in
     *statuses*) echo '{"status":"success"}' ;;
     */repository/branches*) echo '{"name":"feat/12"}' ;;
     */repository/compare*) echo '{"commits":[{"id":"c1"}]}' ;;
-    *username=*) echo '[{"id":2,"username":"moi","access_level":'"${FAKE_ACCESS:-50}"'}]' ;;
+    *users\?username=*) \
+        case "$*" in \
+            *username=moi*|*username=mainteneur*) echo '[{"id":2}]' ;; \
+            *username=absent*) echo '[{"id":999}]' ;; \
+            *) echo '[]' ;; \
+        esac ;; \
+    *members/all/999*) exit 1 ;; \
     *members/all*) echo '{"id":2,"username":"moi","access_level":'"${FAKE_ACCESS:-50}"'}' ;;
     *) echo '{"default_branch":"main","project_access":{"access_level":'"${FAKE_ACCESS:-50}"'}}' ;;
 esac
@@ -426,6 +432,28 @@ GLAB
     grep -q "PRIVATE-TOKEN" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
 }
 
+@test "forge_mr_create_r gitlab : target_branch present avec cible" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_mr_create_r 'titre' 'corps' 'feature/12' 'main'
+    ) || false
+    grep -q "target_branch=main" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
+}
+
+@test "forge_mr_create_r gitlab : target_branch present sans cible" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_mr_create_r 'titre' 'corps' 'feature/12'
+    ) || false
+    grep -q "target_branch=main" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
+}
+
 @test "forge_status_post github : gh api statuses" {
     (
         export GITHUB_ACTIONS=1
@@ -470,6 +498,17 @@ GLAB
     ) || false
     grep -q "projects/groupe%2Fprojet/repository/branches" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
     grep -q "PRIVATE-TOKEN" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
+}
+
+@test "forge_branch_delete gitlab : encode slash dans le chemin" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_branch_delete feat/1-x
+    ) || false
+    grep -q "projects/groupe%2Fprojet/repository/branches/feat%2F1-x" "$FAKE/log" || { echo "log: $(cat "$FAKE/log")"; return 1; }
 }
 
 @test "forge_est_mainteneur_r github : collaborators/permission admin" {
@@ -529,6 +568,41 @@ GLAB
         source "$HOOKS/lib/common.sh"
         forge_est_mainteneur_r moi
         [ "$REPLY" = false ] || { echo "REPLY=$REPLY"; exit 1; }
+    ) || false
+}
+
+@test "forge_est_mainteneur_r gitlab : utilisateur inconnu -> false" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_est_mainteneur_r inconnu
+        [ "$REPLY" = false ] || { echo "REPLY=$REPLY"; exit 1; }
+    ) || false
+    ! grep -q "members/all?username=" "$FAKE/log"
+}
+
+@test "forge_est_mainteneur_r gitlab : connu non membre (404) -> false" {
+    (
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_est_mainteneur_r absent
+        [ "$REPLY" = false ] || { echo "REPLY=$REPLY"; exit 1; }
+    ) || false
+}
+
+@test "forge_est_mainteneur_r gitlab : access_level 40 -> mainteneur" {
+    (
+        export FAKE_ACCESS=40
+        export GITLAB_CI=1
+        git remote set-url origin https://gitlab.com/groupe/projet.git
+        export REPOWARDEN_GITLAB_TOKEN=jeton-secret
+        source "$HOOKS/lib/common.sh"
+        forge_est_mainteneur_r moi
+        [ "$REPLY" = true ] || { echo "REPLY=$REPLY"; exit 1; }
     ) || false
 }
 
