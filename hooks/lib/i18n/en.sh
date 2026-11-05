@@ -758,6 +758,7 @@ _msg_en() {
         garde.protegee) _M="change refused: \"%s\" is a protected branch.\n  → Work on a ticket's branch: repowarden ticket <n>" ;;
         garde.protegee_libre) _M="change refused: \"%s\" is a protected branch.\n  → Create a work branch: git switch -c <type>/<topic>" ;;
         garde.config_verification) _M="tool verification setting: the maintainer's decision; fix the code rather than the rule (\"%s\").\n  → Fix the code, never the rule; only the maintainer sets the tool (setting repowarden.agentsConfig = true)." ;;
+        garde.chemin_protege) _M="path protected from agents: the maintainer's decision (\"%s\").\n  → Do not change or commit it; ask the maintainer (agentsProtectedPaths setting in .repowarden.conf)." ;;
         garde.carte) _M="  → Before changing %s, once on the right branch: repowarden carte %s (functions, tests, tickets)" ;;
         garde.hors_ticket) _M="change refused: branch \"%s\" is not a ticket's branch (<type>/<n>-<topic>).\n  → Take the ticket: repowarden ticket <n>" ;;
         garde.branche) _M="command refused: \"%s\" creates a branch; here, branches come from tickets.\n  → repowarden ticket <n>" ;;

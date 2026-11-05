@@ -20,6 +20,7 @@ Versionné à la racine du projet, au format `git config`, lu **par les hooks et
     allowAgentSignatures = false        # agents IA (auteur, Co-Authored-By) refusés ; défaut false
     agentsTickets = false               # un agent IA peut créer un ticket (repowarden ticket nouveau) ; défaut false
     agentsConfig = false                # un agent IA peut régler un outil de vérification ; défaut false
+    agentsProtectedPaths =              # chemins que le garde-fou refuse aux agents IA (motifs, voir ci-dessous)
     releaseUpdate = npm update -g mon-outil   # commande « Mettre à jour » des notes de version
     sensitiveFiles = .env .env.* *.pem  # noms signalés s'ils ne sont ni suivis ni ignorés (voir Hooks)
     # Bot d'organisation (repowarden bot)
@@ -32,6 +33,8 @@ Versionné à la racine du projet, au format `git config`, lu **par les hooks et
 `agentsTickets` : à `true`, le garde-fou laisse un agent IA créer un ticket (`repowarden ticket nouveau`) ; par défaut, il le refuse et demande de signaler le défaut au mainteneur, qui le crée, ou de le noter sur le ticket en cours.
 
 `agentsConfig` : à `true`, le garde-fou laisse un agent IA modifier la configuration d'un outil de vérification (`.github/actionlint.yaml`/`.yml`, `.shellcheckrc`, `.markdownlint*`, `.yamllint*`, `.gitleaks.toml`, `.gitleaksignore`, `.pre-commit-config.yaml`, `.repowarden.conf`), par édition comme par redirection shell ; par défaut, il le refuse : régler un outil est une décision du mainteneur, on corrige le code plutôt que la règle.
+
+`agentsProtectedPaths` : motifs séparés par des espaces, relatifs à la racine du dépôt, avec les jokers du shell (`*`, `?` ; un motif fini par `/` couvre un dossier), par exemple `.devcontainer/opencode/agent.json .devcontainer/*.sh`. Le garde-fou refuse à un agent IA de les écrire (édition, redirection, `cp`, `mv`, `tee`, `sed -i`…) et de les commiter (`repowarden cc`, `git commit` : index, `-a`, chemins donnés). Le réglage est lu dans `.repowarden.conf` de l'arbre **et** dans celui de `HEAD` (union) : retirer un motif de l'arbre ne lève rien ; le `git config` local est ignoré pour cette clé. `agentsConfig = true` ne le lève pas : ce sont deux décisions distinctes du mainteneur.
 
 ## Flux avec branche d'intégration (`develop`)
 
