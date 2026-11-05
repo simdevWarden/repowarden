@@ -759,6 +759,7 @@ _msg_fr() {
         garde.protegee) _M="modification refusée : « %s » est une branche protégée.\n  → Travailler sur la branche d'un ticket : repowarden ticket <n>" ;;
         garde.protegee_libre) _M="modification refusée : « %s » est une branche protégée.\n  → Créer une branche de travail : git switch -c <type>/<sujet>" ;;
         garde.config_verification) _M="réglage d'un outil de vérification : décision du mainteneur ; corriger le code plutôt que la règle (« %s »).\n  → Corriger le code, jamais la règle ; seul le mainteneur règle l'outil (réglage repowarden.agentsConfig = true)." ;;
+        garde.chemin_protege) _M="chemin protégé des agents : décision du mainteneur (« %s »).\n  → Ne pas le modifier ni le commiter ; demander au mainteneur (réglage agentsProtectedPaths de .repowarden.conf)." ;;
         garde.carte) _M="  → Avant de modifier %s, une fois sur la bonne branche : repowarden carte %s (fonctions, tests, tickets)" ;;
         garde.hors_ticket) _M="modification refusée : la branche « %s » n'est pas celle d'un ticket (<type>/<n>-<sujet>).\n  → Prendre le ticket : repowarden ticket <n>" ;;
         garde.branche) _M="commande refusée : « %s » crée une branche ; ici, la branche naît du ticket.\n  → repowarden ticket <n>" ;;
