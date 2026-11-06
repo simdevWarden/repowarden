@@ -20,6 +20,7 @@ Versioned at the project root, in `git config` format, read **by the hooks and b
     allowAgentSignatures = false        # AI agents (author, Co-Authored-By) refused; default false
     agentsTickets = false               # an AI agent may create a ticket (repowarden ticket nouveau); default false
     agentsConfig = false                # an AI agent may set a tool verification setting; default false
+    agentsProtectedPaths =              # paths the guard refuses to AI agents (patterns, see below)
     releaseUpdate = npm update -g my-tool     # "Update" command in the release notes
     sensitiveFiles = .env .env.* *.pem  # names reported when neither tracked nor ignored (see Hooks)
     # Organization bot (repowarden bot)
@@ -33,6 +34,8 @@ Versioned at the project root, in `git config` format, read **by the hooks and b
 `agentsTickets`: when `true`, the guard lets an AI agent create a ticket (`repowarden ticket nouveau`); by default it refuses and asks to report the defect to the maintainer, who creates the ticket, or to note it on the current ticket.
 
 `agentsConfig`: when `true`, the guard lets an AI agent change a tool verification setting (`.github/actionlint.yaml`/`.yml`, `.shellcheckrc`, `.markdownlint*`, `.yamllint*`, `.gitleaks.toml`, `.gitleaksignore`, `.pre-commit-config.yaml`, `.repowarden.conf`), by editing as well as by shell redirection; by default it refuses: setting a tool is the maintainer's decision, the code is fixed rather than the rule.
+
+`agentsProtectedPaths`: space-separated patterns, relative to the repository root, with shell wildcards (`*`, `?`; a pattern ending in `/` covers a folder), for example `.devcontainer/opencode/agent.json .devcontainer/*.sh`. The guard refuses an AI agent writing them (editing, redirection, `cp`, `mv`, `tee`, `sed -i`...) and committing them (`repowarden cc`, `git commit`: index, `-a`, given paths). The setting is read in the working tree's `.repowarden.conf` **and** in the one of `HEAD` (union): removing a pattern from the tree lifts nothing; the local `git config` is ignored for this key. `agentsConfig = true` does not lift it: they are two separate maintainer decisions.
 
 ## Integration branch flow (`develop`)
 

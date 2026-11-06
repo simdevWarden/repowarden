@@ -17,6 +17,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "$ROOT/hooks/lib/common.sh"
 # shellcheck source=../hooks/lib/tickets.sh
 source "$ROOT/hooks/lib/tickets.sh"
+# shellcheck source=../hooks/lib/chemins-proteges.sh
+source "$ROOT/hooks/lib/chemins-proteges.sh"
 
 aide() { _tr help.garde; printf '%b\n' "$_T"; }
 
@@ -107,6 +109,7 @@ verifier_commit() {
         tickets_managed && refuser garde.commit_protegee "$1" "$b"
         refuser garde.commit_protegee_libre "$1" "$b"
     fi
+    verifier_commit_chemins "${@:2}"
 }
 
 # Vrai si les mots $@ demandent une lecture seule (aide, aperçu) : rien n'est
@@ -125,7 +128,7 @@ verifier_cc() {
     (
         cd "$REPLY" 2>/dev/null || exit 0
         depot_repowarden || exit 0
-        verifier_commit "$1"
+        verifier_commit "$@"
         exit 0
     ) || exit $?
 }
@@ -190,19 +193,25 @@ chemin_racine_r() {
 # Refus si le fichier $1 (depuis le dossier $2) est la configuration d'un outil
 # de vérification : réglage du mainteneur, en tout lieu d'un dépôt repowarden
 verifier_config_cible() {
-    local p="${1%$'\r'}" d
+    local p="${1%$'\r'}" d outil="" rel
     case "$p" in /* | [A-Za-z]:[/\\]*) ;; *) p="$2/$p" ;; esac
-    config_outil_possible "$p" || return 0
+    ! config_outil_possible "$p" || outil=1
     dossier_r "$2"
     d="$REPLY"
     (
         cd "$d" 2>/dev/null || exit 0
         depot_repowarden || exit 0
+        # Chemin protégé (agentsProtectedPaths) : jamais levé par agentsConfig
+        proteges_charger
+        [ -n "$outil${PROTEGES// /}" ] || exit 0
+        chemin_racine_r "$p"
+        rel="$REPLY"
+        ! chemin_protege "$rel" || refuser garde.chemin_protege "$rel"
+        [ -n "$outil" ] || exit 0
         cfg_r agentsConfig false
         [ "$REPLY" != true ] || exit 0
-        chemin_racine_r "$p"
-        config_outil "$REPLY" || exit 0
-        refuser garde.config_verification "$REPLY"
+        config_outil "$rel" || exit 0
+        refuser garde.config_verification "$rel"
     ) || exit $?
 }
 
@@ -360,6 +369,7 @@ verifier_git() {
                     esac
                 done
                 hooks_actifs || refuser garde.sans_hooks "$ligne"
+                verifier_commit_chemins ${args_git[@]+"${args_git[@]}"}
                 [ -n "$amend" ] && [ -n "$noedit" ] && exit 0
                 refuser garde.commit "$ligne"
                 ;;
@@ -375,7 +385,7 @@ verifier_git() {
                 done
                 ;;
             cc)
-                lecture_seule ${args_git[@]+"${args_git[@]}"} || verifier_commit "$ligne"
+                lecture_seule ${args_git[@]+"${args_git[@]}"} || verifier_commit "$ligne" ${args_git[@]+"${args_git[@]}"}
                 ;;
             add)
                 for mot in ${args_git[@]+"${args_git[@]}"}; do
@@ -761,7 +771,7 @@ verifier_shell() {
                     cc | commit)
                         cmd_cc="repowarden ${2//[\"\']/}"
                         shift 2
-                        lecture_seule "${@//[\"\']/}" || verifier_cc "$cmd_cc"
+                        lecture_seule "${@//[\"\']/}" || verifier_cc "$cmd_cc" "${@//[\"\']/}"
                         ;;
                     ticket | ticket-label)
                         shift
