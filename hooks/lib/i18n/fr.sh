@@ -438,7 +438,7 @@ _msg_fr() {
         dc.knip_dep) _M="dépendance jamais importée :" ;;
         # Tests retirés par une PR (vérification tests)
         ci.check.tests_down) _M="%s : %s → %s tests (avant → après) ; une PR ne retire pas de tests." ;;
-        ci.check.tests_fix) _M="  Corriger : remettre les tests retirés, ou l'écrire dans la description de la PR (ligne « Tests retirés : <raison> », « Tests removed: … » en anglais)." ;;
+        ci.check.tests_fix) _M="  Corriger : remettre les tests retirés, ou l'écrire dans la description de la PR ou dans un message de commit (ligne « Tests retirés : <raison> », « Tests removed: … » en anglais)." ;;
         # Fonctions ajoutées sans commentaire
         cm.section) _M="Fonctions sans commentaire (nouveau code uniquement)" ;;
         cm.no_base) _M="Pas de base : contrôle des commentaires ignoré." ;;

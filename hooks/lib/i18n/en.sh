@@ -437,7 +437,7 @@ _msg_en() {
         dc.knip_dep) _M="dependency never imported:" ;;
         # Tests removed by a PR (tests check)
         ci.check.tests_down) _M="%s: %s → %s tests (before → after); a PR does not remove tests." ;;
-        ci.check.tests_fix) _M="  Fix: restore the removed tests, or write it in the PR description (line \"Tests removed: <reason>\", \"Tests retirés : …\" also accepted)." ;;
+        ci.check.tests_fix) _M="  Fix: restore the removed tests, or write it in the PR description or in a commit message (line \"Tests removed: <reason>\", \"Tests retirés : …\" also accepted)." ;;
         # Functions added without a comment
         cm.section) _M="Functions without a comment (new code only)" ;;
         cm.no_base) _M="No base: comment check skipped." ;;

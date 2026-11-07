@@ -20,6 +20,8 @@ REPOWARDEN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "$REPOWARDEN_DIR/hooks/lib/common.sh"
 # shellcheck source=../hooks/lib/lang.sh
 source "$REPOWARDEN_DIR/hooks/lib/lang.sh"
+# shellcheck source=../hooks/lib/tests-declares.sh
+source "$REPOWARDEN_DIR/hooks/lib/tests-declares.sh"
 
 export PATH="${REPOWARDEN_BIN:-$HOME/.local/bin}:$PATH"
 cd "$(git rev-parse --show-toplevel)"
@@ -275,10 +277,8 @@ tests_nombre() {
 # baisse pas entre la base et la tête, sauf raison écrite dans la PR (#518)
 tests_declares_check() {
     [ -n "$BASE" ] || return 0
-    # La raison est déjà donnée dans la description : permis, mais dit
-    if grep -qE '^Tests (retirés|removed) *: .' <<<"${REPOWARDEN_PR_BODY:-${CI_MERGE_REQUEST_DESCRIPTION:-}}"; then
-        return 0
-    fi
+    # La raison est déjà écrite (PR, message de commit, PR fusionnée) : permis
+    if tests_declares_r "$BASE"; then return 0; fi
     local st a b anc nou av ap baisse=0
     while IFS=$'\t' read -r st a b; do
         [ -n "$st" ] || continue
