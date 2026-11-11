@@ -397,6 +397,7 @@ _msg_fr() {
         ci.proteger.what_workflow) _M="Permissions des workflows" ;;
         ci.proteger.what_environment) _M="Environnement de déploiement" ;;
         ci.proteger.tags_fallback) _M="Ruleset des tags : exception « GitHub Actions » refusée dans cette organisation ; tags protégés comme sur un compte personnel (ni déplacés ni supprimés, création libre)." ;;
+        ci.proteger.no_app) _M="App inconnue (variable REPOWARDEN_APP_SLUG absente) : %s ne sera pas alignée automatiquement après une livraison. Lancer repowarden app init." ;;
         ci.version.usage) _M="Usage : ci/version.sh next|notes|notes-livraison [ref]" ;;
         ci.version.breaking) _M="Changements incompatibles" ;;
         ci.version.features) _M="Fonctionnalités" ;;

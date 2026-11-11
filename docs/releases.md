@@ -144,6 +144,8 @@ jobs:
 
 Le rythme des versions stables est régulier : `develop` accumule, une livraison par fenêtre publie le tout en **une** version, mineure ou majeure selon les commits. À sa sortie, les préversions de cette version sont retirées de GitHub (sur npm, elles restent : une version publiée ne se retire pas).
 
+Après chaque livraison sur `main`, le job `aligner-develop` (mode tag) avance `develop` jusqu'à `main` : `git merge-base --is-ancestor` vérifie que `develop` est incluse dans `main`, puis `git push origin main:refs/heads/develop` la rattrape (jamais `--force`). Le premier passage rattrape le retard ; le run résume `alignee`, `deja alignee` ou `non alignee` (`develop` a avancé, aucun rattrapage automatique). `repowarden proteger` ajoute la GitHub App aux `bypass_actors` du ruleset de `develop` (identifiant numérique `actor_id`, `actor_type Integration`, `bypass_mode always`, lu depuis la variable `REPOWARDEN_APP_SLUG`) pour lui permettre ce push ; `main` est inchangée. App introuvable : aucun bypass, un avertissement, et `develop` ne sera pas alignée automatiquement.
+
 !!! note "Approuver quand on veut"
     L'approbation porte sur l'instantané figé au moment de la demande : le travail mergé ensuite dans `develop` ne la rend pas caduque, il partira à la livraison suivante. Une nouvelle demande (urgence, relance) remplace la précédente ; l'instantané d'une demande remplacée, refusée (PR fermée) ou déjà publiée est supprimé au run suivant, s'il n'a aucun commit absent de `develop` ([nettoyage des branches](industrialisation.md#branches-mergees-supprimees-automatiquement)). Seuls `develop` et ses instantanés `livraison/*` peuvent entrer dans `main`, jamais sans approbation.
 
