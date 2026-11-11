@@ -656,6 +656,49 @@ print(json.dumps(out))' <<<"$(sed -n '/^{/,$p' <<<"$1")"
         "$(rulesets_json "$output")"
 }
 
+# Ruleset de branche au nom libre : $1 id, $2 nom, $3 branches (JSON), $4 bypass_actors (JSON)
+ruleset_libre() {
+    printf '{"id": %s, "name": "%s", "target": "branch", "source_type": "Repository", "bypass_actors": %s, "conditions": {"ref_name": {"include": %s, "exclude": []}}, "rules": [{"type": "deletion"}]}' "$1" "$2" "$4" "$3"
+}
+
+@test "proteger : bypass de l'App sur chaque ruleset de develop, aucun sur main" {
+    require jq
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    # deux rulesets sur develop (dont un avec un autre bypass), un sur main, un sur autre chose
+    export GH_RULESETS="[$(ruleset_libre 21 "Protection A" '["refs/heads/develop"]' '[]'),
+        $(ruleset_libre 22 "Protection B" '["refs/heads/develop"]' '[{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}]'),
+        $(ruleset_libre 23 "Protection main" '["refs/heads/main"]' '[]'),
+        $(ruleset_libre 24 "Releases" '["refs/heads/release/*"]' '[]')]"
+    GH_BRANCHES="main develop" run "$PROTEGER"
+    [ "$status" -eq 0 ]
+    grep -q "^api -X PUT repos/moi/projet/rulesets/21 " "$GH_LOG"
+    grep -q "^api -X PUT repos/moi/projet/rulesets/22 " "$GH_LOG"
+    ! grep -q "^api -X PUT repos/moi/projet/rulesets/23 " "$GH_LOG"
+    ! grep -q "^api -X PUT repos/moi/projet/rulesets/24 " "$GH_LOG"
+    # le bypass existant de B est conserve, celui de l'App ajoute
+    grep -q '"actor_id": *5' "$GH_LOG"
+    [ "$(grep -c '"actor_id": *12345' "$GH_LOG")" -ge 2 ]
+    [[ "$output" == *"Protection A : App ajoutée"* ]] || false
+    [[ "$output" == *"Protection B : App ajoutée"* ]] || false
+}
+
+@test "proteger --verifier : bypass de l'App manquant sur un ruleset de develop -> ecart" {
+    require jq
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    export GH_RULESETS="[$(ruleset_libre 21 "Protection A" '["refs/heads/develop"]' '[]')]"
+    GH_BRANCHES="main develop" run "$PROTEGER" --verifier
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"Protection A (id 21) : App absente des acteurs de contournement"* ]] || false
+    # bypass present -> plus d'ecart de ce type
+    export GH_RULESETS="[$(ruleset_libre 21 "Protection A" '["refs/heads/develop"]' '[{"actor_id": 12345, "actor_type": "Integration", "bypass_mode": "always"}]')]"
+    GH_BRANCHES="main develop" run "$PROTEGER" --verifier
+    [[ "$output" != *"App absente"* ]] || false
+}
+
 @test "proteger : livraison exigee sur la branche principale si release-auto est appele (flux develop)" {
     require python3
     fake_gh_repo
