@@ -120,8 +120,8 @@ refs_json() { # branches → "refs/heads/a", "refs/heads/b"
 # $7 règle supplémentaire (JSON, ex. déploiement réussi exigé),
 # $8 acteurs autorisés à contourner le ruleset (JSON tableau, défaut [])
 branch_ruleset() {
-    # shellcheck disable=SC2086 # liste de branches volontairement découpée
     local acteurs="${8:-[]}"
+    # shellcheck disable=SC2086 # $2 : liste de branches, découpage voulu
     cat <<JSON
 {
   "name": "$1",
@@ -229,9 +229,20 @@ if [ -n "$integration" ]; then
     # entrant dans main. PR à jour non exigée : la CI vérifie chaque push.
     # La GitHub App doit pouvoir pousser develop après une livraison sur main
     # (aligner-develop, jamais --force) ; main garde bypass_actors vide.
+    # GitHub exige son identifiant numérique : lu par son slug public (variable
+    # REPOWARDEN_APP_SLUG, posée par repowarden app init), sans jeton d'App.
+    app_bypass=""
+    app_slug="$(gh variable get REPOWARDEN_APP_SLUG --repo "$REPO" 2>/dev/null || true)"
+    if [ -n "$app_slug" ]; then
+        app_id="$(gh api "apps/$app_slug" --jq .id 2>/dev/null || true)"
+        [[ "$app_id" =~ ^[0-9]+$ ]] &&
+            app_bypass="[{\"actor_id\": $app_id, \"actor_type\": \"Integration\", \"bypass_mode\": \"always\"}]"
+    fi
+    # Sans identifiant, aucun bypass : ne pas empêcher develop d'être protégée
+    [ -n "$app_bypass" ] || attention_t ci.proteger.no_app "$integration"
     [[ " $existing " != *" $integration "* ]] ||
         rulesets+=("$(branch_ruleset "repowarden ($integration)" "$integration" '"squash"' false "" "" "" \
-            '[{"actor_type": "Integration", "bypass_mode": "always"}]')")
+            "$app_bypass")")
     merge_commit=true
     # Nettoyage par le workflow nettoyage-branches (garde une branche encore
     # source d'une autre PR ouverte)
