@@ -84,6 +84,16 @@ force() { grep -q -- "--force" "$GIT_LOG"; }
     ! force
 }
 
+@test "aligner-develop : le push porte les identifiants de l'App (credential.helper)" {
+    require python3
+    faux_git
+    faux_gh
+    DEV_SHA="dev-sha" MAIN_SHA="main-sha" DEV_ANCESTOR_MAIN=1
+    run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    grep -q "credential.helper=!gh auth git-credential push origin origin/main:refs/heads/develop" "$GIT_LOG"
+}
+
 @test "aligner-develop : develop a avance sur main -> pas de push, jamais --force" {
     require python3
     faux_git

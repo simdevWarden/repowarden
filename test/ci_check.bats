@@ -1324,6 +1324,13 @@ GH
     grep -q "credential.helper=!gh auth git-credential' fetch -q origin" "$BATS_TEST_DIRNAME"/../.github/workflows/release-auto.yml
 }
 
+@test "release-auto : aligner-develop recupere les scripts et ignore un tag en echec" {
+    local wf="$BATS_TEST_DIRNAME/../.github/workflows/release-auto.yml" job
+    job="$(awk '/^  aligner-develop:/ { j = 1 } j && /^  [a-z][a-z-]*:$/ && !/^  aligner-develop:/ { j = 0 } j' "$wf")"
+    [[ "$job" == *"path: .repowarden-ci"* ]] || false
+    [[ "$job" == *"needs.tag.result == 'success'"* ]] || false
+}
+
 # --- ci/livraison.sh (statut « livraison » de la PR de livraison) : gh simulé ----
 
 LIVRAISON="$BATS_TEST_DIRNAME/../ci/livraison.sh"

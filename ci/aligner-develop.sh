@@ -12,10 +12,13 @@ set -euo pipefail
 INTEGRATION="${INTEGRATION-develop}"
 MAIN="${MAIN-main}"
 
-# Identifiants par le jeton de l'etape (GH_TOKEN, via gh) : un depot prive
-# refuse le fetch anonyme (checkout sans identifiants persistes)
-git -c credential.helper= -c 'credential.helper=!gh auth git-credential' \
-    fetch -q origin "$MAIN" "$INTEGRATION"
+# Git authentifie par le jeton de l'etape (GH_TOKEN, via gh) : un depot prive
+# refuse le fetch et le push anonymes (checkout sans identifiants persistes).
+git_app() {
+    git -c credential.helper= -c 'credential.helper=!gh auth git-credential' "$@"
+}
+
+git_app fetch -q origin "$MAIN" "$INTEGRATION"
 
 # develop est incluse dans main : rien (deja alignee) ou un rattrapage
 if git merge-base --is-ancestor "origin/$INTEGRATION" "origin/$MAIN"; then
@@ -24,7 +27,7 @@ if git merge-base --is-ancestor "origin/$INTEGRATION" "origin/$MAIN"; then
         exit 0
     fi
     # Push rapide (fast-forward) : jamais --force
-    git push origin "origin/$MAIN:refs/heads/$INTEGRATION"
+    git_app push origin "origin/$MAIN:refs/heads/$INTEGRATION"
     echo "$INTEGRATION alignee sur $MAIN."
 else
     # develop a avance sur main : la pousser a main effacerait ses commits
