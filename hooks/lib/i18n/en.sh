@@ -396,7 +396,9 @@ _msg_en() {
         ci.proteger.what_workflow) _M="Workflow permissions" ;;
         ci.proteger.what_environment) _M="Deployment environment" ;;
         ci.proteger.tags_fallback) _M="Tags ruleset: \"GitHub Actions\" bypass refused in this organization; tags protected as on a personal account (not moved or deleted, creation allowed)." ;;
-        ci.proteger.no_app) _M="Unknown App (REPOWARDEN_APP_SLUG variable missing): %s will not be aligned automatically after a delivery. Run repowarden app init." ;;
+        ci.proteger.verify_bypass) _M="%s (id %s): App missing from bypass actors; %s will not be aligned after a delivery" ;;
+        ci.proteger.bypass_added) _M="%s: App added to bypass actors (%s)" ;;
+        ci.proteger.no_app)_M="Unknown App (REPOWARDEN_APP_SLUG variable missing): %s will not be aligned automatically after a delivery. Run repowarden app init." ;;
         ci.version.usage) _M="Usage: ci/version.sh next|notes|notes-livraison [ref]" ;;
         ci.version.breaking) _M="Breaking changes" ;;
         ci.version.features) _M="Features" ;;
