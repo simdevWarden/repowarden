@@ -30,7 +30,11 @@ faux_git() {
 #!/usr/bin/env bash
 echo "$*" >>"$GIT_LOG"
 case "$*" in
-    *"fetch"*) ;;
+    *"fetch"*)
+        if [ -n "${FETCH_REFUSE:-}" ]; then
+            echo "fatal: unable to access remote" >&2
+            exit 128
+        fi ;;
     *"merge-base --is-ancestor"*) [ "$DEV_ANCESTOR_MAIN" = 1 ] || exit 1 ;;
     "rev-parse origin/develop") echo "$DEV_SHA" ;;
     "rev-parse origin/main") echo "$MAIN_SHA" ;;
@@ -123,6 +127,21 @@ force() { grep -q -- "--force" "$GIT_LOG"; }
     [[ "$output" == *"GH013: Repository rule violations"* ]] || false
     grep -q "develop non alignee sur main" "$GITHUB_STEP_SUMMARY"
     poussee
+    ! force
+}
+
+@test "aligner-develop : fetch en echec -> code 0, avertissement, aucun push" {
+    require python3
+    faux_git
+    faux_gh
+    export GITHUB_STEP_SUMMARY="$BATS_TEST_TMPDIR/summary"
+    : >"$GITHUB_STEP_SUMMARY"
+    FETCH_REFUSE=1 run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"::warning::develop non alignee sur main : fetch refuse"* ]] || false
+    [[ "$output" == *"unable to access remote"* ]] || false
+    grep -q "fetch refuse" "$GITHUB_STEP_SUMMARY"
+    ! poussee
     ! force
 }
 
