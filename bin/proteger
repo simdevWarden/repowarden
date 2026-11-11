@@ -117,15 +117,17 @@ refs_json() { # branches → "refs/heads/a", "refs/heads/b"
 # Ruleset de branches : $1 nom, $2 branches (liste), $3 méthodes de merge (JSON),
 # $4 PR à jour exigée (défaut true), $5 approbations (défaut REVIEWS),
 # $6 dernier push approuvé par un autre (défaut selon REVIEWS),
-# $7 règle supplémentaire (JSON), ex. déploiement réussi exigé
+# $7 règle supplémentaire (JSON, ex. déploiement réussi exigé),
+# $8 acteurs autorisés à contourner le ruleset (JSON tableau, défaut [])
 branch_ruleset() {
     # shellcheck disable=SC2086 # liste de branches volontairement découpée
+    local acteurs="${8:-[]}"
     cat <<JSON
 {
   "name": "$1",
   "target": "branch",
   "enforcement": "active",
-  "bypass_actors": [],
+  "bypass_actors": $acteurs,
   "conditions": {"ref_name": {"include": [$(refs_json $2)], "exclude": []}},
   "rules": [
     {"type": "deletion"},
@@ -225,8 +227,11 @@ if [ -n "$integration" ]; then
     # message : les commits intermédiaires n'entrent jamais) ; plus de retour
     # main → develop à merger, seuls develop et ses instantanés livraison/*
     # entrant dans main. PR à jour non exigée : la CI vérifie chaque push.
+    # La GitHub App doit pouvoir pousser develop après une livraison sur main
+    # (aligner-develop, jamais --force) ; main garde bypass_actors vide.
     [[ " $existing " != *" $integration "* ]] ||
-        rulesets+=("$(branch_ruleset "repowarden ($integration)" "$integration" '"squash"' false)")
+        rulesets+=("$(branch_ruleset "repowarden ($integration)" "$integration" '"squash"' false "" "" "" \
+            '[{"actor_type": "Integration", "bypass_mode": "always"}]')")
     merge_commit=true
     # Nettoyage par le workflow nettoyage-branches (garde une branche encore
     # source d'une autre PR ouverte)

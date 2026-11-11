@@ -580,7 +580,7 @@ print(json.dumps(out))' <<<"$(sed -n '/^{/,$p' <<<"$1")"
         assert [c["context"] for c in d["rules"][3]["parameters"]["required_status_checks"]]==["repowarden","tests (ubuntu-latest)"]; \
         assert m["rules"][3]["parameters"]["strict_required_status_checks_policy"] is False; \
         assert d["rules"][3]["parameters"]["strict_required_status_checks_policy"] is False; \
-        assert m["bypass_actors"]==[] and d["bypass_actors"]==[]; \
+        assert m["bypass_actors"]==[] and d["bypass_actors"]==[{"actor_type":"Integration","bypass_mode":"always"}]; \
         assert m["rules"][2]["parameters"]["required_approving_review_count"]==0; \
         assert m["rules"][4]=={"type":"required_deployments","parameters":{"required_deployment_environments":["production"]}}; \
         assert m["rules"][2]["parameters"]["require_last_push_approval"] is False; \
@@ -616,6 +616,20 @@ print(json.dumps(out))' <<<"$(sed -n '/^{/,$p' <<<"$1")"
     GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
     [ "$status" -ne 0 ]
     git config --unset repowarden.deliveryApproval
+}
+
+@test "proteger : bypass GitHub App sur la branche d'integration seulement, pas sur main" {
+    require python3
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
+    [ "$status" -eq 0 ]
+    python3 -c 'import json,sys; r=json.loads(sys.argv[1]); m,d=r[0],r[1]; \
+        assert m["bypass_actors"]==[]; \
+        assert d["bypass_actors"]==[{"actor_type":"Integration","bypass_mode":"always"}]; \
+        assert m["name"]=="repowarden" and d["name"]=="repowarden (develop)"' \
+        "$(rulesets_json "$output")"
 }
 
 @test "proteger : livraison exigee sur la branche principale si release-auto est appele (flux develop)" {
