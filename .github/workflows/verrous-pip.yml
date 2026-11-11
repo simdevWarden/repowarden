@@ -84,3 +84,41 @@ jobs:
           REPOWARDEN_BOT_NAME: ${{ steps.identite.outputs.name }}
           REPOWARDEN_BOT_EMAIL: ${{ steps.identite.outputs.email }}
         run: bash ci/verrous-pip.sh
+
+  # Contrôle léger sur PR : un verrou modifié doit s'installer avec ses
+  # hashes. Échoue si l'un d'eux est incomplet (ex. dépendance manquante
+  # selon la version de Python), sans rien régénérer.
+  controle:
+    name: verrous pip (contrôle)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+      - name: Contrôle des verrous modifiés
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          verrous="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" -- 'ci/requirements/*.txt' 'docs/*requirements*.txt')"
+          if [ -z "$verrous" ]; then
+            echo "Aucun verrou *.txt modifié : contrôle ignoré."
+            exit 0
+          fi
+          while IFS= read -r verrou; do
+            [ -n "$verrou" ] || continue
+            echo "::group::$verrou"
+            rm -rf .essai/venv
+            python3 -m venv .essai/venv
+            .essai/venv/bin/pip install --require-hashes -r "$verrou"
+            rm -rf .essai/venv
+            echo "::endgroup::"
+          done <<<"$verrous"
+          rm -rf .essai
