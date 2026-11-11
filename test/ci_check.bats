@@ -492,6 +492,11 @@ if [ -n "${GH_RULESETS_403:-}" ] && [[ "$*" == *"repos/moi/projet/rulesets"* ]];
 fi
 case "$*" in
     "repo view"*) echo moi/projet ;;
+    # GitHub App : slug rangé par repowarden app init, identifiant public par slug
+    "variable get REPOWARDEN_APP_SLUG --repo moi/projet")
+        v="${GH_APP_SLUG-repowarden-moi}"; [ -n "$v" ] || exit 1; echo "$v" ;;
+    "api apps/"*" --jq .id")
+        v="${GH_APP_ID-12345}"; [ -n "$v" ] || exit 1; echo "$v" ;;
     "api user --jq .login") echo moi ;;
     "api repos/moi/projet --jq .owner.type") echo "${GH_OWNER_TYPE:-User}" ;;
     "api repos/moi/projet --jq .default_branch") echo "${GH_DEFAULT_BRANCH:-main}" ;;
@@ -580,7 +585,7 @@ print(json.dumps(out))' <<<"$(sed -n '/^{/,$p' <<<"$1")"
         assert [c["context"] for c in d["rules"][3]["parameters"]["required_status_checks"]]==["repowarden","tests (ubuntu-latest)"]; \
         assert m["rules"][3]["parameters"]["strict_required_status_checks_policy"] is False; \
         assert d["rules"][3]["parameters"]["strict_required_status_checks_policy"] is False; \
-        assert m["bypass_actors"]==[] and d["bypass_actors"]==[]; \
+        assert m["bypass_actors"]==[] and d["bypass_actors"]==[{"actor_id":12345,"actor_type":"Integration","bypass_mode":"always"}]; \
         assert m["rules"][2]["parameters"]["required_approving_review_count"]==0; \
         assert m["rules"][4]=={"type":"required_deployments","parameters":{"required_deployment_environments":["production"]}}; \
         assert m["rules"][2]["parameters"]["require_last_push_approval"] is False; \
@@ -616,6 +621,39 @@ print(json.dumps(out))' <<<"$(sed -n '/^{/,$p' <<<"$1")"
     GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
     [ "$status" -ne 0 ]
     git config --unset repowarden.deliveryApproval
+}
+
+@test "proteger : bypass GitHub App sur la branche d'integration seulement, pas sur main" {
+    require python3
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
+    [ "$status" -eq 0 ]
+    python3 -c 'import json,sys; r=json.loads(sys.argv[1]); m,d=r[0],r[1]; \
+        assert m["bypass_actors"]==[]; \
+        assert d["bypass_actors"]==[{"actor_id":12345,"actor_type":"Integration","bypass_mode":"always"}]; \
+        assert m["name"]=="repowarden" and d["name"]=="repowarden (develop)"' \
+        "$(rulesets_json "$output")"
+    # JSON réellement envoyé : identifiant numérique de l'App pour develop
+    : >"$GH_LOG"
+    GH_BRANCHES="main develop" run "$PROTEGER"
+    [ "$status" -eq 0 ]
+    grep -q '"actor_id": 12345' "$GH_LOG"
+}
+
+@test "proteger : App inconnue -> aucun bypass (develop), avertissement, main inchangee" {
+    require python3
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    GH_APP_SLUG="" GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"App inconnue"* ]] || false
+    [[ "$output" == *"ne sera pas alignée automatiquement"* ]] || false
+    python3 -c 'import json,sys; r=json.loads(sys.argv[1]); m,d=r[0],r[1]; \
+        assert m["bypass_actors"]==[] and d["bypass_actors"]==[]' \
+        "$(rulesets_json "$output")"
 }
 
 @test "proteger : livraison exigee sur la branche principale si release-auto est appele (flux develop)" {
@@ -1308,6 +1346,13 @@ GH
         "$BATS_TEST_DIRNAME"/../.github/workflows/tickets.yml "$BATS_TEST_DIRNAME"/../.github/workflows/bot.yml
     [ -z "$output" ] || { echo "sans identifiants :"; echo "$output"; return 1; }
     grep -q "credential.helper=!gh auth git-credential' fetch -q origin" "$BATS_TEST_DIRNAME"/../.github/workflows/release-auto.yml
+}
+
+@test "release-auto : aligner-develop recupere les scripts et ignore un tag en echec" {
+    local wf="$BATS_TEST_DIRNAME/../.github/workflows/release-auto.yml" job
+    job="$(awk '/^  aligner-develop:/ { j = 1 } j && /^  [a-z][a-z-]*:$/ && !/^  aligner-develop:/ { j = 0 } j' "$wf")"
+    [[ "$job" == *"path: .repowarden-ci"* ]] || false
+    [[ "$job" == *"needs.tag.result == 'success'"* ]] || false
 }
 
 # --- ci/livraison.sh (statut « livraison » de la PR de livraison) : gh simulé ----

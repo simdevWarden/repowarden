@@ -757,6 +757,47 @@ jobs:
           INTEGRATION: ${{ inputs.integration-branch }}
         run: bash .repowarden-ci/ci/instantanes.sh
 
+  # Apres une livraison sur main (mode tag) : develop avance jusqu'a main, sans
+  # jamais la preceder (jamais --force). Le premier passage rattrape le retard.
+  # Un job dont un ancetre est saute est saute aussi (!cancelled()).
+  aligner-develop:
+    needs: tag
+    if: >-
+      inputs.mode == 'tag' && github.ref_name == inputs.main-branch &&
+      needs.tag.result == 'success' && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # pousser main dans la branche d'integration
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # tags et historique : comparer develop et main
+          persist-credentials: false
+      # Scripts de repowarden (aligner-develop.sh), pas le code du projet
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: simdevWarden/repowarden
+          ref: ${{ inputs.repowarden-ref }}
+          path: .repowarden-ci
+          persist-credentials: false
+      # Jeton de la GitHub App : pousser develop (utilise deja par le workflow)
+      - name: Jeton de l'App
+        id: app
+        if: inputs.app-client-id != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ inputs.app-client-id }}
+          private-key: ${{ secrets.app-key }}
+          permission-contents: write
+      - name: Aligner la branche d'integration sur la branche principale
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token || github.token }}
+          GH_REPO: ${{ github.repository }}
+          INTEGRATION: ${{ inputs.integration-branch }}
+          MAIN: ${{ inputs.main-branch }}
+        run: bash .repowarden-ci/ci/aligner-develop.sh
+
   # Canal de l'équipe (optionnel) : release publiée, PR de release à approuver,
   # échec. Sans secret webhook, rien n'est envoyé. Message dans la langue du projet.
   # Mode tag : livraison validée par l'approbation de l'environnement
