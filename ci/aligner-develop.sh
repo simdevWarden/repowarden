@@ -4,7 +4,8 @@
 # main, jamais l'inverse. Le premier passage rattrape le retard.
 #   ci/aligner-develop.sh
 # Sortie : « alignee », « deja alignee » ou « non alignee » (develop a avance :
-# aucun push, jamais --force). Toujours un code de retour nul (informations).
+# aucun push, jamais --force) ou avertissement (push refuse). Toujours un code
+# de retour nul : l'alignement ne doit jamais bloquer la publication npm.
 # Environnement : GH_TOKEN (push de l'App, via gh), INTEGRATION (develop par
 # defaut), MAIN (main par defaut).
 set -euo pipefail
@@ -26,9 +27,17 @@ if git merge-base --is-ancestor "origin/$INTEGRATION" "origin/$MAIN"; then
         echo "$INTEGRATION est deja alignee sur $MAIN."
         exit 0
     fi
-    # Push rapide (fast-forward) : jamais --force
-    git_app push origin "origin/$MAIN:refs/heads/$INTEGRATION"
-    echo "$INTEGRATION alignee sur $MAIN."
+    # Push rapide (fast-forward) : jamais --force. Refus (ruleset sans bypass de
+    # l'App, protection) : avertissement avec la raison de git, jamais un echec
+    if sortie="$(git_app push origin "origin/$MAIN:refs/heads/$INTEGRATION" 2>&1)"; then
+        echo "$INTEGRATION alignee sur $MAIN."
+    else
+        sortie="$(tr '\n' ' ' <<<"$sortie")"
+        echo "::warning::$INTEGRATION non alignee sur $MAIN : push refuse ($sortie). Lancer repowarden proteger (bypass de l'App sur chaque ruleset de $INTEGRATION)."
+        if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
+            echo "- $INTEGRATION non alignee sur $MAIN : push refuse ($sortie)" >>"$GITHUB_STEP_SUMMARY"
+        fi
+    fi
 else
     # develop a avance sur main : la pousser a main effacerait ses commits
     echo "$INTEGRATION a avance sur $MAIN : aucun rattrapage automatique (jamais --force)."

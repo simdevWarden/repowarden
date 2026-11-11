@@ -427,6 +427,29 @@ RULESETS_OK=1
 ANCIENS=""
 [ -z "$RULESETS_OK" ] || anciens_rulesets
 
+# Rulesets de branche du dépôt qui visent la branche d'intégration (main exclue)
+# sans l'App parmi leurs acteurs de contournement : un seul ruleset sans bypass
+# suffit à refuser le push d'aligner-develop. Une ligne par ruleset dans
+# SANS_BYPASS : id et nom, séparés par une tabulation. Sans App connue ou sans
+# branche d'intégration : rien.
+# shellcheck disable=SC2016 # expressions jq (gh --jq), pas du shell
+rulesets_sans_bypass() {
+    local ids id ligne mains="" b
+    SANS_BYPASS=""
+    [ -n "$integration" ] && [ -n "${app_id:-}" ] || return 0
+    for b in $existing; do [ "$b" = "$integration" ] || mains="$mains\"refs/heads/$b\","; done
+    ids="$(gh api "repos/$REPO/rulesets" --jq '.[] | select(.target == "branch"
+        and (.source_type // "Repository") == "Repository") | .id' 2>/dev/null)" || return 0
+    for id in $ids; do
+        ligne="$(gh api "repos/$REPO/rulesets/$id" --jq "[${mains%,}] as \$m
+            | select((.conditions.ref_name.include | index(\"refs/heads/$integration\"))
+                and (.conditions.ref_name.include | any(. as \$i | \$m | index(\$i))) == false
+                and ([.bypass_actors[]? | select(.actor_type == \"Integration\" and .actor_id == $app_id)] | length) == 0)
+            | \"\(.id)\t\(.name)\"" 2>/dev/null)" || continue
+        [ -z "$ligne" ] || SANS_BYPASS="$SANS_BYPASS$ligne"$'\n'
+    done
+}
+
 # shellcheck disable=SC2016 # expression jq (gh --jq), pas du shell
 SIG_EN_LIGNE='(.rules | map(select(.type == "pull_request"))[0].parameters) as $p
     | "approbations=\($p.required_approving_review_count) dernier_push=\($p.require_last_push_approval) codeowners=\($p.require_code_owner_review) deploiement=\([.rules[] | select(.type == "required_deployments") | .parameters.required_deployment_environments[]] | join(",")) verifications=\([.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context] | sort | join(","))"'
@@ -463,6 +486,12 @@ if [ -n "$VERIFY" ]; then
         err_t ci.proteger.verify_legacy "$name" "$id"
         ecarts=$((ecarts + 1))
     done <<<"$ANCIENS"
+    rulesets_sans_bypass
+    while IFS=$'\t' read -r id name; do
+        [ -n "$id" ] || continue
+        err_t ci.proteger.verify_bypass "$name" "$id" "$integration"
+        ecarts=$((ecarts + 1))
+    done <<<"$SANS_BYPASS"
     [ "$ecarts" = 0 ] || { err_t ci.proteger.verify_fix; exit 1; }
     ok_t ci.proteger.verify_ok
     exit 0
@@ -579,6 +608,25 @@ for ruleset in ${rulesets[@]+"${rulesets[@]}"}; do
         echecs=$((echecs + 1))
     fi
 done
+# L'App contourne chaque ruleset qui vise la branche d'intégration (pas
+# seulement celui de repowarden) : sinon le push d'aligner-develop est refusé
+if [ -n "$RULESETS_OK" ]; then
+    rulesets_sans_bypass
+    while IFS=$'\t' read -r id name; do
+        [ -n "$id" ] || continue
+        acteurs="$(gh api "repos/$REPO/rulesets/$id" --jq ".bypass_actors + [{actor_id: $app_id, actor_type: \"Integration\", bypass_mode: \"always\"}]" 2>/dev/null || true)"
+        if [ -z "$acteurs" ]; then
+            err_t ci.proteger.api_error "$name" "bypass_actors"
+            echecs=$((echecs + 1))
+        elif reponse="$(gh api -X PUT "repos/$REPO/rulesets/$id" --input - 2>&1 <<<"{\"bypass_actors\": $acteurs}")"; then
+            ok_t ci.proteger.bypass_added "$name" "$integration"
+        else
+            erreur_github "$reponse"
+            err_t ci.proteger.api_error "$name" "$REPLY"
+            echecs=$((echecs + 1))
+        fi
+    done <<<"$SANS_BYPASS"
+fi
 # Anciens rulesets non repris (plusieurs sur les mêmes branches) : jamais
 # supprimés ici, la marche à suivre est donnée
 while IFS=$'\t' read -r id name _; do

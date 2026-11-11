@@ -34,7 +34,12 @@ case "$*" in
     *"merge-base --is-ancestor"*) [ "$DEV_ANCESTOR_MAIN" = 1 ] || exit 1 ;;
     "rev-parse origin/develop") echo "$DEV_SHA" ;;
     "rev-parse origin/main") echo "$MAIN_SHA" ;;
-    *"push origin origin/main:refs/heads/develop"*) ;;
+    *"push origin origin/main:refs/heads/develop"*)
+        # push refuse si $PUSH_REFUSE (ruleset sans bypass de l'App)
+        if [ -n "${PUSH_REFUSE:-}" ]; then
+            echo "remote: error: GH013: Repository rule violations found" >&2
+            exit 1
+        fi ;;
     *) exit 0 ;;
 esac
 GH
@@ -103,6 +108,21 @@ force() { grep -q -- "--force" "$GIT_LOG"; }
     [ "$status" -eq 0 ]
     [[ "$output" == *"aucun rattrapage automatique"* ]] || false
     ! poussee
+    ! force
+}
+
+@test "aligner-develop : push refuse -> code 0, avertissement avec la raison, resume" {
+    require python3
+    faux_git
+    faux_gh
+    export GITHUB_STEP_SUMMARY="$BATS_TEST_TMPDIR/summary"
+    : >"$GITHUB_STEP_SUMMARY"
+    DEV_SHA="dev-sha" MAIN_SHA="main-sha" DEV_ANCESTOR_MAIN=1 PUSH_REFUSE=1 run bash "$SCRIPT"
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"::warning::develop non alignee sur main"* ]] || false
+    [[ "$output" == *"GH013: Repository rule violations"* ]] || false
+    grep -q "develop non alignee sur main" "$GITHUB_STEP_SUMMARY"
+    poussee
     ! force
 }
 
