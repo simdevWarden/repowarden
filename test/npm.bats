@@ -152,7 +152,7 @@ setup() {
     [[ "$output" == *"Étape suivante : repowarden agents init"* ]] || false
     [[ "$output" != *"Tout est prêt"* ]] || false
     # Garde-fou de l'utilisateur, puis celui du dépôt : plus rien à signaler
-    printf '{"hooks":{"PreToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit|Bash","hooks":[{"type":"command","command":"repowarden garde --format claude"}]}]}}\n' >"$HOME/.claude/settings.json"
+    printf '{"hooks":{"PreToolUse":[{"matcher":"Edit|Write|MultiEdit|NotebookEdit|Bash","hooks":[{"type":"command","command":"repowarden guard --format claude"}]}]}}\n' >"$HOME/.claude/settings.json"
     run "$PKG/bin/repowarden" statut
     [[ "$output" != *"sans garde-fou"* ]] || false
     [[ "$output" == *"Tout est prêt"* ]] || false
@@ -184,7 +184,7 @@ setup() {
     # À jour pour l'utilisateur ; hook Claude d'une ancienne forme dans le dépôt
     cp "$PKG/hooks/agents/repowarden-garde.js" "$PKG/hooks/agents/repowarden-garde-v2.js" "$HOME/.config/opencode/plugins/"
     mkdir -p .claude
-    printf '{"hooks":{"PreToolUse":[{"matcher":"Edit|Write|Bash","hooks":[{"type":"command","command":"repowarden garde"}]}]}}\n' >.claude/settings.json
+    printf '{"hooks":{"PreToolUse":[{"matcher":"Edit|Write|Bash","hooks":[{"type":"command","command":"repowarden guard"}]}]}}\n' >.claude/settings.json
     REPOWARDEN_LANG=en run "$PKG/bin/repowarden" statut
     [[ "$output" == *"Outdated repowarden guard"*".claude/settings.json"* ]] || false
     [[ "$output" == *"repowarden agents init"* ]] || false

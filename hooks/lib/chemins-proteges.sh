@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Chemins protégés contre les agents (agentsProtectedPaths, #541) : le
 # mainteneur liste des motifs (jokers du shell, relatifs à la racine) que le
-# garde-fou refuse à un agent, à l'écriture comme au commit. Chargé par bin/garde.
+# garde-fou refuse à un agent, à l'écriture comme au commit. Chargé par bin/guard.
 
 # PROTEGES = motifs du réglage agentsProtectedPaths : union de .repowarden.conf
 # de l'arbre et de celui de HEAD, pour qu'en retirer un de l'arbre ne lève rien.

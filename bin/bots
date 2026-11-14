@@ -251,7 +251,7 @@ YAML
 # --- Modèles des workflows -------------------------------------------------
 modele_ci() {
     cat <<'YAML'
-# Vérifications repowarden en CI (obligatoires pour merger : repowarden proteger)
+# Vérifications repowarden en CI (obligatoires pour merger : repowarden protect)
 name: repowarden
 
 on:
@@ -582,8 +582,8 @@ for bot in ${BOTS[@]+"${BOTS[@]}"}; do
 done
 choisi tickets && lancer tickets bash "$BIN/tickets" init --repo "$REPO"
 choisi app && lancer app bash "$BIN/app" init --repo "$REPO"
-choisi proteger && lancer proteger bash "$BIN/proteger" --repo "$REPO"
-choisi npm && lancer npm bash "$BIN/npm-publication" --repo "$REPO"
+choisi proteger && lancer proteger bash "$BIN/protect" --repo "$REPO"
+choisi npm && lancer npm bash "$BIN/npm-publish" --repo "$REPO"
 
 echo >&2
 if [ "$echecs" = 0 ]; then

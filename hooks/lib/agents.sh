@@ -8,7 +8,7 @@ AGENTS_MODELES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../agents" && pwd -P)"
 # Plugins opencode, un par API : 1.x lit l'export nommé, 2.x l'export par
 # défaut, et 1.x ignore l'export nommé d'un module qui a les deux (#469)
 AGENTS_PLUGINS_OPENCODE="repowarden-garde.js repowarden-garde-v2.js"
-AGENTS_COMMANDE_CLAUDE="repowarden garde --format claude"
+AGENTS_COMMANDE_CLAUDE="repowarden guard --format claude"
 AGENTS_MATCHER_CLAUDE="Edit|Write|MultiEdit|NotebookEdit|Bash"
 
 # Modèles de la skill repowarden selon la langue (fr/en)
@@ -43,13 +43,13 @@ agents_plugin_perime() {
     agents_plugin_repowarden "$1" && ! cmp -s "$1" "$AGENTS_MODELES/$(basename "$1")"
 }
 
-# Vrai si le settings.json $1 a un hook « repowarden garde… » d'une autre forme
+# Vrai si le settings.json $1 a un hook « repowarden guard… » d'une autre forme
 # que l'actuelle (commande ou matcher) : posé par une version antérieure
 agents_claude_perime() {
     [ -f "$1" ] && command -v jq >/dev/null 2>&1 || return 1
     jq -e --arg c "$AGENTS_COMMANDE_CLAUDE" --arg m "$AGENTS_MATCHER_CLAUDE" '
         [.hooks.PreToolUse[]? | . as $e | .hooks[]?
-            | select((.command // "") | startswith("repowarden garde"))
+            | select((.command // "") | startswith("repowarden guard"))
             | select(.command != $c or $e.matcher != $m)] | length > 0' "$1" >/dev/null 2>&1
 }
 
@@ -104,7 +104,7 @@ agents_sans_garde() {
     fichiers+=("$AGENTS_CLAUDE_DIR/settings.json" "$AGENTS_OPENCODE_DIR/plugins/repowarden-garde.js" "$AGENTS_OPENCODE_DIR/plugins/repowarden-garde-v2.js")
     # Plugin repowarden d'une version antérieure : branché (périmé, pas absent)
     for f in "${fichiers[@]}"; do
-        ! grep -qs "repowarden garde" "$f" || return 1
+        ! grep -qs "repowarden guard" "$f" || return 1
         ! agents_plugin_repowarden "$f" || return 1
     done
     return 0

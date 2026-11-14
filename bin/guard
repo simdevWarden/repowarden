@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Garde-fou des agents IA : reçoit sur l'entrée standard une action d'agent
 # (JSON) et dit si elle est permise dans ce dépôt, avant qu'elle ne s'exécute.
-#   repowarden garde [--format claude|opencode]
+#   repowarden guard [--format claude|opencode]
 #     claude    hook PreToolUse de Claude Code : tool_name, tool_input, cwd
 #     opencode  plugin opencode (tool.execute.before) : tool, args, cwd (défaut)
 # Code 0 : permis. Code 2 : refusé, raison et commande à lancer sur la sortie

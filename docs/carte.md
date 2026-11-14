@@ -39,13 +39,13 @@ Pour chaque fichier du dépôt (suivi, ou nouveau et non ignoré, hors `repoward
 Lire seulement l'extrait utile, sans charger tout le JSON :
 
 ```bash
-repowarden carte bin/garde          # fonctions du fichier et leur pourquoi
+repowarden carte bin/guard          # fonctions du fichier et leur pourquoi
 repowarden carte verifier_gh        # fichier, ligne, pourquoi de la fonction
-repowarden carte bin/garde --json   # même extrait, pour les outils (aussi : repowarden carte --json)
+repowarden carte bin/guard --json   # même extrait, pour les outils (aussi : repowarden carte --json)
 ```
 
 ```text
-verifier_gh  bin/garde:262
+verifier_gh  bin/guard:262
   Commande gh (mots $@, sans « gh ») lancée depuis $dir, …
 ```
 
@@ -62,7 +62,7 @@ Tests : test/garde.bats
 
 Un test (`*.bats`, premier lot) est relié à un fichier cartographié par :
 
-- **nommage** : même nom sans extension (`bin/garde` ↔ `test/garde.bats`) ;
+- **nommage** : même nom sans extension (`bin/guard` ↔ `test/garde.bats`) ;
 - **chemin cité** dans le test (`$BATS_TEST_DIRNAME/../ci/check.sh` cite `ci/check.sh`), sans autre caractère de nom collé ;
 - **commande** `repowarden <sous-commande>` citée dans le test → `bin/<sous-commande>`.
 
@@ -74,7 +74,7 @@ Le pourquoi d'un fichier est aussi dans son histoire : les tickets qui l'ont mod
 
 ```bash
 repowarden carte '#12'          # fichiers modifiés par le ticket 12 (--json : {"ticket", "fichiers"})
-repowarden carte bin/garde      # … puis « Tickets : #317 #407 … »
+repowarden carte bin/guard      # … puis « Tickets : #317 #407 … »
 ```
 
 Tout fichier encore présent (hors `repowarden.exclude`) touché par un ticket entre dans la carte, même sans fonction (doc, workflow) ; la racine `tickets` donne les fichiers de chaque ticket.

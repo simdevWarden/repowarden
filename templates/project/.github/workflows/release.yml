@@ -37,7 +37,7 @@ jobs:
     # secrets:
     #   webhook: ${{ secrets.REPOWARDEN_WEBHOOK }}
 
-  # Paquet npm à chaque release, sans jeton (mise en place : repowarden/bin/npm-publication) :
+  # Paquet npm à chaque release, sans jeton (mise en place : repowarden/bin/npm-publish) :
   # npm:
   #   needs: release
   #   if: vars.REPOWARDEN_NPM == 'true' && (needs.release.outputs.release_created == 'true' || github.event_name == 'workflow_dispatch')
@@ -61,7 +61,7 @@ jobs:
   #     delivered-sha: ${{ needs.release.outputs.delivered_without_version }}
 
   # Publication propre au projet, après une release (exemple). L'environnement
-  # « production » (bin/proteger --environnement production) fait attendre
+  # « production » (bin/protect --environnement production) fait attendre
   # l'approbation d'une personne désignée avant de publier :
   # publier:
   #   needs: release

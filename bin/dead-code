@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage : repowarden code-mort [base]
+# Usage : repowarden dead-code [base]
 #
 # Code mort introduit par ta branche, comme en CI : seules les lignes ajoutées
 # ou modifiées depuis la base comptent (commits, modifications en cours,

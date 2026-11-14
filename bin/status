@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Usage : repowarden statut   (ou repowarden, sans argument)
+# Usage : repowarden status   (ou repowarden, sans argument)
 #
 # État de repowarden sur ce poste et dans le dépôt courant, puis la commande
 # suivante à lancer (l'équivalent de « gh auth status » ou « brew doctor »).
@@ -97,7 +97,7 @@ if [ -n "$GIT_TOPLEVEL" ]; then
     if [ -e "$GIT_TOPLEVEL/.repogarde.conf" ] || [ -d "$GIT_TOPLEVEL/.repogarde" ] ||
         grep -qs repogarde "$GIT_TOPLEVEL"/.github/workflows/*.y*ml; then
         attention_t st.repo_migrate
-        suivant="${suivant:-repowarden migrer}"
+        suivant="${suivant:-repowarden migrate}"
     fi
     # Workflows qui appellent repowarden : dépôt officiel et tag vN de la
     # majeure installée. Autre dépôt (ancien propriétaire, fork), branche
@@ -155,7 +155,7 @@ if [ -n "$GIT_TOPLEVEL" ]; then
         sensitive_files_r
         [ -z "$REPLY" ] || sensitive_files_warn "$REPLY"
     fi
-    # Carte du projet (repowarden carte) : facultative ; périmée, elle ne dit
+    # Carte du projet (repowarden map) : facultative ; périmée, elle ne dit
     # plus ce que fait le code, et les agents la lisent avant de modifier
     if [ ! -f "$GIT_TOPLEVEL/$CARTE_JSON" ]; then
         info_t st.carte_absente
@@ -163,7 +163,7 @@ if [ -n "$GIT_TOPLEVEL" ]; then
         ok_t st.carte_ok
     else
         attention_t st.carte_perimee
-        suivant="${suivant:-repowarden carte}"
+        suivant="${suivant:-repowarden map}"
     fi
     info_t st.repo_forge "$FORGE"
     [ "$FORGE" != github ] || dim_t st.repo_rules
