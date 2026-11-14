@@ -39,13 +39,13 @@ For each file of the repository (tracked, or new and not ignored, outside `repow
 Read only the useful excerpt, without loading the whole JSON:
 
 ```bash
-repowarden carte bin/garde          # the file's functions and their why
+repowarden carte bin/guard          # the file's functions and their why
 repowarden carte verifier_gh        # file, line, why of the function
-repowarden carte bin/garde --json   # same excerpt, for tools (also: repowarden carte --json)
+repowarden carte bin/guard --json   # same excerpt, for tools (also: repowarden carte --json)
 ```
 
 ```text
-verifier_gh  bin/garde:262
+verifier_gh  bin/guard:262
   Commande gh (mots $@, sans « gh ») lancée depuis $dir, …
 ```
 
@@ -62,7 +62,7 @@ Tests: test/garde.bats
 
 A test (`*.bats`, first batch) is linked to a mapped file by:
 
-- **naming**: same name without extension (`bin/garde` ↔ `test/garde.bats`);
+- **naming**: same name without extension (`bin/guard` ↔ `test/garde.bats`);
 - **cited path** in the test (`$BATS_TEST_DIRNAME/../ci/check.sh` cites `ci/check.sh`), with no other name character attached;
 - **command** `repowarden <subcommand>` cited in the test → `bin/<subcommand>`.
 
@@ -74,7 +74,7 @@ A file's why is also in its history: the tickets that changed it. The map reads 
 
 ```bash
 repowarden carte '#12'          # files changed by ticket 12 (--json: {"ticket", "fichiers"})
-repowarden carte bin/garde      # … then "Tickets: #317 #407 …"
+repowarden carte bin/guard      # … then "Tickets: #317 #407 …"
 ```
 
 Any file still present (outside `repowarden.exclude`) touched by a ticket enters the map, even without functions (doc, workflow); the root `tickets` key gives each ticket's files.

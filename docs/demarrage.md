@@ -39,7 +39,7 @@ Trois parcours, selon l'usage. Le plus rapide pour essayer : **Sur mon poste**.
 
     **Registre npm interne** (entreprise, proxy) : `npm install -g repowarden --registry <url>`, ou `registry=<url>` dans `~/.npmrc` ; voir [sources internes](industrialisation.md#8-sources-internes-reseau-ferme-nexus-artifactory).
 
-    **Sans Node** : même résultat depuis un clone, mis à jour avec `git -C ~/repowarden pull` (les commandes deviennent `~/repowarden/install.sh`, `~/repowarden/bin/code-mort`…).
+    **Sans Node** : même résultat depuis un clone, mis à jour avec `git -C ~/repowarden pull` (les commandes deviennent `~/repowarden/install.sh`, `~/repowarden/bin/dead-code`…).
 
     ```bash
     git clone https://github.com/simdevWarden/repowarden.git ~/repowarden

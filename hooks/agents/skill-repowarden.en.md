@@ -33,7 +33,7 @@ It refuses in particular:
 - `gh` write outside the workflow without a ticket;
 - validating a ticket or changing its status.
 
-If `repowarden garde` refuses an action: read the message, run exactly the command indicated, never bypass (`--no-verify`, `--admin`, exception). A quoted string containing a forbidden command must go in a file. If the refusal seems impossible given the ticket design, stop and explain on the ticket instead of guessing.
+If `repowarden guard` refuses an action: read the message, run exactly the command indicated, never bypass (`--no-verify`, `--admin`, exception). A quoted string containing a forbidden command must go in a file. If the refusal seems impossible given the ticket design, stop and explain on the ticket instead of guessing.
 
 ## Rules
 - French commit messages, no signature or co-author from an agent.

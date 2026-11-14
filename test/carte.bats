@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Carte du projet (repowarden carte) : fonctions, leur « pourquoi » (le
+# Carte du projet (repowarden map) : fonctions, leur « pourquoi » (le
 # commentaire juste au-dessus), dans .repowarden/carte/carte.json
 
 load helpers
@@ -64,7 +64,7 @@ SH
 
 @test "carte : chaque fonction shell avec fichier, ligne et commentaire" {
     projet_shell
-    run "$RW" carte
+    run "$RW" map
     [ "$status" -eq 0 ]
     [ -f "$CARTE" ]
     run jq -c '.fichiers["lib/outil.sh"].fonctions' "$CARTE"
@@ -79,7 +79,7 @@ SH
 
 @test "carte : resume avec le nombre de fonctions sans commentaire" {
     projet_shell
-    run "$RW" carte
+    run "$RW" map
     [ "$status" -eq 0 ]
     [[ "$output" == *"2 fichier(s), 4 fonction(s), dont 1 sans commentaire"* ]] || false
     [[ "$output" == *".repowarden/carte/carte.json"* ]] || false
@@ -87,16 +87,16 @@ SH
 
 @test "carte : deux lancements donnent un fichier identique" {
     projet_shell
-    "$RW" carte >/dev/null
+    "$RW" map >/dev/null
     cp "$CARTE" "$BATS_TEST_TMPDIR/premiere.json"
     touch lib/outil.sh
-    "$RW" carte >/dev/null
+    "$RW" map >/dev/null
     cmp "$BATS_TEST_TMPDIR/premiere.json" "$CARTE"
 }
 
 @test "carte : dossier de la carte ignore par git, jamais versionne" {
     projet_shell
-    "$RW" carte >/dev/null
+    "$RW" map >/dev/null
     [ -z "$(git status --porcelain)" ]
     [ "$(cat .repowarden/carte/.gitignore)" = "*" ]
 }
@@ -104,7 +104,7 @@ SH
 @test "carte : repowarden.exclude respecte" {
     projet_shell
     git config repowarden.exclude "bin/*"
-    "$RW" carte >/dev/null
+    "$RW" map >/dev/null
     run jq -r '.fichiers | keys[]' "$CARTE"
     [ "$output" = "lib/outil.sh" ]
 }
@@ -112,7 +112,7 @@ SH
 @test "carte : lancee depuis un sous-dossier, chemins depuis la racine" {
     projet_shell
     cd lib
-    "$RW" carte >/dev/null
+    "$RW" map >/dev/null
     cd ..
     [ -f "$CARTE" ]
     [ ! -e lib/.repowarden ]
@@ -122,64 +122,64 @@ SH
 @test "carte : hors depot git -> erreur claire" {
     cd "$BATS_TEST_TMPDIR"
     mkdir -p hors && cd hors
-    run "$RW" carte
+    run "$RW" map
     [ "$status" -ne 0 ]
     [[ "$output" == *"dépôt git"* ]] || false
 }
 
 @test "carte : --help en francais et en anglais" {
-    run "$RW" carte --help
+    run "$RW" map --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Usage : repowarden carte"* ]] || false
+    [[ "$output" == *"Usage : repowarden map"* ]] || false
     [ ! -e "$CARTE" ]
-    REPOWARDEN_LANG=en run "$RW" carte --help
+    REPOWARDEN_LANG=en run "$RW" map --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Usage: repowarden carte"* ]] || false
-    REPOWARDEN_LANG=en run "$RW" carte
+    [[ "$output" == *"Usage: repowarden map"* ]] || false
+    REPOWARDEN_LANG=en run "$RW" map
     [[ "$output" == *"function(s)"* ]] || false
 }
 
-# Dépôt de test avec une copie du vrai bin/garde de repowarden
+# Dépôt de test avec une copie du vrai bin/guard de repowarden
 projet_garde() {
     mkdir -p bin
-    cp "$BATS_TEST_DIRNAME/../bin/garde" bin/garde
-    git add bin/garde
+    cp "$BATS_TEST_DIRNAME/../bin/guard" bin/guard
+    git add bin/guard
     git commit -q --no-verify -m "feat: garde"
 }
 
 @test "carte : fichier -> ses fonctions et leurs commentaires" {
     projet_garde
-    run "$RW" carte bin/garde
+    run "$RW" map bin/guard
     [ "$status" -eq 0 ]
-    [[ "$output" == *"bin/garde"* ]] || false
-    ligne="$(grep -n '^verifier_gh()' bin/garde | cut -d: -f1)"
+    [[ "$output" == *"bin/guard"* ]] || false
+    ligne="$(grep -n '^verifier_gh()' bin/guard | cut -d: -f1)"
     [[ "$output" == *"$ligne  verifier_gh — "* ]] || false
     [[ "$output" == *"dossier_r — REPLY = dossier existant le plus proche"* ]] || false
 }
 
 @test "carte : fonction -> fichier, ligne, commentaire ; inconnue -> code 1" {
     projet_garde
-    ligne="$(grep -n '^verifier_gh()' bin/garde | cut -d: -f1)"
-    run "$RW" carte verifier_gh
+    ligne="$(grep -n '^verifier_gh()' bin/guard | cut -d: -f1)"
+    run "$RW" map verifier_gh
     [ "$status" -eq 0 ]
-    [[ "$output" == *"verifier_gh  bin/garde:$ligne"* ]] || false
-    pourquoi="$(sed -n "$((ligne - 1))p" bin/garde | sed 's/^# *//')"
+    [[ "$output" == *"verifier_gh  bin/guard:$ligne"* ]] || false
+    pourquoi="$(sed -n "$((ligne - 1))p" bin/guard | sed 's/^# *//')"
     [[ "$output" == *"$pourquoi"* ]] || false
-    run "$RW" carte fonction_inconnue
+    run "$RW" map fonction_inconnue
     [ "$status" -eq 1 ]
     [[ "$output" == *"fonction_inconnue"*"ni un fichier ni une fonction de la carte"* ]] || false
 }
 
 @test "carte : --json du fichier et de la fonction, valide" {
     projet_shell
-    run "$RW" carte lib/outil.sh --json
+    run "$RW" map lib/outil.sh --json
     [ "$status" -eq 0 ]
     [ "$(jq -r '.fichier' <<<"$output")" = lib/outil.sh ]
     [ "$(jq -r '.fonctions[0].nom' <<<"$output")" = range ]
-    run "$RW" carte --json vide
+    run "$RW" map --json vide
     [ "$status" -eq 0 ]
     [ "$(jq -c '.' <<<"$output")" = '[{"fichier":"lib/outil.sh","ligne":10,"nom":"vide","pourquoi":"Vide le cache, sinon il grossit sans fin"}]' ]
-    run "$RW" carte --json
+    run "$RW" map --json
     [ "$status" -eq 0 ]
     jq -e '.fichiers["bin/outil"]' <<<"$output" >/dev/null
 }
@@ -187,31 +187,31 @@ projet_garde() {
 @test "carte : fichier depuis un sous-dossier, sans fonction, sans commentaire" {
     projet_shell
     cd lib
-    run "$RW" carte outil.sh
+    run "$RW" map outil.sh
     [ "$status" -eq 0 ]
     [[ "$output" == *"lib/outil.sh"* ]] || false
     [[ "$output" == *"13  nu (sans commentaire)"* ]] || false
     cd ..
-    run "$RW" carte notes.txt
+    run "$RW" map notes.txt
     [ "$status" -eq 0 ]
     [[ "$output" == *"notes.txt : aucune fonction"* ]] || false
 }
 
 @test "carte : absente ou perimee -> regeneree avant de repondre, a jour -> gardee" {
     projet_shell
-    run "$RW" carte range
+    run "$RW" map range
     [ "$status" -eq 0 ]
     [ -f "$CARTE" ]
     # À jour : pas réécrite
     touch -t 202001010000 "$CARTE" "$(git rev-parse --git-path index)" lib/outil.sh bin/outil notes.txt README.md
     touch -t 202101010000 "$CARTE"
-    run "$RW" carte range
+    run "$RW" map range
     [ "$status" -eq 0 ]
     [ -z "$(find "$CARTE" -newermt 2022-01-01)" ]
     # Fichier modifié après la carte : régénérée, nouvelle fonction vue
     printf '# Ajoutée apres la carte\nneuve() { :; }\n' >>lib/outil.sh
     touch -t 202001010000 "$CARTE"
-    run "$RW" carte neuve
+    run "$RW" map neuve
     [ "$status" -eq 0 ]
     [[ "$output" == *"neuve  lib/outil.sh:15"* ]] || false
 }
@@ -219,13 +219,13 @@ projet_garde() {
 @test "carte : fichier -> ses tests (nommage) et la commande pour les lancer" {
     projet_garde
     mkdir -p test
-    printf '#!/usr/bin/env bats\n@test "x" { true; }\n' >test/garde.bats
-    git add test/garde.bats
-    git commit -q --no-verify -m "test: garde"
-    run "$RW" carte bin/garde
+    printf '#!/usr/bin/env bats\n@test "x" { true; }\n' >test/guard.bats
+    git add test/guard.bats
+    git commit -q --no-verify -m "test: guard"
+    run "$RW" map bin/guard
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Tests : test/garde.bats"* ]] || false
-    [[ "$output" == *"bats test/garde.bats"* ]] || false
+    [[ "$output" == *"Tests : test/guard.bats"* ]] || false
+    [[ "$output" == *"bats test/guard.bats"* ]] || false
 }
 
 @test "carte : tests lies par chemin cite et par commande repowarden, noms voisins ignores" {
@@ -237,7 +237,7 @@ projet_garde() {
     printf '#!/usr/bin/env bats\n@test "b" { run repowarden outil --help; }\n' >test/commande.bats
     git add -A
     git commit -q --no-verify -m "test: liens"
-    "$RW" carte >/dev/null
+    "$RW" map >/dev/null
     [ "$(jq -c '.fichiers["lib/outil.sh"].tests' "$CARTE")" = '["test/chemins.bats"]' ]
     [ "$(jq -c '.fichiers["bin/outil"].tests' "$CARTE")" = '["test/commande.bats"]' ]
     [ "$(jq -c '.fichiers["bin/outil2"].tests' "$CARTE")" = '[]' ]
@@ -245,10 +245,10 @@ projet_garde() {
 
 @test "carte : fichier sans test signale, --json avec tests vides" {
     projet_shell
-    run "$RW" carte lib/outil.sh
+    run "$RW" map lib/outil.sh
     [ "$status" -eq 0 ]
     [[ "$output" == *"Aucun test trouvé pour lib/outil.sh"* ]] || false
-    run "$RW" carte lib/outil.sh --json
+    run "$RW" map lib/outil.sh --json
     [ "$(jq -c '.tests' <<<"$output")" = '[]' ]
 }
 
@@ -273,29 +273,29 @@ projet_tickets() {
 
 @test "carte : ticket -> fichiers modifies ; fichier -> ses tickets (git seul)" {
     projet_tickets
-    run "$RW" carte '#12'
+    run "$RW" map '#12'
     [ "$status" -eq 0 ]
     [[ "$output" == *"lib/a.sh"* ]] || false
     [[ "$output" == *"README.md"* ]] || false
     [[ "$output" != *"lib/c.sh"* ]] || false
-    run "$RW" carte lib/a.sh
+    run "$RW" map lib/a.sh
     [ "$status" -eq 0 ]
     [[ "$output" == *"Tickets : #12 #30"* ]] || false
-    run "$RW" carte README.md
+    run "$RW" map README.md
     [[ "$output" == *"Tickets : #12"* ]] || false
-    run "$RW" carte fusion.txt
+    run "$RW" map fusion.txt
     [[ "$output" == *"Tickets : #40"* ]] || false
-    run "$RW" carte '#40' --json
+    run "$RW" map '#40' --json
     [ "$status" -eq 0 ]
     [ "$(jq -c . <<<"$output")" = '{"fichiers":["fusion.txt"],"ticket":40}' ]
-    run "$RW" carte '#99'
+    run "$RW" map '#99'
     [ "$status" -eq 1 ]
     [[ "$output" == *"#99"* ]] || false
 }
 
 @test "carte : tickets sans appel reseau (gh non connecte, aucune lecture gh)" {
     projet_tickets
-    "$RW" carte >/dev/null
+    "$RW" map >/dev/null
     [[ "$(cat "$GH_LOG")" != *"issue"* ]] || false
     [ "$(jq -c '.tickets["12"].fichiers' "$CARTE")" = '["README.md","lib/a.sh"]' ]
     [ "$(jq -c '.fichiers["lib/a.sh"].tickets' "$CARTE")" = '[12,30]' ]
@@ -305,7 +305,7 @@ projet_tickets() {
     printf '#!/usr/bin/env bash\r\n# Texte du pourquoi\r\ncr() { :; }\r\n' >crlf.sh
     git add crlf.sh
     git commit -q --no-verify -m "feat: crlf"
-    "$RW" carte >/dev/null
+    "$RW" map >/dev/null
     [ "$(jq -r '.fichiers["crlf.sh"].fonctions[0].pourquoi' "$CARTE")" = "Texte du pourquoi" ]
 }
 
@@ -325,7 +325,7 @@ JSON
     projet_tickets
     issues_simulees
     export GH_CONNECTE=1
-    run "$RW" carte '#12'
+    run "$RW" map '#12'
     [ "$status" -eq 0 ]
     [[ "$output" == *"Conception :"* ]] || false
     [[ "$output" == *"Somme des paniers dans lib/a.sh"* ]] || false
@@ -333,7 +333,7 @@ JSON
     [[ "$output" == *"arrondi au centime"* ]] || false
     [[ "$output" != *"Avis d un tiers"* ]] || false
     [[ "$output" != *"un test"* ]] || false
-    run "$RW" carte lib/a.sh
+    run "$RW" map lib/a.sh
     [[ "$output" == *"#12 — "*"Somme des paniers dans lib/a.sh"* ]] || false
     [[ "$output" != *"#30 — "* ]] || false
     jq -e '.tickets["30"] | has("conception") | not' "$CARTE" >/dev/null
@@ -346,11 +346,11 @@ JSON
     projet_tickets
     issues_simulees
     export GH_CONNECTE=1
-    "$RW" carte >/dev/null
+    "$RW" map >/dev/null
     [ "$(grep -c '^issue list' "$GH_LOG")" = 1 ]
     : >"$GH_LOG"
-    "$RW" carte >/dev/null
-    run "$RW" carte '#12' --json
+    "$RW" map >/dev/null
+    run "$RW" map '#12' --json
     [ "$status" -eq 0 ]
     [[ "$(jq -r .conception <<<"$output")" == *"Somme des paniers"* ]] || false
     [ ! -s "$GH_LOG" ]
@@ -358,12 +358,12 @@ JSON
 
 @test "carte : gh non connecte -> avertissement, code 0, sans conception" {
     projet_tickets
-    run "$RW" carte
+    run "$RW" map
     [ "$status" -eq 0 ]
     [[ "$output" == *"carte sans la conception des tickets"* ]] || false
     jq -e '.tickets["12"] | has("conception") | not' "$CARTE" >/dev/null
     touch lib/a.sh
-    "$RW" carte '#12' --json 2>/dev/null | jq -e '.fichiers' >/dev/null
+    "$RW" map '#12' --json 2>/dev/null | jq -e '.fichiers' >/dev/null
 }
 
 # Poste prêt (hooks et git cc du dépôt, garde-fou branché) : seule la carte
@@ -376,22 +376,22 @@ poste_pret() {
     garde_branche
 }
 
-@test "carte : statut -> perimee signalee, etape suivante repowarden carte" {
+@test "carte : statut -> perimee signalee, etape suivante repowarden map" {
     poste_pret
     projet_shell
-    run "$RW" statut
+    run "$RW" status
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Carte du projet absente"*"repowarden carte"* ]] || false
-    [[ "$output" != *"Étape suivante : repowarden carte"* ]] || false
-    "$RW" carte >/dev/null
-    run "$RW" statut
+    [[ "$output" == *"Carte du projet absente"*"repowarden map"* ]] || false
+    [[ "$output" != *"Étape suivante : repowarden map"* ]] || false
+    "$RW" map >/dev/null
+    run "$RW" status
     [[ "$output" == *"Carte du projet à jour"* ]] || false
     printf '# Nouvelle\nneuve() { :; }\n' >>lib/outil.sh
     touch -t 202001010000 "$CARTE"
-    run "$RW" statut
+    run "$RW" status
     [ "$status" -eq 0 ]
     [[ "$output" == *"Carte du projet périmée"* ]] || false
-    [[ "$output" == *"Étape suivante : repowarden carte"* ]] || false
+    [[ "$output" == *"Étape suivante : repowarden map"* ]] || false
 }
 
 @test "carte : post-merge -> carte existante recalculee hors ligne, sinon rien" {
@@ -404,7 +404,7 @@ poste_pret() {
     git merge -q --no-ff --no-verify -m "Merge branch 'feat/2-autre'" feat/2-autre
     [ ! -e "$CARTE" ]
     git reset -q --hard HEAD~1
-    "$RW" carte >/dev/null
+    "$RW" map >/dev/null
     touch -t 202001010000 "$CARTE"
     export GH_CONNECTE=1
     : >"$GH_LOG"
@@ -419,7 +419,7 @@ poste_pret() {
     cd "$BATS_TEST_TMPDIR/copie"
     TIMEFORMAT=%R
     sans="$({ time "$HOOKS/post-merge" >/dev/null 2>&1; } 2>&1)"
-    "$RW" carte >/dev/null
+    "$RW" map >/dev/null
     touch -t 202001010000 "$CARTE"
     avec="$({ time "$HOOKS/post-merge" >/dev/null 2>&1; } 2>&1)"
     echo "post-merge : ${sans}s sans carte, ${avec}s avec carte" >&3

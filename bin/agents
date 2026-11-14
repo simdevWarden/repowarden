@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Branche le garde-fou repowarden (repowarden garde) dans les agents IA :
+# Branche le garde-fou repowarden (repowarden guard) dans les agents IA :
 #   repowarden agents init    [--claude] [--opencode] [--projet | --global]
 #   repowarden agents retirer [--claude] [--opencode] [--projet | --global]
 #     Claude Code  hook PreToolUse dans .claude/settings.json + skill repowarden
@@ -18,6 +18,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "$ROOT/hooks/lib/common.sh"
 # shellcheck source=../hooks/lib/agents.sh
 source "$ROOT/hooks/lib/agents.sh"
+# shellcheck source=../hooks/lib/command-aliases.sh
+source "$ROOT/hooks/lib/command-aliases.sh"
 
 aide() { _tr help.agents; printf '%b\n' "$_T"; }
 
@@ -26,8 +28,14 @@ MATCHER_CLAUDE="$AGENTS_MATCHER_CLAUDE"
 MODELE_SKILL="$(agents_modele_skill)"
 
 action=""
-case "${1:-}" in
-    init | retirer) action="$1"; shift ;;
+_original_sub="${1:-}"
+_sub_canon="$(subcommand_canonical agents "$_original_sub")"
+if [ -n "$_original_sub" ] && [ "$_sub_canon" != "$_original_sub" ]; then
+    _tr cli.deprecated_name "agents $_original_sub" "agents $_sub_canon"
+    warn "$_T"
+fi
+case "$_sub_canon" in
+    init) action=init; shift ;;
     remove) action=retirer; shift ;;
     "" | -h | --help) aide; exit 0 ;;
     *) err_t install.unknown_arg "$1"; aide >&2; exit 1 ;;
@@ -67,7 +75,7 @@ fi
 ecrits=()
 
 # Hook PreToolUse de Claude Code : ajouté au settings.json (créé au besoin),
-# rien si une commande « repowarden garde » y est déjà ; d'une ancienne forme,
+# rien si une commande « repowarden guard » y est déjà ; d'une ancienne forme,
 # remplacé (les autres hooks restent)
 init_claude() {
     local f="$fichier_claude" entree tmp
@@ -78,7 +86,7 @@ init_claude() {
         jq -e . "$f" >/dev/null 2>&1 || { err_t agents.bad_json "Claude Code" "$f"; return 1; }
         if agents_claude_perime "$f"; then
             tmp="$(mktemp)"
-            jq --argjson e "$entree" 'def rw: (.command // "") | startswith("repowarden garde");
+            jq --argjson e "$entree" 'def rw: (.command // "") | startswith("repowarden guard");
                 .hooks.PreToolUse = ([.hooks.PreToolUse[]
                     | if any(.hooks[]?; rw) then (.hooks |= map(select(rw | not))) | select(.hooks | length > 0) else . end]
                     + [$e])' "$f" >"$tmp"
@@ -88,7 +96,7 @@ init_claude() {
             ok_t agents.updated "Claude Code" "$f"
             return 0
         fi
-        if jq -e '[.hooks.PreToolUse[]?.hooks[]?.command // empty | select(test("repowarden garde"))] | length > 0' "$f" >/dev/null; then
+        if jq -e '[.hooks.PreToolUse[]?.hooks[]?.command // empty | select(test("repowarden guard"))] | length > 0' "$f" >/dev/null; then
             ok_t agents.present "Claude Code" "$f"
             return 0
         fi
@@ -149,11 +157,11 @@ poser_skill() {
     ok_t agents.skill_added "$nom" "$f"
 }
 
-# Hook PreToolUse : seules les commandes « repowarden garde » retirées ; une
+# Hook PreToolUse : seules les commandes « repowarden guard » retirées ; une
 # entrée vidée disparaît, et le fichier s'il ne reste plus rien
 retirer_claude() {
     local f="$fichier_claude" tmp
-    if [ ! -f "$f" ] || ! grep -q "repowarden garde" "$f"; then
+    if [ ! -f "$f" ] || ! grep -q "repowarden guard" "$f"; then
         ok_t agents.absent "Claude Code" "$f"
         return 0
     fi
@@ -161,7 +169,7 @@ retirer_claude() {
     jq -e . "$f" >/dev/null 2>&1 || { err_t agents.bad_json "Claude Code" "$f"; return 1; }
     tmp="$(mktemp)"
     jq '(.hooks.PreToolUse // []) as $p
-        | .hooks.PreToolUse = [$p[] | .hooks = [(.hooks // [])[] | select((.command // "") | test("repowarden garde") | not)]
+        | .hooks.PreToolUse = [$p[] | .hooks = [(.hooks // [])[] | select((.command // "") | test("repowarden guard") | not)]
             | select(.hooks | length > 0)]
         | if (.hooks.PreToolUse | length) == 0 then del(.hooks.PreToolUse) else . end
         | if (.hooks | length) == 0 then del(.hooks) else . end' "$f" >"$tmp"

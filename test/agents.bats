@@ -35,7 +35,7 @@ setup() {
     [[ "$output" == *"À versionner : git add .claude/settings.json .opencode/plugins/repowarden-garde.js .opencode/plugins/repowarden-garde-v2.js .claude/skills/repowarden/SKILL.md .opencode/skills/repowarden/SKILL.md"* ]] || false
     # jq -e : comparaison dans jq, sans les fins de ligne \r\n de jq sous Windows
     jq -e '.hooks.PreToolUse[0].matcher == "Edit|Write|MultiEdit|NotebookEdit|Bash"
-        and .hooks.PreToolUse[0].hooks[0].command == "repowarden garde --format claude"' .claude/settings.json
+        and .hooks.PreToolUse[0].hooks[0].command == "repowarden guard --format claude"' .claude/settings.json
     cmp -s .opencode/plugins/repowarden-garde.js "$MODELE"
     cmp -s .opencode/plugins/repowarden-garde-v2.js "$MODELE_V2"
 }
@@ -176,7 +176,7 @@ JS
     [ "$status" -eq 0 ]
     [ "$(jq -c '.hooks.PreToolUse' .claude/settings.json)" = '[{"matcher":"Bash","hooks":[{"type":"command","command":"mon-hook"}]}]' ]
     [ "$(jq -r '.model + " " + .hooks.Stop[0].hooks[0].command' .claude/settings.json)" = "x fin" ]
-    ! grep -q "repowarden garde" .claude/settings.json
+    ! grep -q "repowarden guard" .claude/settings.json
     [ -f .opencode/plugins/repowarden-garde.js ]
     [[ "$output" == *"diffère du modèle ; gardé"* ]] || false
 }
@@ -209,7 +209,7 @@ ANCIEN_PLUGIN="$BATS_TEST_DIRNAME/fixtures/agents/ancien-plugin-opencode-autonom
 
 @test "agents init : plugin personnalise (sans en-tete repowarden) garde et signale" {
     mkdir -p .opencode/plugins
-    printf '// Mon garde-fou\nimport { spawnSync } from "node:child_process"\n// repowarden garde\n' >.opencode/plugins/repowarden-garde.js
+    printf '// Mon garde-fou\nimport { spawnSync } from "node:child_process"\n// repowarden guard\n' >.opencode/plugins/repowarden-garde.js
     cp .opencode/plugins/repowarden-garde.js "$BATS_TEST_TMPDIR/perso.js"
     run "$RW" agents init --opencode
     [ "$status" -eq 0 ]
@@ -220,13 +220,13 @@ ANCIEN_PLUGIN="$BATS_TEST_DIRNAME/fixtures/agents/ancien-plugin-opencode-autonom
 
 @test "agents init : ancien hook Claude remplace, autres hooks et reglages intacts" {
     mkdir -p .claude
-    printf '%s\n' '{"model":"x","hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"./mon-hook.sh"}]},{"matcher":"Edit|Write|Bash","hooks":[{"type":"command","command":"repowarden garde"}]},{"matcher":"Write","hooks":[{"type":"command","command":"repowarden garde --format claude"},{"type":"command","command":"autre-hook"}]}],"Stop":[{"hooks":[{"type":"command","command":"fin"}]}]}}' >.claude/settings.json
+    printf '%s\n' '{"model":"x","hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"./mon-hook.sh"}]},{"matcher":"Edit|Write|Bash","hooks":[{"type":"command","command":"repowarden guard"}]},{"matcher":"Write","hooks":[{"type":"command","command":"repowarden guard --format claude"},{"type":"command","command":"autre-hook"}]}],"Stop":[{"hooks":[{"type":"command","command":"fin"}]}]}}' >.claude/settings.json
     run "$RW" agents init --claude
     [ "$status" -eq 0 ]
     [[ "$output" == *"Claude Code : garde-fou mis à jour"* ]] || false
     # Une seule entrée repowarden, sous la forme actuelle
-    jq -e '[.hooks.PreToolUse[].hooks[] | select(.command | startswith("repowarden garde"))] | length == 1' .claude/settings.json
-    jq -e '.hooks.PreToolUse[-1] == {matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash", hooks: [{type: "command", command: "repowarden garde --format claude"}]}' .claude/settings.json
+    jq -e '[.hooks.PreToolUse[].hooks[] | select(.command | startswith("repowarden guard"))] | length == 1' .claude/settings.json
+    jq -e '.hooks.PreToolUse[-1] == {matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash", hooks: [{type: "command", command: "repowarden guard --format claude"}]}' .claude/settings.json
     # Hooks et réglages de l'utilisateur intacts
     jq -e '.hooks.PreToolUse[0] == {matcher: "Bash", hooks: [{type: "command", command: "./mon-hook.sh"}]}' .claude/settings.json
     jq -e '.hooks.PreToolUse[1] == {matcher: "Write", hooks: [{type: "command", command: "autre-hook"}]}' .claude/settings.json

@@ -11,7 +11,7 @@
 #     livraison approuvée (deliveryApproval deployment ou review, défaut) ou
 #     automatique (auto : vérifications exigées gardées).
 #
-#   bin/proteger [--repo propriétaire/nom] [--checks "repowarden,tests (ubuntu-latest)"] [--relecteurs N]
+#   bin/protect [--repo propriétaire/nom] [--checks "repowarden,tests (ubuntu-latest)"] [--relecteurs N]
 #                [--codeowners] [--environnement NOM] [--approbateurs "login …"]
 #                [--sans-tags] [--dry-run] [--verifier]
 # --sans-tags : dépôt qui déplace lui-même un tag (tag majeur flottant v2…).

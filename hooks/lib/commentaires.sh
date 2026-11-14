@@ -45,7 +45,7 @@ comments_missing() {
 
 # REPLY = langage du fichier $1 pour la détection des fonctions (shell, py,
 # js), vide sinon ; $2 = son contenu, dont le shebang décide sans extension.
-# Partagé par le contrôle et la carte (repowarden carte) : une seule détection.
+# Partagé par le contrôle et la carte (repowarden map) : une seule détection.
 comments_lang_r() {
     local l=""
     case "${1##*/}" in

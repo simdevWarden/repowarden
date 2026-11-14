@@ -55,7 +55,7 @@ gere() {
     # ce qu'est un ticket ici, avec le lien vers la doc
     [[ "$output" == *"https://simdevwarden.github.io/repowarden/tickets/"* ]] || false
     [[ "$output" == *"repowarden.skip tickets"* ]] || false
-    [[ "$output" != *"ticket nouveau"* ]] || false
+    [[ "$output" != *"ticket new"* ]] || false
 }
 
 @test "ticket cli : suivi non gere -> prevenu une seule fois par branche" {
@@ -89,7 +89,7 @@ gere() {
     gere
     PATH="$F/bin:$PATH" run git switch -c feat/panier
     [[ "$output" == *"sans ticket"* ]] || false
-    [[ "$output" == *"repowarden ticket nouveau"* ]] || false
+    [[ "$output" == *"repowarden ticket new"* ]] || false
 }
 
 @test "ticket cli : branche avec ticket, main ou skip tickets -> aucun avertissement" {

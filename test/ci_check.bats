@@ -321,13 +321,13 @@ setup() {
     [ "$status" -eq 0 ]
     git config --unset repowarden.mainBranch
     # le statut le signale aussi
-    run "$BATS_TEST_DIRNAME/../bin/statut"
+    run "$BATS_TEST_DIRNAME/../bin/status"
     [[ "$output" == *"flux develop → main n'est pas déclaré"* ]] || false
     # flux déclaré : règles du flux develop, plus d'alerte
     git config repowarden.integrationBranch develop
     REPOWARDEN_TARGET=develop run "$CHECK" branch
     [ "$status" -eq 0 ]
-    run "$BATS_TEST_DIRNAME/../bin/statut"
+    run "$BATS_TEST_DIRNAME/../bin/status"
     [[ "$output" != *"n'est pas déclaré"* ]] || false
     # sans branche develop : projet « main seule », PR vers main admise
     git config --unset repowarden.integrationBranch
@@ -474,9 +474,9 @@ flux_develop() {
     header_valid "$REPLY" || { echo "trop long : $REPLY"; return 1; }
 }
 
-# --- bin/proteger (protection GitHub d'après .repowarden.conf) : gh simulé --------
+# --- bin/protect (protection GitHub d'après .repowarden.conf) : gh simulé --------
 
-PROTEGER="$BATS_TEST_DIRNAME/../bin/proteger"
+PROTEGER="$BATS_TEST_DIRNAME/../bin/protect"
 
 # Faux gh : branches existantes = $GH_BRANCHES ; journalise les appels
 fake_gh_repo() {
@@ -769,7 +769,7 @@ ruleset_libre() {
     GH_BRANCHES="main develop" run "$PROTEGER" --verifier
     [ "$status" -ne 0 ]
     [[ "$output" == *"approbations=1"* && "$output" == *"approbations=0"* ]] || false
-    [[ "$output" == *"repowarden proteger"* ]] || false
+    [[ "$output" == *"repowarden protect"* ]] || false
     # ruleset absent -> ecart
     GH_RULESETS='[]' GH_BRANCHES="main develop" run "$PROTEGER" --verifier
     [ "$status" -ne 0 ]
@@ -1318,7 +1318,7 @@ GH
     fake_gh_notes
     git tag v1.0.0
     git commit -q --no-verify --allow-empty -m "fix(api): timeout" -m "Ticket : #13"
-    git commit -q --no-verify --allow-empty -m "feat: panier" -m "À faire : relancer repowarden proteger" -m "Ticket : #12"
+    git commit -q --no-verify --allow-empty -m "feat: panier" -m "À faire : relancer repowarden protect" -m "Ticket : #12"
     git commit -q --no-verify --allow-empty -m "docs: guide" -m "Ticket : #14"
     git commit -q --no-verify --allow-empty -m "feat: suite du panier" -m "Ticket : #12"
     git commit -q --no-verify --allow-empty -m "feat!: nouvelle API" -m "BREAKING CHANGE: /v1 retirée"
@@ -1328,7 +1328,7 @@ GH
     # fonctionnalités, puis corrections, puis le reste ; un ticket une seule fois
     [[ "$output" == *"### En bref"*"- Panier : total affiché (#12)"*"- API : délai dépassé géré (#13)"*"- Guide : installation (#14)"*"### À faire"* ]] || false
     [ "$(grep -c "(#12)" <<<"$output")" -eq 1 ]
-    [[ "$output" == *"### À faire"*"- relancer repowarden proteger"*"- /v1 retirée"* ]] || false
+    [[ "$output" == *"### À faire"*"- relancer repowarden protect"*"- /v1 retirée"* ]] || false
     [[ "$output" == *"### Mettre à jour"*'`npm update -g mon-outil`'* ]] || false
     [[ "$output" == *"### Tickets livrés"*"#12, #13, #14"*"### ⚠ Changements incompatibles"* ]] || false
     [[ "$output" == *"### Fonctionnalités"*"- feat: panier"* ]] || false
@@ -1448,22 +1448,22 @@ GH
     [[ "$output" == success*"non exigée"* ]] || false
 }
 
-@test "livraison : protection du flux develop absente -> en echec, repowarden proteger" {
+@test "livraison : protection du flux develop absente -> en echec, repowarden protect" {
     fake_gh_livraison
     git tag v1.0.0
     c "feat: panier"
     git tag v1.1.0-next.1
     GH_REGLES="pull_request" run "$LIVRAISON"
-    [[ "$output" == failure*"repowarden proteger"* ]] || false
+    [[ "$output" == failure*"repowarden protect"* ]] || false
     GH_REGLAGES="false false" run "$LIVRAISON"
-    [[ "$output" == failure*"repowarden proteger"* ]] || false
+    [[ "$output" == failure*"repowarden protect"* ]] || false
     GH_REGLAGES="true true" run "$LIVRAISON"
-    [[ "$output" == failure*"repowarden proteger"* ]] || false
+    [[ "$output" == failure*"repowarden protect"* ]] || false
     # rulesets indisponibles (privé, compte gratuit) : seule la règle manque, réglages bons
     GH_RULESETS_403=1 GH_REGLES="" run "$LIVRAISON"
     [[ "$output" == success* ]] || false
     GH_RULESETS_403=1 GH_REGLES="" GH_REGLAGES="true true" run "$LIVRAISON"
-    [[ "$output" == failure*"repowarden proteger"* ]] || false
+    [[ "$output" == failure*"repowarden protect"* ]] || false
     # réglages non renvoyés par l'API (jeton sans droits) : pas de faux échec
     GH_REGLAGES="null null" run "$LIVRAISON"
     [[ "$output" == success* ]] || false
@@ -1856,7 +1856,7 @@ T
 
 @test "code-mort : aucune modification -> message clair, pas aucun langage" {
     git update-ref refs/remotes/origin/main HEAD
-    run "$BATS_TEST_DIRNAME/../bin/code-mort"
+    run "$BATS_TEST_DIRNAME/../bin/dead-code"
     [ "$status" -eq 0 ]
     [[ "$output" == *"Aucune modification par rapport à origin/main"* ]] || false
     [[ "$output" != *"langage analysable"* ]] || false
@@ -1913,7 +1913,7 @@ GH
     git update-ref refs/remotes/origin/main HEAD
     printf '# Doc\n' >NOTES.md
     printf 'a: 1\n' >conf.yml
-    run "$BATS_TEST_DIRNAME/../bin/code-mort"
+    run "$BATS_TEST_DIRNAME/../bin/dead-code"
     [ "$status" -eq 0 ]
     [[ "$output" != *"JavaScript"* ]] || false
 }

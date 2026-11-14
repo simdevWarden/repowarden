@@ -1,10 +1,10 @@
 #!/usr/bin/env bats
-# Passage de repogarde à repowarden (bin/migrer) : projet tel que
+# Passage de repogarde à repowarden (bin/migrate) : projet tel que
 # repowarden-demo avant sa migration, gh simulé pour --pr
 
 load helpers
 
-MIGRER="$BATS_TEST_DIRNAME/../bin/migrer"
+MIGRER="$BATS_TEST_DIRNAME/../bin/migrate"
 
 setup() {
     setup_repo
@@ -86,7 +86,7 @@ YML
     [[ "$output" == *"REPOWARDEN_APP_KEY"* ]] || false
     [[ "$output" == *"README.md"* ]] || false
     grep -q repogarde README.md
-    [[ "$output" == *"repowarden proteger"* ]] || false
+    [[ "$output" == *"repowarden protect"* ]] || false
     # relance : rien à faire
     git add -A && git -c core.hooksPath=/dev/null commit -q -m "chore: migration"
     run "$MIGRER"
@@ -140,7 +140,7 @@ YML
     # Chemin réel, comme migrer l'affiche (macOS : /var → /private/var)
     copie="$(cd "$copie" && pwd -P)"
     avant="$(git status --porcelain)"
-    run "$copie/bin/migrer"
+    run "$copie/bin/migrate"
     [ "$status" -ne 0 ]
     [[ "$output" == *"Version de repowarden inconnue (clone sans tags) : git -C $copie fetch --tags"* ]] || false
     [ "$(git status --porcelain)" = "$avant" ]
@@ -241,10 +241,10 @@ YML
 }
 
 @test "statut : anciens noms dans le projet -> repowarden migrer propose" {
-    run "$BATS_TEST_DIRNAME/../bin/statut"
-    [[ "$output" == *"Anciens noms repogarde dans ce projet : repowarden migrer"* ]] || false
+    run "$BATS_TEST_DIRNAME/../bin/status"
+    [[ "$output" == *"Anciens noms repogarde dans ce projet : repowarden migrate"* ]] || false
     "$MIGRER" >/dev/null
-    run "$BATS_TEST_DIRNAME/../bin/statut"
+    run "$BATS_TEST_DIRNAME/../bin/status"
     [[ "$output" != *"repowarden migrer"* ]] || false
 }
 
@@ -265,11 +265,11 @@ workflows_repowarden() {
         autre-compte/repowarden/.github/workflows/release-auto.yml@v4 \
         simdevWarden/repowarden/.github/workflows/tickets.yml@feat/tickets \
         "'simdevWarden/repowarden@v3'"
-    run "$BATS_TEST_DIRNAME/../bin/statut"
+    run "$BATS_TEST_DIRNAME/../bin/status"
     [[ "$output" == *".github/workflows/ci.yml:5 : repowarden appelé depuis un autre dépôt que le dépôt officiel (autre-compte/repowarden) ; attendu : simdevWarden/repowarden/.github/workflows/release-auto.yml@v4"* ]] || false
     [[ "$output" == *".github/workflows/ci.yml:7 : repowarden appelé sur une branche (@feat/tickets), cassé dès qu'elle disparaît ; attendu : simdevWarden/repowarden/.github/workflows/tickets.yml@v4"* ]] || false
     [[ "$output" == *".github/workflows/ci.yml:9 : repowarden appelé dans une majeure dépassée (@v3) ; attendu : simdevWarden/repowarden@v4"* ]] || false
-    REPOWARDEN_LANG=en run "$BATS_TEST_DIRNAME/../bin/statut"
+    REPOWARDEN_LANG=en run "$BATS_TEST_DIRNAME/../bin/status"
     [[ "$output" == *"ci.yml:7: repowarden called on a branch (@feat/tickets)"* ]] || false
 }
 
@@ -280,7 +280,7 @@ workflows_repowarden() {
         simdevWarden/repowarden@0123456789abcdef0123456789abcdef01234567 \
         ./.github/workflows/local.yml
     printf '  # uses: simdevWarden/repowarden@v1\n' >>.github/workflows/ci.yml
-    run "$BATS_TEST_DIRNAME/../bin/statut"
+    run "$BATS_TEST_DIRNAME/../bin/status"
     [ "$status" -eq 0 ]
     [[ "$output" != *"repowarden appelé"* ]] || false
     [[ "$output" != *"corriger les lignes uses:"* ]] || false
@@ -288,7 +288,7 @@ workflows_repowarden() {
 
 @test "statut : ligne uses: a corriger -> etape suivante, pas tout est pret" {
     workflows_repowarden simdevWarden/repowarden@main
-    run "$BATS_TEST_DIRNAME/../bin/statut"
+    run "$BATS_TEST_DIRNAME/../bin/status"
     [[ "$output" == *".github/workflows/ci.yml:5 : repowarden appelé sur une branche (@main)"* ]] || false
     # Étape suivante : celle-ci, ou une étape prioritaire selon le poste
     # (hooks ou git cc d'une autre installation)

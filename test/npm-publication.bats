@@ -65,7 +65,7 @@ EOF
 }
 
 npm_publication() {
-    run bash "$PKG/bin/npm-publication" --repo own/paquet "$@" </dev/null
+    run bash "$PKG/bin/npm-publish" --repo own/paquet "$@" </dev/null
 }
 
 # Aucun appel journalise ne correspond (un « ! grep » isole ne fait pas echouer un test)

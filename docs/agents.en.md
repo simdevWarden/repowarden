@@ -24,8 +24,8 @@ Only in a repowarden repository (`.repowarden.conf`, a `repowarden.*` setting or
 | `git add .`, `-A`, `--all` | always | `git add <files>` |
 | command whose path contains a space (`"/opt/my folder/git" commit …`), a Windows extension (`git.exe`, `repowarden.cmd`) or an unclosed quote | recognised on the last path element (`/` or `\`, without `.exe`/`.cmd`/`.bat`) and refused like its short form; an unclosed quote is an unreadable command, refused (when in doubt, refuse) | fix the quotes and run the short command |
 | forced `git push`: `--force`, `-f` (`-uf`…), `--force-with-lease[=…]`, `--force-if-includes`, `+branch` refspec | always: it rewrites the history already pushed | fix it with a new commit (`repowarden cc …`), then `git push` without forcing |
-| `gh issue create` | always | `repowarden ticket nouveau "<title>"` |
-| `repowarden ticket nouveau` | always, unless `repowarden.agentsTickets = true`: creating a ticket is the maintainer's decision (`--help` stays allowed) | report the defect to the maintainer, who creates the ticket; or note it on the current ticket |
+| `gh issue create` | always | `repowarden ticket new "<title>"` |
+| `repowarden ticket new` | always, unless `repowarden.agentsTickets = true`: creating a ticket is the maintainer's decision (`--help` stays allowed) | report the defect to the maintainer, who creates the ticket; or note it on the current ticket |
 | **workdir** (opencode format) | the `workdir` argument, if present and non-empty, becomes the command's working directory (absolute as-is, relative resolved from `cwd`); non-existent directory: closest existing directory (`dossier_r`) | `repowarden ticket <n>` (without ticket tracking: `git switch -c <type>/<topic>`) |
 | `gh issue comment`, `gh issue edit` | always | `repowarden ticket comment <n> "…"`, `repowarden ticket label <n> <label>` |
 | `gh pr create` | always: the draft PR is opened by the bot on the first push | `git push -u origin HEAD` |
@@ -33,7 +33,7 @@ Only in a repowarden repository (`.repowarden.conf`, a `repowarden.*` setting or
 | `gh pr ready`, `gh pr merge`, `gh pr review --approve`, writing `gh api …/pending_deployments` | always, even with a ticket: the maintainer's decision | say the PR is ready, the maintainer decides |
 | writing `gh api` on a ticket's decision labels: `POST`/`DELETE`/`PUT` on `…/issues/<n>/labels[/<name>]`, `PATCH …/issues/<n>` with `labels`, `--input` | always, even with `REPOWARDEN_TICKET=<n>`: setting, removing or replacing `validé`, a status or `à décider` is the maintainer's decision; a write that replaces or empties the set is refused when in doubt, and other labels stay subject to a validated ticket | ask the maintainer to change the label |
 | `repowarden ticket label <n> validé` (and `--remove`), any status label (`statut: …`) or `à décider` | always, even with `REPOWARDEN_TICKET=<n>`: validating a ticket is the maintainer's decision | ask the maintainer to validate the ticket, then `repowarden ticket <n>`; other labels (`type: fix`…) stay allowed |
-| any other `gh` command (refused by default): writing `gh api` (`-X` other than `GET`, `-f`/`-F`/`--input` without `-X GET`, `graphql` mutation), `gh repo edit`, `gh issue close`, `gh pr comment`, `gh pr review` without `--approve`, `gh release create`, `gh label create`, `gh gist`, unknown subcommand… | without a `REPOWARDEN_TICKET=<n>` prefix of an **open and validated** ticket (read with `gh issue view <n>`, in the current repository or the `-R` one); unreadable ticket: refused (a write without proof of a ticket) | create the ticket (`repowarden ticket nouveau`), get it validated, then `REPOWARDEN_TICKET=<n> gh …` |
+| any other `gh` command (refused by default): writing `gh api` (`-X` other than `GET`, `-f`/`-F`/`--input` without `-X GET`, `graphql` mutation), `gh repo edit`, `gh issue close`, `gh pr comment`, `gh pr review` without `--approve`, `gh release create`, `gh label create`, `gh gist`, unknown subcommand… | without a `REPOWARDEN_TICKET=<n>` prefix of an **open and validated** ticket (read with `gh issue view <n>`, in the current repository or the `-R` one); unreadable ticket: refused (a write without proof of a ticket) | create the ticket (`repowarden ticket new`), get it validated, then `REPOWARDEN_TICKET=<n> gh …` |
 
 Only known `gh` reads are allowed without a ticket: `view`, `list`, `status`, `checks`, `diff`, `watch`, `gh search`, `gh browse`, read-only `gh api`, `gh auth status`, help (`--help`), plus `gh pr edit` (PR description). **Anything that is not a read is refused without a ticket**, forgotten or future subcommands included. Every change, GitHub settings included, starts from a ticket created beforehand.
 
@@ -48,27 +48,27 @@ Help and preview (`--help`, `-h`, `--dry-run` of `repowarden cc`, `git cc`, `git
 
 | Tool | Wiring | Project (`--projet`, default) | User (`--global`) |
 |---|---|---|---|
-| [Claude Code](https://code.claude.com/docs/en/hooks) | `PreToolUse` hook (`Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `Bash` tools): `repowarden garde --format claude` | `.claude/settings.json` | `$CLAUDE_CONFIG_DIR/settings.json` ([if set](https://code.claude.com/docs/en/settings)), else `~/.claude/settings.json` |
+| [Claude Code](https://code.claude.com/docs/en/hooks) | `PreToolUse` hook (`Edit`, `Write`, `MultiEdit`, `NotebookEdit`, `Bash` tools): `repowarden guard --format claude` | `.claude/settings.json` | `$CLAUDE_CONFIG_DIR/settings.json` ([if set](https://code.claude.com/docs/en/settings)), else `~/.claude/settings.json` |
 | [opencode](https://opencode.ai/docs/plugins/) 1.x | plugin, `tool.execute.before` hook (`edit`, `write`, `apply_patch`, `bash` tools) | `.opencode/plugins/repowarden-garde.js` | `$OPENCODE_CONFIG_DIR/plugins/` ([if set](https://opencode.ai/docs/config/)), else `${XDG_CONFIG_HOME:-~/.config}/opencode/plugins/` |
 | opencode 2.x (`@opencode/cli`) | `{ id, setup }` plugin, `ctx.tool.hook("execute.before")` hook (`edit`, `write`, `shell` tools) | `.opencode/plugins/repowarden-garde-v2.js` | same folder |
 
 Two files, one per opencode version: opencode 1.x takes a module with a default `{ id, setup }` export for a 2.x plugin and no longer calls its 1.x export. Each version loads both; the other version's file does nothing. Tried with opencode 1.18.34, 1.19.4 and 2.1.4.
 
-`repowarden agents init --claude` or `--opencode` for a single tool. Re-runnable: an existing `settings.json` is completed (nothing if the hook is already there), a modified plugin is kept as is and reported. **The guard follows repowarden updates**: a plugin written by repowarden (first line `// Garde-fou repowarden pour opencode…`, the former standalone plugin included) or a `repowarden garde…` hook in a form other than the current one is replaced by the template, other hooks staying intact ("guard updated"). A personal file (without that header) is never overwritten. `repowarden statut` reports an outdated guard, in the repository or for the user, with `repowarden agents init` (`--global` for the user); `repowarden install` updates, without asking, the user guard already wired. repowarden hooks inactive (repository, or `--global` without `repowarden install --global`): reported, with the command, since the guard will then refuse commits. `repowarden statut` and `repowarden install` report an agent present (`claude` or `opencode` in the `PATH`, or their configuration folder) with the guard wired neither in the repository nor for the user, with `repowarden agents init`; `install` offers it in a terminal.
+`repowarden agents init --claude` or `--opencode` for a single tool. Re-runnable: an existing `settings.json` is completed (nothing if the hook is already there), a modified plugin is kept as is and reported. **The guard follows repowarden updates**: a plugin written by repowarden (first line `// Garde-fou repowarden pour opencode…`, the former standalone plugin included) or a `repowarden guard…` hook in a form other than the current one is replaced by the template, other hooks staying intact ("guard updated"). A personal file (without that header) is never overwritten. `repowarden statut` reports an outdated guard, in the repository or for the user, with `repowarden agents init` (`--global` for the user); `repowarden install` updates, without asking, the user guard already wired. repowarden hooks inactive (repository, or `--global` without `repowarden install --global`): reported, with the command, since the guard will then refuse commits. `repowarden statut` and `repowarden install` report an agent present (`claude` or `opencode` in the `PATH`, or their configuration folder) with the guard wired neither in the repository nor for the user, with `repowarden agents init`; `install` offers it in a terminal.
 
 ### Removing the guard
 
 ```bash
-repowarden agents retirer             # repository; --global: user configuration (alias: remove)
+repowarden agents remove             # repository; --global: user configuration (alias: remove)
 ```
 
-Same options as `init` (`--claude`, `--opencode`, `--projet`, `--global`). Only what `init` wrote goes: in `settings.json`, the `repowarden garde` commands (other hooks and settings stay; the file is deleted if nothing is left); each opencode plugin if identical to its template (modified, it is kept and reported). Run again, nothing to remove, no error.
+Same options as `init` (`--claude`, `--opencode`, `--projet`, `--global`). Only what `init` wrote goes: in `settings.json`, the `repowarden guard` commands (other hooks and settings stay; the file is deleted if nothing is left); each opencode plugin if identical to its template (modified, it is kept and reported). Run again, nothing to remove, no error.
 
 ### Customizing the skill
 
 If the repowarden skill placed by `repowarden agents init` still has the marker line `<!-- repowarden:skill ... -->`, it is considered placed by repowarden and will be replaced by the template on the next `agents init`. To customize it, remove that marker line from `SKILL.md` (Claude Code or opencode, project or global). A skill without the marker is kept as is by `agents init` and `agents retirer`.
 
-## Checker: `repowarden garde`
+## Checker: `repowarden guard`
 
 One checker for all tools: it reads the action on standard input (JSON) and answers with its exit code.
 
@@ -91,7 +91,7 @@ Every new function has, right above it, one or two lines saying what it does and
 ```text
 ✖ repowarden: change refused: "main" is a protected branch.
   → Work on a ticket's branch: repowarden ticket <n>
-  → Before changing bin/garde, once on the right branch: repowarden carte bin/garde (functions, tests, tickets)
+  → Before changing bin/guard, once on the right branch: repowarden carte bin/guard (functions, tests, tickets)
 ```
 
 ## Limitations

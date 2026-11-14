@@ -110,7 +110,7 @@ jobs:
 
   # Paquet npm (installation sur la machine : npm install -g), publié sans
   # jeton (publication de confiance). Activé par la variable REPOWARDEN_NPM ;
-  # mise en place : bin/npm-publication. Le secret NPM_TOKEN ne sert qu'à la
+  # mise en place : bin/npm-publish. Le secret NPM_TOKEN ne sert qu'à la
   # toute première publication (vide ensuite : publication de confiance).
   npm:
     needs: release

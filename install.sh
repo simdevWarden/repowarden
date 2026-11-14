@@ -20,6 +20,8 @@ HOOKS="$ROOT/hooks"
 source "$HOOKS/lib/ui.sh"
 # shellcheck source=hooks/lib/i18n.sh
 source "$HOOKS/lib/i18n.sh"
+# shellcheck source=hooks/lib/command-aliases.sh
+source "$HOOKS/lib/command-aliases.sh"
 # shellcheck source=hooks/lib/agents.sh
 source "$HOOKS/lib/agents.sh"
 SCOPE="--local"
@@ -35,7 +37,7 @@ while [ $# -gt 0 ]; do
         --uninstall) ACTION="uninstall" ;;
         --purge) PURGE=1 ;;
         --bots) BOTS=demande ;;
-        --sans-bots) BOTS=jamais ;;
+        --sans-bots | --no-bots) BOTS=jamais ;;
         --lang)
             shift
             LANG_CHOICE="${1:-}"
@@ -279,10 +281,10 @@ done < <(agents_perimes "")
 # terminal, jamais fait sans accord ; sinon, la commande sur une ligne
 RACINE="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 if agents_sans_garde "$RACINE"; then
-    AGENTS_PORTEE=--projet
+    AGENTS_PORTEE=--project
     [ "$SCOPE" = --local ] || AGENTS_PORTEE=--global
     CMD_AGENTS="repowarden agents init"
-    [ "$AGENTS_PORTEE" = --projet ] || CMD_AGENTS="$CMD_AGENTS --global"
+    [ "$AGENTS_PORTEE" = --project ] || CMD_AGENTS="$CMD_AGENTS --global"
     REPONSE=n
     if [ -t 0 ] || [ -n "${REPOWARDEN_INTERACTIF:-}" ]; then
         t install.agents_ask "$CMD_AGENTS"
