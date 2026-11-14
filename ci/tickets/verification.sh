@@ -15,9 +15,18 @@ conception_ecrite() {
 }
 
 # REPLY = premier autre ticket que $2 cité par un commit de la PR $1 (« Ticket : #M »)
+# Les messages lus sont ceux des commits propres à la PR : comparaison base...tête
+# (base $3, tête $4), dont GitHub calcule le merge-base. La liste des commits de la
+# PR garde ceux déjà dans la base après une fusion de develop : ils ne sont pas des
+# commits de la PR. Sans base (appel hors PR), la liste des commits de la PR.
 autre_ticket_r() {
-    local cites n
-    cites="$(gh pr view "$1" --json commits -q '.commits[].messageBody' 2>/dev/null || true)"
+    local cites n base="${3:-}" head="${4:-}"
+    if [ -n "$base" ] && [ -n "$head" ]; then
+        cites="$(gh api "repos/$GH_REPO/compare/$base...$head" \
+            -q '.commits[].commit.message' 2>/dev/null || true)"
+    else
+        cites="$(gh pr view "$1" --json commits -q '.commits[].messageBody' 2>/dev/null || true)"
+    fi
     REPLY=""
     for n in $(grep -oiE '^[[:space:]]*tickets?[[:space:]]*:[[:space:]]*#[0-9]+' <<<"$cites" | grep -oE '[0-9]+' || true); do
         if [ "$n" != "$2" ]; then REPLY="$n"; return 0; fi
@@ -43,7 +52,7 @@ verifier() {
         _tr tk.bad_branch "$head" "$tickets"; etat=failure
     elif [ "${REQUIRE_DESIGN:-true}" = true ] && ! conception_ecrite "$tickets"; then
         _tr tk.no_design "$tickets"; etat=failure
-    elif autre_ticket_r "$pr" "$tickets"; then
+    elif autre_ticket_r "$pr" "$tickets" "${BASE:-}" "$head"; then
         _tr tk.other_ticket "$REPLY" "$tickets"; etat=failure
     else
         liste=""
