@@ -74,6 +74,9 @@ case "$1 $2" in
     "api repos/o/r/compare/"*)
         case "$*" in
             *"commits[0]"*) cat "$F/premier" 2>/dev/null || true ;;
+            # messages des commits propres a la PR (base...tete) : ce que lit le
+            # controle « ticket »
+            *".commits[].commit.message") cat "$F/compare_commits" 2>/dev/null || true ;;
             *commits*) cat "$F/commits" 2>/dev/null || true ;;
             *) echo "${FAKE_AHEAD:-1}" ;;
         esac ;;
@@ -934,17 +937,32 @@ EOF
     HEAD=feat/ticket12-test ACTION=synchronize run "$TICKETS" pr
     [[ "$output" == *"doit porter le numéro du ticket"* ]] || false
     grep -qx "statut-pr failure" "$F/events"
-    # commit qui cite un autre ticket
+    # commit qui cite un autre ticket (commit propre a la branche)
     printf 'fix: x\n\nTicket : #12\nfeat: y\n\nTicket : #13\n' >"$F/pr_commits"
+    cp "$F/pr_commits" "$F/compare_commits"
     : >"$F/events"
     ACTION=synchronize run "$TICKETS" pr
     [[ "$output" == *"cite le ticket #13"* ]] || false
     grep -qx "statut-pr failure" "$F/events"
     # tout en regle
     printf 'fix: x\n\nTicket : #12\n' >"$F/pr_commits"
+    cp "$F/pr_commits" "$F/compare_commits"
     : >"$F/events"
     ACTION=synchronize run "$TICKETS" pr
     grep -qx "statut-pr success" "$F/events"
+}
+
+@test "tickets : develop fusionne dans la branche -> son commit n'est pas un commit d'un autre ticket" {
+    N=12 ticket "validé" "statut: en cours"
+    printf 'Ticket : #12' >"$F/pr_body"
+    # la liste GitHub des commits de la PR garde le commit de develop, fusionne
+    # dans la branche : la comparaison base...tete ne le liste pas
+    printf 'fix: x\n\nTicket : #12\nfeat: develop\n\nTicket : #13\n' >"$F/pr_commits"
+    : >"$F/events"
+    ACTION=synchronize run "$TICKETS" pr
+    grep -qx "statut-pr success" "$F/events"
+    # le controle lit les commits propres a la PR (comparaison base...tete)
+    grep -qF "api repos/o/r/compare/develop...feat/12-panier -q .commits[].commit.message" "$F/log"
 }
 
 @test "tickets : nom de branche du ticket (type, numero, titre sans accents, tronque)" {
