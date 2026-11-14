@@ -876,7 +876,7 @@ EOF
     ! grep -q "merge-auto" "$F/events"
     grep -qx "pr-commentaire 7" "$F/events"
     grep -q "regles-perimees" "$F/pr_comments"
-    grep -q "proteger --checks" "$F/pr_comments"
+    grep -q "protect --checks" "$F/pr_comments"
 }
 
 @test "tickets : merge auto second passage -> pas de second commentaire" {
