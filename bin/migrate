@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # Passage de repogarde à repowarden dans le projet courant (docs/migration-v4.md) :
-#   repowarden migrer           applique la migration dans l'arbre de travail
-#   repowarden migrer --pr      sur une branche chore/migration-repowarden-vN :
+#   repowarden migrate           applique la migration dans l'arbre de travail
+#   repowarden migrate --pr      sur une branche chore/migration-repowarden-vN :
 #                               commit, push et PR (rien si une PR est ouverte)
-#   repowarden migrer --hooks   déplace aussi les hooks lefthook résiduels de
+#   repowarden migrate --hooks   déplace aussi les hooks lefthook résiduels de
 #                               .git/hooks dans .git/hooks-lefthook/
 # Configuration (.repowarden.conf, .repowarden/), workflows (uses: vers le
 # dépôt repowarden et sa version majeure, anciens noms, permissions), puis la

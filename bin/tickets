@@ -12,7 +12,7 @@
 #     mainteneur → backlog, sinon à valider ; --sans-validation-auto : tous à
 #     valider) ; branches des PR ouvertes et mergées inscrites sur leurs tickets.
 # Ensuite : committer ces fichiers, exiger la vérification « ticket »
-# (repowarden proteger --checks "…,ticket") et, s'il n'y est pas, brancher le
+# (repowarden protect --checks "…,ticket") et, s'il n'y est pas, brancher le
 # job tickets de release.yml (repowarden bots l'y écrit).
 set -euo pipefail
 

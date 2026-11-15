@@ -15,8 +15,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # shellcheck source=../hooks/lib/common.sh
 source "$ROOT/hooks/lib/common.sh"
+# shellcheck source=../hooks/lib/command-aliases.sh
+source "$ROOT/hooks/lib/command-aliases.sh"
 
-aide() { _tr help.bot; printf '%b\n' "$_T" >&2; }
+aide() { _tr help.bot; printf '%b\n' "$_T"; }
 
 # Scripts appelés (remplaçables dans les tests) et origine des clones
 BIN="${REPOWARDEN_BIN:-$ROOT/bin}"
@@ -24,8 +26,14 @@ GIT_URL="${REPOWARDEN_BOT_GIT:-https://github.com}"
 TITRE_RAPPORT="Rapport du bot repowarden"
 
 commande="${1:-}"
+_original_sub="$commande"
+commande="$(subcommand_canonical bot "$commande")"
+if [ -n "$_original_sub" ] && [ "$commande" != "$_original_sub" ]; then
+    _tr cli.deprecated_name "bot $_original_sub" "bot $commande"
+    warn "$_T"
+fi
 case "$commande" in
-    init | rapport) shift ;;
+    init | report) shift ;;
     -h | --help) aide; exit 0 ;;
     *) commande=passage ;;
 esac
@@ -80,7 +88,8 @@ YAML
 fi
 
 # --- repowarden bot rapport FICHIER : issue unique du dépôt de pilotage -----
-if [ "$commande" = rapport ]; then
+if [ "$commande" = report ]; then
+    case "${1:-}" in -h | --help) aide; exit 0 ;; esac
     fichier="${1:?repowarden bot rapport FICHIER}"
     [ -f "$fichier" ] || { err_t bot.no_report "$fichier"; exit 1; }
     numero="$(gh issue list --state open --search "\"$TITRE_RAPPORT\" in:title" --json number,title \
@@ -204,11 +213,11 @@ for depot in $REPOS; do
     # Protection : vérifiée, appliquée seulement en auto (hors --dry-run)
     verifications_r "$depot" "$conf"
     checks="$REPLY"
-    if sortie="$(cd "$clone" && bash "$BIN/proteger" --repo "$depot" --checks "$checks" --verifier 2>&1)"; then
+    if sortie="$(cd "$clone" && bash "$BIN/protect" --repo "$depot" --checks "$checks" --verifier 2>&1)"; then
         t bot.prot_ok
     elif [ "$mode" = pr ] || [ -n "$DRY_RUN" ]; then
         t bot.prot_stale
-    elif sortie="$(cd "$clone" && bash "$BIN/proteger" --repo "$depot" --checks "$checks" 2>&1)"; then
+    elif sortie="$(cd "$clone" && bash "$BIN/protect" --repo "$depot" --checks "$checks" 2>&1)"; then
         t bot.prot_applied
     else
         derniere_erreur_r "$sortie"
@@ -221,7 +230,7 @@ for depot in $REPOS; do
     # Migration : par PR seulement (dans le clone jetable en --dry-run)
     options=(--pr)
     [ -z "$DRY_RUN" ] || options=()
-    if sortie="$(cd "$clone" && bash "$BIN/migrer" ${options[@]+"${options[@]}"} 2>&1)"; then
+    if sortie="$(cd "$clone" && bash "$BIN/migrate" ${options[@]+"${options[@]}"} 2>&1)"; then
         case "$sortie" in
             *"$MIG_RIEN"*) t bot.mig_none ;;
             *"$MIG_OUVERTE"*) t bot.mig_open ;;

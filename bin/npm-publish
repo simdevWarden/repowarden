@@ -4,7 +4,7 @@
 # vérifie que la publication vient de ce dépôt et de release.yml (publication
 # de confiance, OIDC) et joint la provenance au paquet.
 #
-#   bin/npm-publication [--repo propriétaire/nom] [--workflow release.yml]
+#   bin/npm-publish [--repo propriétaire/nom] [--workflow release.yml]
 #                       [--environnement NOM] [--dry-run]
 #
 # 1. connexion npm (npm login si besoin) ;

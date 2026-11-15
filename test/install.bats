@@ -208,7 +208,7 @@ faux_repowarden() {
     [ ! -e .claude/settings.json ]
     REPOWARDEN_INTERACTIF=1 run "$INSTALL" <<<"o"
     [ "$status" -eq 0 ]
-    grep -q "repowarden garde" .claude/settings.json
+    grep -q "repowarden guard" .claude/settings.json
     [ -f .opencode/plugins/repowarden-garde.js ]
     run "$INSTALL"
     [[ "$output" != *"sans garde-fou"* ]] || false
@@ -224,7 +224,7 @@ faux_repowarden() {
     git config --unset core.hooksPath
     mkdir -p "$HOME/.config/opencode/plugins"
     cp "$BATS_TEST_DIRNAME/fixtures/agents/ancien-plugin-opencode-autonome.js" "$HOME/.config/opencode/plugins/repowarden-garde.js"
-    printf '{"model":"x","hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"repowarden garde"}]}]}}\n' >"$HOME/.claude/settings.json"
+    printf '{"model":"x","hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"repowarden guard"}]}]}}\n' >"$HOME/.claude/settings.json"
     run "$INSTALL" --global --lang fr
     [ "$status" -eq 0 ]
     [[ "$output" == *"opencode : garde-fou mis à jour"* ]] || false
@@ -232,7 +232,7 @@ faux_repowarden() {
     [[ "$output" != *"sans garde-fou"* ]] || false
     cmp -s "$HOME/.config/opencode/plugins/repowarden-garde.js" "$BATS_TEST_DIRNAME/../hooks/agents/repowarden-garde.js"
     cmp -s "$HOME/.config/opencode/plugins/repowarden-garde-v2.js" "$BATS_TEST_DIRNAME/../hooks/agents/repowarden-garde-v2.js"
-    jq -e '.model == "x" and .hooks.PreToolUse == [{matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash", hooks: [{type: "command", command: "repowarden garde --format claude"}]}]' "$HOME/.claude/settings.json"
+    jq -e '.model == "x" and .hooks.PreToolUse == [{matcher: "Edit|Write|MultiEdit|NotebookEdit|Bash", hooks: [{type: "command", command: "repowarden guard --format claude"}]}]' "$HOME/.claude/settings.json"
     # Déjà à jour : rien à dire ; plugin personnel jamais touché
     printf '// mon plugin\n' >"$HOME/.config/opencode/plugins/repowarden-garde.js"
     run "$INSTALL" --global

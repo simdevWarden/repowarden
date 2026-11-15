@@ -17,6 +17,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 source "$ROOT/hooks/lib/common.sh"
 # shellcheck source=../hooks/lib/tickets.sh
 source "$ROOT/hooks/lib/tickets.sh"
+# shellcheck source=../hooks/lib/command-aliases.sh
+source "$ROOT/hooks/lib/command-aliases.sh"
 
 # Aide sur la sortie standard quand elle est demandée (code 0) ; les cas
 # d'erreur la redirigent eux-mêmes vers stderr
@@ -141,9 +143,18 @@ cmd_nouveau() {
     fi
 }
 
-case "${1:-}" in
+_original_sub="${1:-}"
+_sub_canon="$(subcommand_canonical ticket "$_original_sub")"
+if [ -n "$_original_sub" ] && [ "$_sub_canon" != "$_original_sub" ]; then
+    _tr cli.deprecated_name "ticket $_original_sub" "ticket $_sub_canon"
+    warn "$_T"
+fi
+_args=()
+for _a in "${@:2}"; do _args+=("$(option_canonical "$_a")"); done
+
+case "$_sub_canon" in
     -h | --help | help) aide ;;
-    nouveau | new) shift; cmd_nouveau "$@" ;;
+    new) shift; cmd_nouveau ${_args[@]+"${_args[@]}"} ;;
     comment) shift; exec bash "$ROOT/bin/ticket-comment" "$@" ;;
     label) shift; exec bash "$ROOT/bin/ticket-label" "$@" ;;
     "")

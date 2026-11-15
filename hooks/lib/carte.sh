@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Carte du projet (repowarden carte) : quoi fait quoi et pourquoi, sans LLM ni
+# Carte du projet (repowarden map) : quoi fait quoi et pourquoi, sans LLM ni
 # réseau, pour qu'un agent (ou une personne) lise l'extrait utile au lieu
 # d'explorer le dépôt. Fichier .repowarden/carte/carte.json, dossier ignoré
 # par git ; clés triées, ni date ni chemin absolu : même dépôt, même fichier.
@@ -280,7 +280,7 @@ END { if (NR > 0) sortie() }'
 # extension), par son chemin cité, ou par « repowarden <commande> » (bin/…)
 # shellcheck disable=SC2016 # programme awk, rien à développer
 CARTE_TESTS_AWK='
-# Nom sans dossier ni extension : bin/garde, test/garde.bats → garde
+# Nom sans dossier ni extension : bin/guard, test/garde.bats → garde
 function base(p) { sub(/^.*\//, "", p); sub(/\.[^.\/]*$/, "", p); return p }
 # Vrai si le texte x cite le chemin p, sans autre caractère de nom collé
 function cite(x, p,   k, av, ap) {

@@ -177,7 +177,7 @@ sans_gitleaks() {
 }
 
 @test "statut : fichier sensible signale, gitleaks absent -> installation en etape suivante" {
-    local statut="$BATS_TEST_DIRNAME/../bin/statut"
+    local statut="$BATS_TEST_DIRNAME/../bin/status"
     export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/global.gitconfig"
     git config --global alias.cc "!bash \"$(cd "$BATS_TEST_DIRNAME/.." && pwd -P)/bin/commit\""
     echo "API_KEY=valeur-tres-secrete" >.env

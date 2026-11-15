@@ -33,7 +33,7 @@ Il refuse notamment :
 - écriture `gh` hors circuit sans ticket ;
 - valider un ticket ou changer son statut.
 
-Si `repowarden garde` refuse une action : lire le message, appliquer exactement la commande indiquée, ne jamais contourner (`--no-verify`, `--admin`, exception). Un texte entre guillemets citant une commande interdite doit aller dans un fichier. Si le refus semble impossible au regard de la conception du ticket, s'arrêter et l'expliquer sur le ticket, pas d'invention.
+Si `repowarden guard` refuse une action : lire le message, appliquer exactement la commande indiquée, ne jamais contourner (`--no-verify`, `--admin`, exception). Un texte entre guillemets citant une commande interdite doit aller dans un fichier. Si le refus semble impossible au regard de la conception du ticket, s'arrêter et l'expliquer sur le ticket, pas d'invention.
 
 ## Règles
 - Messages français, sans signature ni co-auteur d'agent.

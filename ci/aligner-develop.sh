@@ -24,7 +24,7 @@ git_app() {
 avertir() {
     local raison
     raison="$(tr '\n' ' ' <<<"$1")"
-    echo "::warning::$INTEGRATION non alignee sur $MAIN : $raison. Lancer repowarden proteger (bypass de l'App sur chaque ruleset de $INTEGRATION)."
+    echo "::warning::$INTEGRATION non alignee sur $MAIN : $raison. Lancer repowarden protect (bypass de l'App sur chaque ruleset de $INTEGRATION)."
     if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then
         echo "- $INTEGRATION non alignee sur $MAIN : $raison" >>"$GITHUB_STEP_SUMMARY"
     fi

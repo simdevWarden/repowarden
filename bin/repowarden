@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # Point d'entrée unique de repowarden (paquet npm, ou clone du dépôt) :
 #   repowarden                                     état du poste et étape suivante
-#   repowarden statut                              (idem)
+#   repowarden status                              (idem)
 #   repowarden install [--global] [--lang fr|en]   active les hooks (install.sh)
 #   repowarden bots                                bots du dépôt GitHub (CI, releases, tickets…)
 #   repowarden uninstall [--global] [--purge]      les retire (avant npm uninstall -g)
 #   repowarden cc                                  assistant de commit
-#   repowarden code-mort                           nouveau code mort de la branche
-#   repowarden carte                               carte du projet : fonctions et leur pourquoi
+#   repowarden dead-code                           nouveau code mort de la branche
+#   repowarden map                                 carte du projet : fonctions et leur pourquoi
 #   repowarden ticket <n>                         branche du ticket (créée, liée, si besoin)
-#   repowarden ticket nouveau "<titre>"           nouveau ticket
+#   repowarden ticket new "<titre>"               nouveau ticket
 #   repowarden ticket comment <n> "<texte>"       commentaire sur un ticket
 #   repowarden ticket label <n> <label> [--remove]  gère les labels d'un ticket
 #   repowarden pr label <n> <label> [--remove]     gère les labels d'une PR
@@ -17,14 +17,14 @@
 #   repowarden run rerun <id|--failed|--workflow> relance un workflow
 #   repowarden run list [--workflow <nom>]        liste les runs récents
 #   repowarden tickets init                        suivi des tickets (GitHub)
-#   repowarden proteger [options]                  protection des branches (GitHub)
-#   repowarden migrer [--pr] [--hooks]             passage de repogarde à repowarden
-#   repowarden npm-publication                     publication npm automatique
+#   repowarden protect [options]                  protection des branches (GitHub)
+#   repowarden migrate [--pr] [--hooks]             passage de repogarde à repowarden
+#   repowarden npm-publish                         publication npm automatique
 #   repowarden app init                            GitHub App des workflows (une fois)
-#   repowarden bot [init|rapport]                  bot d'organisation (dépôt de pilotage)
+#   repowarden bot [init|report]                  bot d'organisation (dépôt de pilotage)
 #   repowarden agents init [--claude] [--opencode] garde-fou des agents IA
-#   repowarden agents retirer                      le retire
-#   repowarden garde [--format claude|opencode]    vérifie une action d'agent
+#   repowarden agents remove                      le retire
+#   repowarden guard [--format claude|opencode]    vérifie une action d'agent
 #   repowarden --version
 set -euo pipefail
 
@@ -41,6 +41,8 @@ ROOT="$(cd "$(dirname "$src")/.." && pwd -P)"
 source "$ROOT/hooks/lib/ui.sh"
 # shellcheck source=../hooks/lib/i18n.sh
 source "$ROOT/hooks/lib/i18n.sh"
+# shellcheck source=../hooks/lib/command-aliases.sh
+source "$ROOT/hooks/lib/command-aliases.sh"
 
 # Clé d'aide d'une commande, alias compris ; vide si la commande est inconnue.
 help_key_r() {
@@ -50,19 +52,19 @@ help_key_r() {
         bots) REPLY=help.bots ;;
         bot) REPLY=help.bot ;;
         agents) REPLY=help.agents ;;
-        garde | guard) REPLY=help.garde ;;
+        guard) REPLY=help.garde ;;
         cc | commit) REPLY=help.cc ;;
-        code-mort | deadcode) REPLY=help.code-mort ;;
-        carte | map) REPLY=help.carte ;;
+        dead-code | deadcode) REPLY=help.code-mort ;;
+        map) REPLY=help.carte ;;
         ticket) REPLY=help.ticket ;;
         tickets) REPLY=help.tickets ;;
         pr) REPLY=help.pr ;;
         run) REPLY=help.run ;;
         app) REPLY=help.app ;;
-        migrer | migrate) REPLY=help.migrer ;;
-        proteger | protect) REPLY=help.proteger ;;
-        npm-publication | npm-publish) REPLY=help.npm-publication ;;
-        "" | statut | status) REPLY=help.statut ;;
+        migrate) REPLY=help.migrer ;;
+        protect) REPLY=help.proteger ;;
+        npm-publish) REPLY=help.npm-publication ;;
+        "" | status) REPLY=help.statut ;;
         *) REPLY="" ;;
     esac
 }
@@ -70,6 +72,12 @@ help_key_r() {
 aide() { _tr help.main; printf '%b\n' "$_T" >&2; }
 
 commande="${1:-}"
+original="$commande"
+commande="$(command_canonical "$commande")"
+if [ -n "$original" ] && [ "$commande" != "$original" ]; then
+    _tr cli.deprecated_name "$original" "$commande"
+    attention "$_T"
+fi
 cmd="$commande"
 [ $# -eq 0 ] || shift
 
@@ -103,8 +111,8 @@ case "$cmd" in
         ;;
     uninstall) exec bash "$ROOT/install.sh" --uninstall "$@" ;;
     cc | commit) exec bash "$ROOT/bin/commit" "$@" ;;
-    code-mort | deadcode) exec bash "$ROOT/bin/code-mort" "$@" ;;
-    carte | map) exec bash "$ROOT/bin/carte" "$@" ;;
+    dead-code) exec bash "$ROOT/bin/dead-code" "$@" ;;
+    map) exec bash "$ROOT/bin/map" "$@" ;;
     tickets) exec bash "$ROOT/bin/tickets" "$@" ;;
     ticket) exec bash "$ROOT/bin/ticket" "$@" ;;
     ticket-comment) exec bash "$ROOT/bin/ticket-comment" "$@" ;;
@@ -135,19 +143,19 @@ case "$cmd" in
     run-rerun) exec bash "$ROOT/bin/run-rerun" "$@" ;;
     run-list) exec bash "$ROOT/bin/run-list" "$@" ;;
     pr-checks) exec bash "$ROOT/bin/pr-checks" "$@" ;;
-    proteger | protect) exec bash "$ROOT/bin/proteger" "$@" ;;
-    migrer | migrate) exec bash "$ROOT/bin/migrer" "$@" ;;
-    npm-publication | npm-publish) exec bash "$ROOT/bin/npm-publication" "$@" ;;
+    protect) exec bash "$ROOT/bin/protect" "$@" ;;
+    migrate) exec bash "$ROOT/bin/migrate" "$@" ;;
+    npm-publish) exec bash "$ROOT/bin/npm-publish" "$@" ;;
     app) exec bash "$ROOT/bin/app" "$@" ;;
     bots) exec bash "$ROOT/bin/bots" "$@" ;;
     bot) exec bash "$ROOT/bin/bot" "$@" ;;
     agents) exec bash "$ROOT/bin/agents" "$@" ;;
-    garde | guard) exec bash "$ROOT/bin/garde" "$@" ;;
+    guard) exec bash "$ROOT/bin/guard" "$@" ;;
     -v | --version | version)
         repowarden_version_r "$ROOT"
         echo "$REPLY"
         ;;
-    "" | statut | status) exec bash "$ROOT/bin/statut" "$@" ;;
+    "" | status) exec bash "$ROOT/bin/status" "$@" ;;
     -h | --help | help)
         _tr help.main
         printf '%b\n' "$_T"

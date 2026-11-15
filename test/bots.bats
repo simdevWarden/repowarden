@@ -37,7 +37,7 @@ case "$*" in
 esac
 exit 0
 GH
-    for c in tickets app proteger npm-publication; do
+    for c in tickets app protect npm-publish; do
         printf '#!/usr/bin/env bash\necho "%s $*" >>"$FAKE/log"\n[ "${ECHEC:-}" != %s ]\n' "$c" "$c" >"$F/fakebin/$c"
     done
     chmod +x "$F/bin/gh" "$F/fakebin/"*
@@ -54,7 +54,7 @@ lancer() { run bash -c "\"$BOTS\" <\"$F/reponses\""; }
     [ "$status" -eq 0 ]
     [[ "$output" == *"Aucun bot configuré"* ]] || false
     [ ! -e .github ] && ! grep -q -- "-X POST" "$F/log"
-    ! grep -qE "^(tickets|app|proteger|npm-publication) " "$F/log"
+    ! grep -qE "^(tickets|app|protect|npm-publish) " "$F/log"
     REPOWARDEN_INTERACTIF="" run bash -c "\"$BOTS\" </dev/null"
     [[ "$output" == *"pas de terminal"*"repowarden bots"* ]] || false
     GH_ADMIN=false lancer
@@ -80,7 +80,7 @@ lancer() { run bash -c "\"$BOTS\" <\"$F/reponses\""; }
     ! grep -q 'app-client-id' .github/workflows/release.yml
     [ ! -e .github/workflows/nettoyage.yml ]
     grep -q "^tickets init --repo moi/projet$" "$F/log"
-    grep -q "^proteger --repo moi/projet$" "$F/log"
+    grep -q "^protect --repo moi/projet$" "$F/log"
     ! grep -q "^app " "$F/log"
     ! git config -f .repowarden.conf --get repowarden.integrationBranch
     [[ "$output" == *"commiter par une PR"* ]] || false
@@ -219,14 +219,14 @@ lancer() { run bash -c "\"$BOTS\" <\"$F/reponses\""; }
     ECHEC=tickets lancer
     [ "$status" -ne 0 ]
     [[ "$output" == *"tickets : échec"* ]] || false
-    grep -q "^proteger " "$F/log"
+    grep -q "^protect " "$F/log"
     [[ "$output" != *"Publication npm"* ]] || false
     printf '{ "name": "x" }\n' >package.json
     : >"$F/log"
     # ... protection (non), npm, confirmation
     repondre o 1 n n n n n o o
     lancer
-    grep -q "^npm-publication --repo moi/projet$" "$F/log"
+    grep -q "^npm-publish --repo moi/projet$" "$F/log"
 }
 
 @test "install : bots proposes dans un depot GitHub, --sans-bots les fait taire" {
@@ -376,7 +376,7 @@ YAML
     # ni environnement d'approbation (indisponible sur ce dépôt) : revue de la PR de livraison
     ! grep -q 'delivery-environment' "$f"
     [ "$(git config -f .repowarden.conf repowarden.deliveryApproval)" = review ]
-    grep -q "^proteger --repo moi/projet$" "$F/log"
+    grep -q "^protect --repo moi/projet$" "$F/log"
     # dépôt public ou offre payante : rien de tout cela
     rm -rf .github .repowarden.conf
     repondre o 2 n o n n o n "" "" o

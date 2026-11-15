@@ -6,7 +6,7 @@ Chaque changement part d'un **ticket** (issue GitHub) : **la branche découle du
 
 | Statut (étiquette) | Quand | Effet automatique |
 |---|---|---|
-| `statut: à valider` | ticket créé (à la main, ou `repowarden ticket nouveau`) | — |
+| `statut: à valider` | ticket créé (à la main, ou `repowarden ticket new`) | — |
 | `statut: backlog` | un mainteneur pose l'étiquette **`validé`**, ou ouvre lui-même le ticket (validé d'office) | ticket prêt à être pris ; commentaire avec la commande pour le prendre |
 | `statut: en cours` | quelqu'un s'assigne le ticket (ou `repowarden ticket N`), ou pousse un premier commit sur sa branche | à l'assignation : **branche `<type>/<n°>-<titre>` créée** depuis `develop` et **liée au ticket** (panneau *Development*), un ticket validé pour plus tard n'a donc pas de branche qui vieillit ; au premier push : **PR en brouillon** ouverte vers `develop`, titrée par l'**en-tête du premier commit** de la branche, `(#n)` final retiré (il devient le commit de squash ; s'il n'est pas conforme : titre du ticket, portée tirée de son préfixe, sigles gardés, aucun mot coupé), à la **description qui dit d'abord ce que fait la PR** (en-tête et corps de chaque commit, commits de fusion ignorés), puis les critères du ticket en cases à cocher, les commentaires de mainteneur titrés « Ajout » ou « Constat lié », le résumé de la « Conception retenue » (ce qui change et hors périmètre), le reste du ticket replié (`<details>`) et `Ticket : #n`, assignée à l'auteur du push (si c'est un bot, à l'assigné du ticket, sinon à personne ; un refus de GitHub n'est qu'un avertissement) ; **actualisée à chaque push** tant qu'elle est en brouillon, une section `## Réalisé` écrite à la main y étant gardée telle quelle |
 | `statut: en relecture` | PR « Ready for review » | la CI tourne ; une revue « Request changes » ramène le ticket en cours |
@@ -27,12 +27,12 @@ Tout est automatique, sauf la validation : c'est la seule décision humaine, et 
 
 ```bash
 repowarden ticket 12                          # se place sur la branche du ticket #12
-repowarden ticket nouveau "Ajoute le panier"   # crée un ticket (à valider)
+repowarden ticket new "Ajoute le panier"   # crée un ticket (à valider)
 repowarden ticket                             # ticket de la branche courante
 ```
 
 - `repowarden ticket <n>` **prend le ticket** (assigné à soi) et se place sur sa branche ; la crée et la lie au ticket (`gh issue develop`) si elle n'existe pas encore.
-- `repowarden ticket nouveau --type <type>` : type parmi `feat`, `fix`, `docs`, `refactor`, `chore` (les étiquettes `type: …`) : si le suivi est géré par repowarden, un autre est refusé, avant toute création.
+- `repowarden ticket new --type <type>` : type parmi `feat`, `fix`, `docs`, `refactor`, `chore` (les étiquettes `type: …`) : si le suivi est géré par repowarden, un autre est refusé, avant toute création.
 - **Tickets assignés → branches locales** : `repowarden tickets sync` crée la branche locale de chaque ticket qui t'est assigné, sans changer ta branche courante. Un ticket réassigné à quelqu'un d'autre est signalé, sa branche locale conservée. Jamais pour un ticket livré (`préprod`, `done`) ou en relecture dont la branche a disparu (PR mergée). Réglage `ticketSync = manual | auto | off` : par défaut `manual`, un `git pull` ou un clonage ne touche à rien ; avec `git config repowarden.ticketSync auto`, la synchronisation se fait aussi à chaque `git pull` ou changement de branche (au plus toutes les 15 min, seulement avec `gh` connecté), jamais au clonage.
 - **Branche sans ticket** : `repowarden` prévient (à l'arrivée sur la branche et dans `git cc`), **sans jamais bloquer** : tout le monde ne travaille pas avec des tickets. Si le projet fait gérer ses tickets par repowarden, il **propose d'en créer un** (`git cc` le crée et le cite sur un « oui ») ; sinon, il indique comment ne plus le voir : `git config repowarden.skip tickets`.
 - `git cc` cite `Ticket : #12` sur une branche `feat/12-…`.

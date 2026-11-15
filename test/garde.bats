@@ -1,5 +1,5 @@
 #!/usr/bin/env bats
-# Garde-fou des agents IA (ticket #317) : repowarden garde reçoit l'action
+# Garde-fou des agents IA (ticket #317) : repowarden guard reçoit l'action
 # d'un agent (JSON, format Claude Code ou opencode) et la permet (code 0) ou
 # la refuse (code 2, raison et commande à lancer).
 
@@ -20,13 +20,13 @@ setup() {
 claude() {
     jq -n --arg t "$1" --argjson i "$2" --arg d "${3:-$PWD}" \
         '{hook_event_name: "PreToolUse", tool_name: $t, tool_input: $i, cwd: $d}' |
-        "$RW" garde --format claude
+        "$RW" guard --format claude
 }
 
 # Action opencode (tool.execute.before) : outil, arguments (JSON), dossier
 opencode() {
     jq -n --arg t "$1" --argjson a "$2" --arg d "${3:-$PWD}" '{tool: $t, args: $a, cwd: $d}' |
-        "$RW" garde
+        "$RW" guard
 }
 
 # Commande shell lancée par un agent (format opencode)
@@ -340,7 +340,7 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
 }
 
 @test "garde : un argument entre guillemets reste un seul mot" {
-    run shell 'cd .; "/opt/mon dossier/git" commit -m "repowarden ticket nouveau"'
+    run shell 'cd .; "/opt/mon dossier/git" commit -m "repowarden ticket new"'
     [ "$status" -eq 2 ]
     [[ "$output" == *"les commits passent par l'assistant"* ]] || false
     run shell 'cd .; "/opt/mon dossier/git" push origin "ma branche"'
@@ -422,10 +422,10 @@ edit() { claude Edit "$(jq -n --arg f "$PWD/${1:-README.md}" '{file_path: $f, ol
 }
 
 @test "garde : panne du garde-fou jamais bloquante, format inconnu refuse" {
-    run bash -c "echo 'pas du json' | '$RW' garde --format claude"
+    run bash -c "echo 'pas du json' | '$RW' guard --format claude"
     [ "$status" -eq 1 ]
     [[ "$output" == *"illisible"* ]] || false
-    run "$RW" garde --format cursor </dev/null
+    run "$RW" guard --format cursor </dev/null
     [ "$status" -eq 1 ]
     [[ "$output" == *"claude ou opencode"* ]] || false
 }
@@ -468,7 +468,7 @@ GH
     done
     run shell 'gh issue create --title x --body y'
     [ "$status" -eq 2 ]
-    [[ "$output" == *"repowarden ticket nouveau"* ]] || false
+    [[ "$output" == *"repowarden ticket new"* ]] || false
     for c in 'gh issue comment 12 --body x' 'gh issue edit 12 --add-label validé'; do
         run shell "$c"
         [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
@@ -531,33 +531,33 @@ GH
     [ "$status" -eq 0 ]
 }
 
-@test "garde : repowarden ticket nouveau refuse a un agent, sauf agentsTickets (#496)" {
+@test "garde : repowarden ticket new refuse a un agent, sauf agentsTickets (#496)" {
     # Chemin absolu précédé de cd : sous Git Bash, un argument qui commence par / passé à jq serait converti en chemin Windows
-    for c in 'repowarden ticket nouveau "Essai"' 'repowarden ticket new "Essai" --type fix' \
-        'REPOWARDEN_TICKET=12 repowarden ticket nouveau x' 'git status; repowarden ticket nouveau x' \
+    for c in 'repowarden ticket new "Essai"' 'repowarden ticket new "Essai" --type fix' \
+        'REPOWARDEN_TICKET=12 repowarden ticket new x' 'git status; repowarden ticket new x' \
         'cd .; /usr/local/bin/repowarden "ticket" nouveau x'; do
         run shell "$c"
         [ "$status" -eq 2 ] || { echo "$c permis"; return 1; }
         [[ "$output" == *"créer un ticket est une décision du mainteneur"* ]] || false
         [[ "$output" == *"agentsTickets"* ]] || false
     done
-    REPOWARDEN_LANG=en run shell 'repowarden ticket nouveau x'
+    REPOWARDEN_LANG=en run shell 'repowarden ticket new x'
     [ "$status" -eq 2 ]
     [[ "$output" == *"creating a ticket is the maintainer's decision"* ]] || false
-    for c in 'repowarden ticket nouveau --help' 'repowarden ticket 12' 'repowarden ticket' 'repowarden tickets sync'; do
+    for c in 'repowarden ticket new --help' 'repowarden ticket 12' 'repowarden ticket' 'repowarden tickets sync'; do
         run shell "$c"
         [ "$status" -eq 0 ] || { echo "$c refusé : $output"; return 1; }
     done
     git config repowarden.agentsTickets true
-    run shell 'repowarden ticket nouveau x'
+    run shell 'repowarden ticket new x'
     [ "$status" -eq 0 ]
     git config --unset repowarden.agentsTickets
     printf '[repowarden]\n    agentsTickets = true\n' >.repowarden.conf
-    run shell 'repowarden ticket nouveau x'
+    run shell 'repowarden ticket new x'
     [ "$status" -eq 0 ]
     # Hors dépôt repowarden : tout est permis
     git init -q -b main "$BATS_TEST_TMPDIR/libre"
-    run shell "cd $BATS_TEST_TMPDIR/libre && repowarden ticket nouveau x"
+    run shell "cd $BATS_TEST_TMPDIR/libre && repowarden ticket new x"
     [ "$status" -eq 0 ]
 }
 
@@ -638,19 +638,19 @@ GH
     done
 }
 
-@test "garde : refus d'une modification de fichier existant -> rappel de repowarden carte" {
+@test "garde : refus d'une modification de fichier existant -> rappel de repowarden map" {
     mkdir -p lib
     echo x >lib/outil.sh
     run edit lib/outil.sh
     [ "$status" -eq 2 ]
-    [[ "$output" == *"repowarden carte lib/outil.sh"* ]] || false
+    [[ "$output" == *"repowarden map lib/outil.sh"* ]] || false
     # Chemin lu par jq sous Windows : CR final
     run claude Edit "$(jq -n --arg f "$PWD/lib/outil.sh"$'\r' '{file_path: $f, old_string: "a", new_string: "b"}')"
     [ "$status" -eq 2 ]
-    [[ "$output" == *"repowarden carte lib/outil.sh"* ]] || false
+    [[ "$output" == *"repowarden map lib/outil.sh"* ]] || false
     run claude Write "$(jq -n --arg f "$PWD/nouveau.sh" '{file_path: $f, content: "x"}')"
     [ "$status" -eq 2 ]
-    [[ "$output" != *"repowarden carte"* ]] || false
+    [[ "$output" != *"repowarden map"* ]] || false
 }
 
 @test "garde : valider un ticket (valide, statut) refuse, meme avec REPOWARDEN_TICKET" {

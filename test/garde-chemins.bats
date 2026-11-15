@@ -26,12 +26,12 @@ setup() {
 claude() {
     jq -n --arg t "$1" --argjson i "$2" --arg d "${3:-$PWD}" \
         '{hook_event_name: "PreToolUse", tool_name: $t, tool_input: $i, cwd: $d}' |
-        "$RW" garde --format claude
+        "$RW" guard --format claude
 }
 
 opencode() {
     jq -n --arg t "$1" --argjson a "$2" --arg d "${3:-$PWD}" '{tool: $t, args: $a, cwd: $d}' |
-        "$RW" garde
+        "$RW" guard
 }
 
 shell() { opencode bash "$(jq -n --arg c "$1" '{command: $c}')"; }

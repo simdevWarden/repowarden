@@ -27,8 +27,8 @@ GH
 
 @test "aide : chaque commande --help donne l'usage (code 0, rien n'est fait)" {
     avant_head="$(git rev-parse HEAD)"
-    for cmd in statut install uninstall cc code-mort carte ticket tickets pr run \
-        proteger migrer npm-publication app bots bot agents garde \
+    for cmd in status install uninstall cc dead-code map ticket tickets pr run \
+        protect migrate npm-publish app bots bot agents guard \
         "ticket comment" "ticket label"; do
         run "$RW" $cmd --help
         if [ "$status" -ne 0 ]; then
@@ -49,7 +49,7 @@ GH
     [ "$status" -eq 0 ]
     grep -q 'repowarden tickets sync' <<<"$output"
     grep -Eq '^  repowarden ticket[[:space:]]+ticket de la branche courante' <<<"$output"
-    grep -q 'repowarden code-mort' <<<"$output"
+    grep -q 'repowarden dead-code' <<<"$output"
 }
 
 @test "aide : version anglaise de repowarden --help et d'une commande" {
@@ -57,24 +57,24 @@ GH
     [ "$status" -eq 0 ]
     [[ "$output" == *"commit assistant"* ]] || false
     [[ "$output" != *"étape suivante"* ]] || false
-    REPOWARDEN_LANG=en run "$RW" statut --help
+    REPOWARDEN_LANG=en run "$RW" status --help
     [ "$status" -eq 0 ]
     [[ "$output" == *"Read-only"* ]] || false
     [[ "$output" != *"Lecture seule"* ]] || false
 }
 
 @test "aide : code-mort --help s'arrete avant l'analyse" {
-    run "$RW" code-mort --help
+    run "$RW" dead-code --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Usage : repowarden code-mort"* ]] || false
+    [[ "$output" == *"Usage : repowarden dead-code"* ]] || false
     [[ "$output" != *"━━"* ]] || false
     [[ "$output" != *"Aucune modification par rapport"* ]] || false
 }
 
 @test "aide : statut --help ne lit pas le statut" {
-    run "$RW" statut --help
+    run "$RW" status --help
     [ "$status" -eq 0 ]
-    [[ "$output" == *"Usage : repowarden statut"* ]] || false
+    [[ "$output" == *"Usage : repowarden status"* ]] || false
     [[ "$output" != *"Hooks git"* ]] || false
     [[ "$output" != *"Étape suivante"* ]] || false
 }
