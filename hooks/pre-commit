@@ -23,6 +23,11 @@ if ! skipped branch-name && ! branch_name_valid "$BRANCH"; then
     exit 1
 fi
 
+# 0 bis. Chemins protégés des agents (agentsProtectedPaths, #576) : un commit
+# d'agent qui les touche est refusé, à écrire par le mainteneur
+source "$(dirname "$0")/lib/chemins-proteges.sh"
+verifier_index_agent || exit 1
+
 # 1. Pas de commit direct sur les branches protégées (sauf commit initial)
 PROTECTED="$(cfg protectedBranches "main master")"
 if ! skipped protect-branch && [[ " $PROTECTED " == *" $BRANCH "* ]] && git rev-parse --verify -q HEAD >/dev/null; then
