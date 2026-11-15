@@ -78,3 +78,26 @@ verifier_commit_chemins() {
         [ -z "$c" ] || ! chemin_protege "$c" || refuser garde.chemin_protege "$c"
     done <<<"$REPLY"
 }
+
+# Vrai si le commit est lancé depuis une session d'agent : CLAUDECODE (posée par
+# Claude Code), OPENCODE (posée par opencode au démarrage, héritée par ses
+# commandes shell) ou REPOWARDEN_AGENT=1 (explicite, pour tout autre lanceur).
+# Aucun hook d'outil n'exporte rien : seul l'environnement du pre-commit le dit.
+session_agent() {
+    [ -n "${CLAUDECODE:-}" ] || [ -n "${OPENCODE:-}" ] || [ "${REPOWARDEN_AGENT:-}" = 1 ]
+}
+
+# Pre-commit : refuse (code 1) le commit d'un agent dont l'index touche un
+# chemin protégé, la garde fiable (le hook d'outil ne voit que les chemins en
+# clair). Un humain, sans variable d'agent, commite comme avant.
+verifier_index_agent() {
+    local c idx
+    session_agent || return 0
+    proteges_charger
+    [ -n "${PROTEGES// /}" ] || return 0
+    idx="$(git -c core.quotepath=off diff --cached --no-renames --name-only 2>/dev/null || true)"
+    while IFS= read -r c; do
+        [ -z "$c" ] || ! chemin_protege "$c" || { err_t garde.chemin_protege "$c" >&2; return 1; }
+    done <<<"$idx"
+    return 0
+}
