@@ -163,7 +163,8 @@ refuse() {
 
 precommit_refuse() {
     [ "$status" -ne 0 ] || { echo "commit accepte : $output"; return 1; }
-    [[ "$output" == *"chemin protégé des agents"* ]] || { echo "$output"; return 1; }
+    echo "$output"
+    [[ "$output" == *"chemin protégé des agents"* ]] || false
 }
 
 @test "pre-commit : agent (CLAUDECODE) + chemin protege indexe -> refus" {
