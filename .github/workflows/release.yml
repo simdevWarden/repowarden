@@ -183,10 +183,16 @@ jobs:
         env:
           TAG: ${{ needs.release.outputs.tag_name }}
           MAJOR: v${{ needs.release.outputs.major }}
+          RUN_ID: ${{ github.run_id }}
         run: |
           git fetch --no-tags origin "refs/tags/$TAG:refs/tags/$TAG"
           git tag -f "$MAJOR" "$TAG"
-          git push -f origin "refs/tags/$MAJOR"
+          # Refus (ruleset des tags) : message clair et échec visible, le tag
+          # majeur ne reste pas en retard en silence
+          if ! git push -f origin "refs/tags/$MAJOR"; then
+            echo "::error title=Tag majeur refusé::tag majeur $MAJOR protégé par le ruleset des tags : repowarden proteger, puis repowarden run rerun $RUN_ID"
+            exit 1
+          fi
 
   # Archive source signée (Sigstore, sans clé) jointe à la release :
   # vérifiable avec `cosign verify-blob` (voir SECURITY.md)

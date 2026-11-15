@@ -9,6 +9,8 @@ AGENT=".devcontainer/opencode/agent.json"
 
 setup() {
     require jq
+    # La session qui lance bats peut etre celle d'un agent : le test decide
+    unset CLAUDECODE OPENCODE REPOWARDEN_AGENT
     # Aucun réglage repowarden global du poste ne compte
     export GIT_CONFIG_GLOBAL="$BATS_TEST_TMPDIR/gitconfig-global"
     : >"$GIT_CONFIG_GLOBAL"
@@ -155,4 +157,63 @@ refuse() {
     REPOWARDEN_LANG=en run edit "$AGENT"
     [ "$status" -eq 2 ]
     [[ "$output" == *"path protected from agents"* ]] || false
+}
+
+# Pre-commit (#576) : la garde fiable, l'environnement dit si l'agent commite
+
+precommit_refuse() {
+    [ "$status" -ne 0 ] || { echo "commit accepte : $output"; return 1; }
+    echo "$output"
+    [[ "$output" == *"chemin protégé des agents"* ]] || false
+}
+
+@test "pre-commit : agent (CLAUDECODE) + chemin protege indexe -> refus" {
+    echo '{"a":1}' >"$AGENT"
+    git add "$AGENT"
+    CLAUDECODE=1 run git commit -q -m "fix: essai"
+    precommit_refuse
+    [[ "$output" == *"$AGENT"* ]] || false
+}
+
+@test "pre-commit : opencode et REPOWARDEN_AGENT=1 sont aussi des agents" {
+    echo '{"a":1}' >"$AGENT"
+    git add "$AGENT"
+    OPENCODE=1 run git commit -q -m "fix: essai"
+    precommit_refuse
+    REPOWARDEN_AGENT=1 run git commit -q -m "fix: essai"
+    precommit_refuse
+    # Seule la valeur 1 compte pour la variable explicite
+    REPOWARDEN_AGENT=0 run git commit -q -m "fix: essai"
+    [ "$status" -eq 0 ]
+}
+
+@test "pre-commit : humain (aucune variable) + chemin protege -> accepte" {
+    echo '{"a":1}' >"$AGENT"
+    git add "$AGENT"
+    run git commit -q -m "fix: essai"
+    [ "$status" -eq 0 ]
+}
+
+@test "pre-commit : agent + chemin non protege -> accepte" {
+    echo autre >src.txt
+    git add src.txt
+    CLAUDECODE=1 run git commit -q -m "fix: essai"
+    [ "$status" -eq 0 ]
+}
+
+@test "pre-commit : agent, motif avec joker et dossier -> refus" {
+    printf '[repowarden]\n    agentsProtectedPaths = .devcontainer/*.sh docs/prive/\n' >"$BATS_TEST_TMPDIR/conf"
+    cp "$BATS_TEST_TMPDIR/conf" "$PWD/.repowarden.conf"
+    git add .repowarden.conf
+    git commit -q --no-verify -m "chore: conf"
+    echo 'echo x' >.devcontainer/autre.sh
+    git add .devcontainer/autre.sh
+    REPOWARDEN_AGENT=1 run git commit -q -m "fix: essai"
+    precommit_refuse
+    git reset -q
+    mkdir -p docs/prive
+    echo x >docs/prive/note.md
+    git add docs/prive/note.md
+    REPOWARDEN_AGENT=1 run git commit -q -m "fix: essai"
+    precommit_refuse
 }

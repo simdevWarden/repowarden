@@ -148,6 +148,12 @@ Après chaque livraison sur `main`, le job `aligner-develop` (mode tag) avance `
 
 L'alignement ne bloque jamais la publication (npm) : si le push est refusé, `aligner-develop` émet un `::warning::` avec la raison donnée par git, ajoute une ligne au résumé du run (`GITHUB_STEP_SUMMARY`) et sort en code 0. Le bypass de l'App est posé sur **chaque** ruleset de branche du dépôt dont la condition vise `develop` (liste `gh api repos/<dépôt>/rulesets`, puis détail de chacun), y compris ceux que repowarden n'a pas créés ; jamais sur un ruleset qui vise aussi `main`. Les bypass déjà présents sont conservés. `repowarden proteger --verifier` signale comme écart tout ruleset de `develop` où l'App est absente des acteurs de contournement.
 
+### Tag majeur mobile, tags de version figés
+
+Le tag majeur (`v4`) est **mobile** : le job `tag-major` le déplace sur la dernière version à chaque release. Les tags de version (`vX.Y.Z`, `vX.Y.Z-next.N`) sont **figés** : jamais déplacés. `repowarden proteger` pose deux rulesets de tags : « repowarden (tags) » (création et suppression de `v*`) et « repowarden (tags de version) » (déplacement, `refs/tags/v*.*.*` seulement, donc pas `v4`). La GitHub App de repowarden contourne les deux, comme ceux des branches ; `repowarden proteger --verifier` signale une règle de déplacement qui couvre un tag majeur, ou l'App absente des contournements.
+
+Rattrapage si `tag-major` est refusé (« Cannot update this protected ref », GH013) : le ruleset des tags est ancien. Lancer `repowarden proteger` (il le corrige), puis `repowarden run rerun <id>` sur le dernier run `release` de `main` : `tag-major` rejoue et déplace `v4` sur la dernière version. Le job échoue avec ce message tant que le refus dure.
+
 !!! note "Approuver quand on veut"
     L'approbation porte sur l'instantané figé au moment de la demande : le travail mergé ensuite dans `develop` ne la rend pas caduque, il partira à la livraison suivante. Une nouvelle demande (urgence, relance) remplace la précédente ; l'instantané d'une demande remplacée, refusée (PR fermée) ou déjà publiée est supprimé au run suivant, s'il n'a aucun commit absent de `develop` ([nettoyage des branches](industrialisation.md#branches-mergees-supprimees-automatiquement)). Seuls `develop` et ses instantanés `livraison/*` peuvent entrer dans `main`, jamais sans approbation.
 

@@ -138,5 +138,5 @@ Le format suit la plateforme reconnue d'après l'adresse (Slack, Discord, Micros
 ## Traçabilité et arrêt d'urgence
 
 - Chaque merge, approbation, déploiement et contournement est enregistré (historique des PR, onglet *Environments*, journal d'audit).
-- Les tags `v*` ne peuvent être posés que par les workflows (ruleset « repowarden (tags) ») ; chaque paquet publié porte une attestation de provenance vérifiable.
+- Les tags `v*` ne peuvent être posés ou supprimés que par les workflows (ruleset « repowarden (tags) »), et les tags de version `vX.Y.Z` jamais déplacés (ruleset « repowarden (tags de version) ») ; seul le tag majeur (`v4`) reste mobile, déplacé à chaque release (voir [Versions et releases](releases.md)) ; chaque paquet publié porte une attestation de provenance vérifiable.
 - Suspendre les releases automatiques : *Actions → release → Disable workflow*.

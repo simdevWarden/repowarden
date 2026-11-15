@@ -97,6 +97,7 @@ Every new function has, right above it, one or two lines saying what it does and
 ## Limitations
 
 - **Safety net, not a wall**: git hooks and the `ticket` check in CI remain the protection. A change made through the shell (`sed -i`, `>` redirection, script) is not seen before the commit, where the hooks check it.
+- **Protected paths: the reliable guard is at commit.** The tool hook only sees paths written in the action (editing, redirection, usual file commands); a script, an obscure `sed -i` or a generator changes them unseen. The **pre-commit** therefore refuses any agent commit whose index touches an `agentsProtectedPaths` pattern. It recognises the agent from the commit's environment: `CLAUDECODE` (set by Claude Code), `OPENCODE` (set by opencode, inherited by its shell commands) or `REPOWARDEN_AGENT=1` (explicit: export it from any other agent launcher, `devzone agent` and `claude -p` included). A human in a terminal, without these variables, commits as before.
 - **GitHub writes**: only `gh` ones are seen, and only from a repowarden repository: `gh -R …` run outside such a repository is not seen; neither are the web interface and `curl` to the API.
 - **Reading a shell line**: simple splitting (quotes and subshells are not interpreted); a command hidden in `bash -c "…"` or in a variable is not seen.
 - **Requirements**: `repowarden` on the `PATH` (`npm install -g repowarden`) and [jq](https://jqlang.org). Otherwise nothing is blocked (the guard never blocks an agent because of a failure).
