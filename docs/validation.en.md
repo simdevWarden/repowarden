@@ -138,5 +138,5 @@ The format follows the platform recognised from the address (Slack, Discord, Mic
 ## Traceability and emergency stop
 
 - Every merge, approval, deployment and bypass is recorded (PR history, *Environments* tab, audit log).
-- `v*` tags can only be created by the workflows (ruleset "repowarden (tags)"); each published package carries a verifiable provenance attestation.
+- `v*` tags can only be created or deleted by the workflows (ruleset "repowarden (tags)"), and `vX.Y.Z` version tags are never moved (ruleset "repowarden (tags de version)"); only the major tag (`v4`) stays movable, moved on every release (see [Versions and releases](releases.md)); each published package carries a verifiable provenance attestation.
 - Suspend automatic releases: *Actions → release → Disable workflow*.
