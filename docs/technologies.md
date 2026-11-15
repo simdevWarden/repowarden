@@ -57,6 +57,9 @@ Détectées automatiquement ; chacune est **vérifiée en CI sur un vrai projet*
 !!! note "Infrastructure"
     Pour l'infrastructure, l'étape « tests » est une **validation** (lint, rendu, schémas) : rien n'est déployé. Schémas Kubernetes et providers Terraform sont mis en cache (`~/.cache/repowarden`).
 
+!!! note "Helm : dépôts des dépendances"
+    Avant `helm dependency build`, les dépôts `https://` ou `http://` listés dans les `dependencies:` de `Chart.yaml` sont ajoutés (`helm repo add`) le temps du contrôle, dans une configuration et un cache temporaires supprimés ensuite : la configuration helm de l'utilisateur n'est pas modifiée. Un dépôt injoignable fait échouer le contrôle. Les dépendances `oci://` et `file://` ne sont pas concernées. Limite : si un chart mêle un dépôt HTTP et une dépendance `@alias` (dépôt déjà ajouté par l'utilisateur), l'alias n'est pas résolu par le contrôle.
+
 **Outil absent** : ignoré sur le poste (avertissement dans un projet, silence pour un fichier isolé) ; bloquant en CI avec le [mode strict](ci.md).
 
 **Versions des outils** : celles du projet sont prioritaires (`node_modules`, `.venv` / uv, `vendor/bin`, `bundle exec`, wrapper Maven / Gradle, plugin Spotless versionné), pour que tout le monde formate à l'identique.
