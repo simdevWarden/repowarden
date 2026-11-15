@@ -57,6 +57,9 @@ Detected automatically; each one is **tested in CI on a real project** with its 
 !!! note "Infrastructure"
     For infrastructure, the "tests" step is a **validation** (lint, rendering, schemas): nothing is deployed. Kubernetes schemas and Terraform providers are cached (`~/.cache/repowarden`).
 
+!!! note "Helm: dependency repositories"
+    Before `helm dependency build`, the `https://` or `http://` repositories listed in the `dependencies:` of `Chart.yaml` are added (`helm repo add`) for the duration of the check, in a temporary configuration and cache deleted afterwards: the user's helm configuration is never modified. An unreachable repository fails the check. `oci://` and `file://` dependencies are not affected. Limit: if a chart mixes an HTTP repository and an `@alias` dependency (a repository the user already added), the check does not resolve the alias.
+
 **Missing tool**: skipped on the developer machine (warning in a project, silent for a standalone file); blocking in CI with [strict mode](ci.md).
 
 **Tool versions**: the project's own versions take priority (`node_modules`, `.venv` / uv, `vendor/bin`, `bundle exec`, Maven / Gradle wrapper, versioned Spotless plugin), so that everyone formats identically.

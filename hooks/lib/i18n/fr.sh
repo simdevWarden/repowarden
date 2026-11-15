@@ -199,6 +199,7 @@ _msg_fr() {
         lang.helm.2) _M="Helm : lint + template" ;;
         lang.helm.3) _M="Helm : kubeconform (schémas Kubernetes)" ;;
         lang.helm.4) _M="Helm : unittest" ;;
+        lang.helm.5) _M="Helm : dépôt %s injoignable" ;;
         lang.kubernetes.1) _M="Kubernetes : kubectl kustomize" ;;
         lang.kubernetes.2) _M="Kubernetes : kustomize build" ;;
         lang.kubernetes.3) _M="Kubernetes : ni kubectl ni kustomize, vérification ignorée." ;;

@@ -329,6 +329,89 @@ load_engine() {
     ! declare -F helm_format
 }
 
+# helm simulé dans le PATH : chaque appel est journalisé avec la configuration
+# reçue (HELM_REPOSITORY_CONFIG) ; « repo add » échoue pour une URL injoignable.
+helm_fake() {
+    mkdir -p "$BATS_TEST_TMPDIR/bin"
+    cat >"$BATS_TEST_TMPDIR/bin/helm" <<'SH'
+#!/usr/bin/env bash
+echo "$* | CFG=${HELM_REPOSITORY_CONFIG:-}" >>"$HELM_TEST_LOG"
+case "$*" in *injoignable*) exit 1 ;; esac
+exit 0
+SH
+    chmod +x "$BATS_TEST_TMPDIR/bin/helm"
+    export HELM_TEST_LOG="$BATS_TEST_TMPDIR/helm.log"
+    : >"$HELM_TEST_LOG"
+    PATH="$BATS_TEST_TMPDIR/bin:$PATH"
+}
+
+helm_chart_deps() {
+    printf 'apiVersion: v2\nname: enveloppe\nversion: 0.1.0\ndependencies:\n' >Chart.yaml
+    printf '%s\n' "$@" >>Chart.yaml
+}
+
+@test "IaC : helm, depot HTTP ajoute avant dependency build dans une configuration temporaire" {
+    load_engine
+    helm_fake
+    helm_chart_deps "  - name: gitlab" "    repository: https://charts.gitlab.io"
+    run helm_test
+    [ "$status" -eq 0 ]
+    [ "$(sed -n 1p "$HELM_TEST_LOG" | sed 's/ | CFG=.*//')" = "repo add charts-gitlab-io https://charts.gitlab.io --force-update" ]
+    [ "$(sed -n 2p "$HELM_TEST_LOG" | sed 's/ | CFG=.*//')" = "dependency build" ]
+    sed -n 2p "$HELM_TEST_LOG" | grep -q ' | CFG=/.' || false
+}
+
+@test "IaC : helm, depot injoignable : message et refus, sans build" {
+    load_engine
+    helm_fake
+    helm_chart_deps "  - name: gitlab" "    repository: https://injoignable.example/helm"
+    run helm_test
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"dépôt https://injoignable.example/helm injoignable"* ]] || false
+    [ "$(grep -c "dependency build" "$HELM_TEST_LOG")" -eq 0 ]
+}
+
+@test "IaC : helm, depots oci:// et file:// sans repo add ni configuration temporaire" {
+    load_engine
+    helm_fake
+    helm_chart_deps "  - name: a" "    repository: oci://registry.example/charts" \
+        "  - name: b" "    repository: file://../b"
+    run helm_test
+    [ "$status" -eq 0 ]
+    [ "$(grep -c "repo add" "$HELM_TEST_LOG")" -eq 0 ]
+    grep -q '^dependency build | CFG=$' "$HELM_TEST_LOG"
+}
+
+@test "IaC : helm, deux depots HTTP distincts ajoutes, le doublon n'est ajoute qu'une fois" {
+    load_engine
+    helm_fake
+    helm_chart_deps "  - name: a" "    repository: https://charts.gitlab.io" \
+        "  - name: b" "    repository: https://charts.gitlab.io/" \
+        "  - name: c" "    repository: \"https://example.org/helm\"" \
+        "  - name: d" "    repository: https://charts.gitlab.io"
+    run helm_test
+    [ "$status" -eq 0 ]
+    [ "$(grep -c "repo add" "$HELM_TEST_LOG")" -eq 3 ]
+    grep -q "repo add charts-gitlab-io " "$HELM_TEST_LOG" || false
+    grep -q "repo add example-org-helm https://example.org/helm " "$HELM_TEST_LOG" || false
+}
+
+@test "IaC : helm, configuration utilisateur intacte et dossier temporaire supprime" {
+    load_engine
+    helm_fake
+    printf 'apiVersion: v1\nrepositories: []\n' >user.yaml
+    export HELM_REPOSITORY_CONFIG="$PWD/user.yaml"
+    helm_chart_deps "  - name: gitlab" "    repository: https://charts.gitlab.io"
+    run helm_test
+    [ "$status" -eq 0 ]
+    [ "$(cat user.yaml)" = "$(printf 'apiVersion: v1\nrepositories: []')" ]
+    local cfg
+    cfg="$(sed -n 2p "$HELM_TEST_LOG" | sed 's/.*CFG=//')"
+    [ -n "$cfg" ] || false
+    [ "$cfg" != "$PWD/user.yaml" ] || false
+    [ ! -e "$(dirname "$cfg")" ]
+}
+
 @test "IaC : detection Kubernetes, Ansible, Terraform, Packer, Docker, Actions" {
     load_engine
     mkdir -p k8s infra ansible img .github/workflows

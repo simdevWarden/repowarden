@@ -223,6 +223,7 @@ Anciens noms acceptés : statut, code-mort, carte, proteger, migrer, npm-publica
         lang.helm.2) _M="Helm: lint + template" ;;
         lang.helm.3) _M="Helm: kubeconform (Kubernetes schemas)" ;;
         lang.helm.4) _M="Helm: unittest" ;;
+        lang.helm.5) _M="Helm: repository %s unreachable" ;;
         lang.kubernetes.1) _M="Kubernetes: kubectl kustomize" ;;
         lang.kubernetes.2) _M="Kubernetes: kustomize build" ;;
         lang.kubernetes.3) _M="Kubernetes: neither kubectl nor kustomize, check skipped." ;;
