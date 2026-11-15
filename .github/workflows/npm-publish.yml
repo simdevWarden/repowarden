@@ -30,12 +30,6 @@ on:
           dernier tag vX.Y.Z (rattrapage d'une release pas encore publiée sur npm).
         type: string
         default: ""
-      repowarden-ref:
-        description: >-
-          Mode sans tag : version de repowarden dont release-tag.sh calcule le
-          dernier tag. À changer à la main à chaque majeure, comme release-auto.
-        type: string
-        default: v4
       directory:
         description: Dossier du paquet (package.json)
         type: string
@@ -79,22 +73,12 @@ jobs:
           ref: ${{ inputs.tag }}
           fetch-depth: 0 # tags, pour trouver la dernière release
           persist-credentials: false
-      # Script de repowarden (release-tag.sh), pas le code du projet : retiré de
-      # l'espace de travail après usage
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: inputs.tag == ''
-        with:
-          repository: simdevWarden/repowarden
-          ref: ${{ inputs.repowarden-ref }}
-          path: .repowarden-ci
-          persist-credentials: false
       - name: Release à publier
         env:
           TAG: ${{ inputs.tag }}
         run: |
           if [ -z "$TAG" ]; then
-            TAG="$(bash "$GITHUB_WORKSPACE/.repowarden-ci/ci/release-tag.sh")"
-            rm -rf "$GITHUB_WORKSPACE/.repowarden-ci"
+            TAG="$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' --exclude '*-*')"
             git checkout -q "$TAG"
           fi
           echo "TAG=$TAG" >>"$GITHUB_ENV"
