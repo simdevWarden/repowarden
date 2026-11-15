@@ -276,6 +276,36 @@ setup() {
     [ "$REPLY" -eq 13 ]
 }
 
+@test "ci : plusieurs references finales (#N) non comptees dans les 72 caracteres" {
+    # 71 caractères écrits + « (#586) (#589) » ajouté par GitHub : admis
+    git commit -q --no-verify --allow-empty -m "feat: $(printf 'a%.0s' {1..65}) (#586) (#589)"
+    run "$CHECK" commits
+    [ "$status" -eq 0 ]
+    # 73 caractères écrits : refusé, avec ou sans références
+    git commit -q --no-verify --allow-empty -m "feat: $(printf 'a%.0s' {1..67})"
+    run "$CHECK" commits
+    [ "$status" -ne 0 ]
+    git commit -q --no-verify --allow-empty -m "feat: $(printf 'a%.0s' {1..67}) (#586) (#589)"
+    run "$CHECK" commits
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"72 caractères"* ]] || false
+}
+
+@test "ci : reference (#N) au milieu du titre comptee" {
+    source "$HOOKS/lib/common.sh"
+    authored_length "feat: $(printf 'a%.0s' {1..30}) (#12) $(printf 'b%.0s' {1..40})"
+    [ "$REPLY" -eq 83 ]
+}
+
+@test "ci : titre de PR, references finales non comptees" {
+    git commit -q --no-verify --allow-empty -m "feat: a"
+    REPOWARDEN_PR_TITLE="feat: $(printf 'a%.0s' {1..65}) (#586) (#589)" run "$CHECK" commits
+    [ "$status" -eq 0 ]
+    REPOWARDEN_PR_TITLE="feat: $(printf 'a%.0s' {1..67}) (#586) (#589)" run "$CHECK" commits
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"72 caractères"* ]] || false
+}
+
 @test "ci : flux develop, cibles de PR autorisees" {
     git config repowarden.integrationBranch develop
     git config repowarden.allowedBranches "main develop release/* release-please--* dependabot/*"

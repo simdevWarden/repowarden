@@ -101,11 +101,12 @@ type_proche_r() {
     done
 }
 
-# REPLY = longueur de la première ligne écrite par l'auteur : le suffixe
-# « (#123) » ajouté par GitHub lors d'un merge squash n'est pas compté.
+# REPLY = longueur de la première ligne écrite par l'auteur : les références
+# finales « (#123) » ajoutées par GitHub (merge squash, parfois plusieurs) ne
+# sont pas comptées. La boucle retire la dernière tant qu'il y en a une.
 authored_length() {
     local subject="$1" continuation
-    if [[ "$subject" =~ ^(.*)\ \(\#[0-9]+\)$ ]]; then subject="${BASH_REMATCH[1]}"; fi
+    while [[ "$subject" =~ ^(.*)\ \(\#[0-9]+\)$ ]]; do subject="${BASH_REMATCH[1]}"; done
     # Caractères et non octets, quelle que soit la locale (Git Bash sous Windows
     # est en locale C : « é » compterait double). En UTF-8, on retire du nombre
     # d'octets les octets de continuation (0x80 à 0xBF).
