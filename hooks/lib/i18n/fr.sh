@@ -401,6 +401,8 @@ Anciens noms acceptés : statut, code-mort, carte, proteger, migrer, npm-publica
         ci.proteger.what_environment) _M="Environnement de déploiement" ;;
         ci.proteger.tags_fallback) _M="Ruleset des tags : exception « GitHub Actions » refusée dans cette organisation ; tags protégés comme sur un compte personnel (ni déplacés ni supprimés, création libre)." ;;
         ci.proteger.verify_bypass) _M="%s (id %s) : App absente des acteurs de contournement ; %s ne sera pas alignée après une livraison" ;;
+        ci.proteger.verify_tags_major) _M="%s (id %s) : la règle de déplacement couvre le tag majeur (%s) ; le job tag-major serait refusé. Elle ne doit viser que refs/tags/v*.*.*" ;;
+        ci.proteger.verify_tags_bypass) _M="%s (id %s) : App absente des acteurs de contournement ; elle ne pourra pas poser les tags" ;;
         ci.proteger.bypass_added) _M="%s : App ajoutée aux acteurs de contournement (%s)" ;;
         ci.proteger.no_app)_M="App inconnue (variable REPOWARDEN_APP_SLUG absente) : %s ne sera pas alignée automatiquement après une livraison. Lancer repowarden app init." ;;
         ci.version.usage) _M="Usage : ci/version.sh next|notes|notes-livraison [ref]" ;;

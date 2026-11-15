@@ -516,7 +516,7 @@ case "$*" in
     "api -X POST repos/moi/projet/rulesets"* | "api -X PUT repos/moi/projet/rulesets/"*)
         r="$(cat)"; echo "$r" >>"$GH_LOG"
         # exception GitHub Actions refusée dans l'organisation si $GH_REFUSE_INTEGRATION
-        if [ -n "${GH_REFUSE_INTEGRATION:-}" ] && [[ "$r" == *'"actor_type": "Integration"'* ]]; then
+        if [ -n "${GH_REFUSE_INTEGRATION:-}" ] && [[ "$r" == *'"actor_id": 15368, "actor_type": "Integration"'* ]]; then
             echo '{"message":"Validation Failed","errors":["Actor GitHub Actions integration must be part of the ruleset source or owner organization"],"status":"422"}'
             exit 1
         fi
@@ -560,12 +560,15 @@ print(json.dumps(out))' <<<"$(sed -n '/^{/,$p' <<<"$1")"
     fake_gh_repo
     GH_BRANCHES="main" run "$PROTEGER" --dry-run
     [ "$status" -eq 0 ]
-    python3 -c 'import json,sys; r=json.loads(sys.argv[1]); assert len(r)==2; b,t=r; \
+    python3 -c 'import json,sys; r=json.loads(sys.argv[1]); assert len(r)==3; b,t,tv=r; \
         assert b["name"]=="repowarden" and b["conditions"]["ref_name"]["include"]==["refs/heads/main"]; \
         assert b["rules"][2]["parameters"]["allowed_merge_methods"]==["squash"]; \
         assert b["rules"][3]["parameters"]["required_status_checks"][0]["context"]=="repowarden"; \
         assert b["rules"][3]["parameters"]["strict_required_status_checks_policy"] is True; \
-        assert t["target"]=="tag" and t["conditions"]["ref_name"]["include"]==["refs/tags/v*"]' "$(rulesets_json "$output")"
+        assert t["target"]=="tag" and t["conditions"]["ref_name"]["include"]==["refs/tags/v*"]; \
+        assert "update" not in [x["type"] for x in t["rules"]]; \
+        assert tv["conditions"]["ref_name"]["include"]==["refs/tags/v*.*.*"] and [x["type"] for x in tv["rules"]]==["update"]; \
+        assert {"actor_id":12345,"actor_type":"Integration","bypass_mode":"always"} in t["bypass_actors"]+tv["bypass_actors"]' "$(rulesets_json "$output")"
     [[ "$output" == *"suppression auto des branches : true"* ]] || false
     [[ "$output" != *"branche par défaut"* ]] || false
 }
@@ -577,7 +580,7 @@ print(json.dumps(out))' <<<"$(sed -n '/^{/,$p' <<<"$1")"
     git config repowarden.protectedBranches "main develop"
     GH_BRANCHES="main develop" run "$PROTEGER" --dry-run --checks "repowarden, tests (ubuntu-latest)"
     [ "$status" -eq 0 ]
-    python3 -c 'import json,sys; r=json.loads(sys.argv[1]); assert len(r)==4; m,d,t,e=r; \
+    python3 -c 'import json,sys; r=json.loads(sys.argv[1]); assert len(r)==5; m,d,t,tv,e=r; \
         assert m["conditions"]["ref_name"]["include"]==["refs/heads/main"]; \
         assert m["rules"][2]["parameters"]["allowed_merge_methods"]==["merge"]; \
         assert d["name"]=="repowarden (develop)" and d["conditions"]["ref_name"]["include"]==["refs/heads/develop"]; \
@@ -613,7 +616,7 @@ print(json.dumps(out))' <<<"$(sed -n '/^{/,$p' <<<"$1")"
     git config --unset repowarden.autoMergeWork
     git config repowarden.deliveryApproval review
     GH_BRANCHES="main develop" run "$PROTEGER" --dry-run --checks "repowarden"
-    python3 -c 'import json,sys; r=json.loads(sys.argv[1]); assert len(r)==3; m=r[0]; \
+    python3 -c 'import json,sys; r=json.loads(sys.argv[1]); assert len(r)==4; m=r[0]; \
         assert m["rules"][2]["parameters"]["required_approving_review_count"]==1 and len(m["rules"])==4' \
         "$(rulesets_json "$output")"
     [[ "$output" == *"livraison vers main : 1 approbation(s) exigée(s)"* ]] || false
@@ -794,7 +797,7 @@ ancien_ruleset() {
     # mis a jour en place (renomme), aucun second ruleset de branche, l'autre intact
     grep -q "^api -X PUT repos/moi/projet/rulesets/7 " "$GH_LOG"
     ! grep -q "rulesets/9" <(grep -- "-X" "$GH_LOG")
-    [ "$(grep -c '^api -X POST repos/moi/projet/rulesets ' "$GH_LOG")" -eq 1 ] # tags seulement
+    [ "$(grep -c '^api -X POST repos/moi/projet/rulesets ' "$GH_LOG")" -eq 2 ] # tags seulement (base et version)
 }
 
 @test "proteger : ancien ruleset en trop jamais supprime, marche a suivre, echec" {
@@ -1088,20 +1091,63 @@ ancien_ruleset() {
     [ "$status" -ne 0 ]
 }
 
-@test "proteger : tags -> workflows seuls (organisation), ni deplaces ni supprimes (compte perso)" {
+@test "proteger : tags -> workflows seuls (organisation), ni deplaces ni supprimes (compte perso), majeur mobile" {
     require python3
     fake_gh_repo
     GH_OWNER_TYPE=Organization GH_BRANCHES="main" run "$PROTEGER" --dry-run
-    python3 -c 'import json,sys; t=json.loads(sys.argv[1])[-1]; \
-        assert [r["type"] for r in t["rules"]]==["creation","update","deletion"]; \
-        assert t["bypass_actors"][0]["actor_type"]=="Integration"' "$(rulesets_json "$output")"
+    python3 -c 'import json,sys; t,tv=json.loads(sys.argv[1])[-2:]; \
+        assert [r["type"] for r in t["rules"]]==["creation","deletion"]; \
+        assert [r["type"] for r in tv["rules"]]==["update"]; \
+        assert tv["conditions"]["ref_name"]["include"]==["refs/tags/v*.*.*"]; \
+        assert t["bypass_actors"][0]["actor_type"]=="Integration"; \
+        assert t["bypass_actors"][-1]["actor_id"]==12345 and tv["bypass_actors"][-1]["actor_id"]==12345' "$(rulesets_json "$output")"
     GH_OWNER_TYPE=User GH_BRANCHES="main" run "$PROTEGER" --dry-run
-    python3 -c 'import json,sys; t=json.loads(sys.argv[1])[-1]; \
-        assert [r["type"] for r in t["rules"]]==["update","deletion"]; \
+    python3 -c 'import json,sys; t,tv=json.loads(sys.argv[1])[-2:]; \
+        assert [r["type"] for r in t["rules"]]==["deletion"]; \
+        assert [r["type"] for r in tv["rules"]]==["update"]; \
         assert t["bypass_actors"][0]["actor_type"]=="RepositoryRole"' "$(rulesets_json "$output")"
     [[ "$output" == *"compte personnel"* ]] || false
     GH_BRANCHES="main" run "$PROTEGER" --dry-run --sans-tags
     python3 -c 'import json,sys; r=json.loads(sys.argv[1]); assert all(x["target"]=="branch" for x in r)' "$(rulesets_json "$output")"
+}
+
+@test "proteger : ancien ruleset des tags (update sur v*) corrige, a jour inchange" {
+    require jq
+    fake_gh_repo
+    export GH_RULESETS='[{"id":30,"name":"repowarden (tags)","target":"tag","conditions":{"ref_name":{"include":["refs/tags/v*"]}},"rules":[{"type":"update"},{"type":"deletion"}],"bypass_actors":[]}]'
+    GH_BRANCHES="main" run "$PROTEGER"
+    [ "$status" -eq 0 ] || { echo "$output"; return 1; }
+    # ancien ruleset mis a jour en place (plus d'update), le ruleset de version cree
+    grep -q "^api -X PUT repos/moi/projet/rulesets/30 " "$GH_LOG"
+    grep -q "^api -X POST repos/moi/projet/rulesets " "$GH_LOG"
+    grep -q '"include": \["refs/tags/v\*\.\*\.\*"\]' "$GH_LOG"
+    # les deux presents : chacun mis a jour en place, rien de cree
+    export GH_RULESETS='[{"id":30,"name":"repowarden (tags)"},{"id":31,"name":"repowarden (tags de version)"}]'
+    : >"$GH_LOG"
+    GH_BRANCHES="main" run "$PROTEGER"
+    grep -q "^api -X PUT repos/moi/projet/rulesets/31 " "$GH_LOG"
+}
+
+@test "proteger --verifier : update couvrant le tag majeur ou App sans bypass sur les tags -> ecart" {
+    require jq
+    fake_gh_repo
+    app='{"actor_id": 12345, "actor_type": "Integration", "bypass_mode": "always"}'
+    rs() { printf '{"id":%s,"name":"%s","target":"tag","conditions":{"ref_name":{"include":%s}},"rules":[%s],"bypass_actors":[%s]}' "$1" "$2" "$3" "$4" "$5"; }
+    # ancien : update sur v*, sans App
+    export GH_RULESETS="[$(rs 30 "repowarden (tags)" '["refs/tags/v*"]' '{"type":"update"},{"type":"deletion"}' ''),$(rs 31 "repowarden (tags de version)" '["refs/tags/v*.*.*"]' '{"type":"update"}' "$app")]"
+    GH_BRANCHES="main" run "$PROTEGER" --verifier
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"repowarden (tags) (id 30)"*"couvre le tag majeur"* ]] || false
+    [[ "$output" == *"repowarden (tags) (id 30) : App absente"* ]] || false
+    [[ "$output" != *"(tags de version) (id 31)"* ]] || false
+    # corriges : plus d'ecart de tags
+    export GH_RULESETS="[$(rs 30 "repowarden (tags)" '["refs/tags/v*"]' '{"type":"deletion"}' "$app"),$(rs 31 "repowarden (tags de version)" '["refs/tags/v*.*.*"]' '{"type":"update"}' "$app")]"
+    GH_BRANCHES="main" run "$PROTEGER" --verifier
+    [[ "$output" != *"couvre le tag majeur"* && "$output" != *"App absente"* ]] || false
+    # ruleset des tags de version absent
+    export GH_RULESETS="[$(rs 30 "repowarden (tags)" '["refs/tags/v*"]' '{"type":"deletion"}' "$app")]"
+    GH_BRANCHES="main" run "$PROTEGER" --verifier
+    [[ "$output" == *"repowarden (tags de version)"* ]] || false
 }
 
 @test "proteger : rulesets de l'ancien nom (repogarde) repris et renommes, pas doubles" {

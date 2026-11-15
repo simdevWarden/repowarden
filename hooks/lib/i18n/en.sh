@@ -400,6 +400,8 @@ Anciens noms acceptés : statut, code-mort, carte, proteger, migrer, npm-publica
         ci.proteger.what_environment) _M="Deployment environment" ;;
         ci.proteger.tags_fallback) _M="Tags ruleset: \"GitHub Actions\" bypass refused in this organization; tags protected as on a personal account (not moved or deleted, creation allowed)." ;;
         ci.proteger.verify_bypass) _M="%s (id %s): App missing from bypass actors; %s will not be aligned after a delivery" ;;
+        ci.proteger.verify_tags_major) _M="%s (id %s): the move rule covers the major tag (%s); the tag-major job would be refused. It must only target refs/tags/v*.*.*" ;;
+        ci.proteger.verify_tags_bypass) _M="%s (id %s): App missing from bypass actors; it will not be able to set tags" ;;
         ci.proteger.bypass_added) _M="%s: App added to bypass actors (%s)" ;;
         ci.proteger.no_app)_M="Unknown App (REPOWARDEN_APP_SLUG variable missing): %s will not be aligned automatically after a delivery. Run repowarden app init." ;;
         ci.version.usage) _M="Usage: ci/version.sh next|notes|notes-livraison [ref]" ;;

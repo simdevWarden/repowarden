@@ -4,7 +4,8 @@
 #     ni suppression ni push forcé (ruleset « repowarden ») ;
 #   - merges : squash ; avec integrationBranch (flux develop), merge commit sur
 #     main et branche par défaut develop ; titre de PR = message du commit ;
-#   - tags v* : créés, déplacés ou supprimés uniquement par les workflows ;
+#   - tags v* : créés ou supprimés uniquement par les workflows ; tags de version
+#     (vX.Y.Z) figés, tag majeur (v4) mobile ;
 #   - GitHub Actions autorisé à créer des PR (releases automatiques) ;
 #   - validation humaine (optionnelle) : approbations obligatoires, revue des
 #     CODEOWNERS, environnement de déploiement approuvé par des personnes ;
@@ -150,26 +151,50 @@ branch_ruleset() {
 JSON
 }
 
-# Tags de version v*. Organisation : posés uniquement par les workflows
-# (GitHub Actions en exception). Compte personnel : GitHub n'accepte pas
-# cette exception ; un tag publié ne peut alors être ni déplacé ni supprimé
-# (exception : administrateurs, tracée), sa création restant libre.
-tags_ruleset() { # $1 : Organization ou User
-    local bypass rules
+# GitHub App de repowarden : GitHub exige son identifiant numérique, lu par son
+# slug public (variable REPOWARDEN_APP_SLUG, posée par repowarden app init),
+# sans jeton d'App. Sert au bypass des rulesets de develop et des tags.
+app_bypass=""
+app_bypass_tags=""
+app_slug="$(gh variable get REPOWARDEN_APP_SLUG --repo "$REPO" 2>/dev/null || true)"
+if [ -n "$app_slug" ]; then
+    app_id="$(gh api "apps/$app_slug" --jq .id 2>/dev/null || true)"
+    if [[ "$app_id" =~ ^[0-9]+$ ]]; then
+        app_bypass_tags="{\"actor_id\": $app_id, \"actor_type\": \"Integration\", \"bypass_mode\": \"always\"}"
+        app_bypass="[$app_bypass_tags]"
+    fi
+fi
+
+# Tags v* : le tag de version (vX.Y.Z, vX.Y.Z-next.N) est figé, le tag majeur
+# (v4) reste mobile, le job tag-major le déplace à chaque release. Deux
+# rulesets, un ruleset n'ayant qu'un ciblage : « repowarden (tags) » (création,
+# suppression : v*) et « repowarden (tags de version) » (déplacement : v*.*.*
+# seulement). Organisation : posés uniquement par les workflows (GitHub Actions
+# en exception). Compte personnel : GitHub n'accepte pas cette exception ; un
+# tag publié ne peut alors être ni déplacé ni supprimé (exception :
+# administrateurs, tracée), sa création restant libre. L'App de repowarden,
+# si connue, contourne les deux comme ceux des branches.
+tags_ruleset() { # $1 : Organization ou User, $2 : base ou version
+    local bypass rules nom include
     if [ "$1" = Organization ]; then
         bypass='{"actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always"}'
-        rules='{"type": "creation"}, {"type": "update"}, {"type": "deletion"}'
+        rules='{"type": "creation"}, {"type": "deletion"}'
     else
         bypass='{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}'
-        rules='{"type": "update"}, {"type": "deletion"}'
+        rules='{"type": "deletion"}'
+    fi
+    [ -z "$app_bypass_tags" ] || bypass="$bypass, $app_bypass_tags"
+    nom="repowarden (tags)" include="refs/tags/v*"
+    if [ "$2" = version ]; then
+        nom="repowarden (tags de version)" include="refs/tags/v*.*.*" rules='{"type": "update"}'
     fi
     cat <<JSON
 {
-  "name": "repowarden (tags)",
+  "name": "$nom",
   "target": "tag",
   "enforcement": "active",
   "bypass_actors": [$bypass],
-  "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
+  "conditions": {"ref_name": {"include": ["$include"], "exclude": []}},
   "rules": [$rules]
 }
 JSON
@@ -229,15 +254,6 @@ if [ -n "$integration" ]; then
     # entrant dans main. PR à jour non exigée : la CI vérifie chaque push.
     # La GitHub App doit pouvoir pousser develop après une livraison sur main
     # (aligner-develop, jamais --force) ; main garde bypass_actors vide.
-    # GitHub exige son identifiant numérique : lu par son slug public (variable
-    # REPOWARDEN_APP_SLUG, posée par repowarden app init), sans jeton d'App.
-    app_bypass=""
-    app_slug="$(gh variable get REPOWARDEN_APP_SLUG --repo "$REPO" 2>/dev/null || true)"
-    if [ -n "$app_slug" ]; then
-        app_id="$(gh api "apps/$app_slug" --jq .id 2>/dev/null || true)"
-        [[ "$app_id" =~ ^[0-9]+$ ]] &&
-            app_bypass="[{\"actor_id\": $app_id, \"actor_type\": \"Integration\", \"bypass_mode\": \"always\"}]"
-    fi
     # Sans identifiant, aucun bypass : ne pas empêcher develop d'être protégée
     [ -n "$app_bypass" ] || attention_t ci.proteger.no_app "$integration"
     [[ " $existing " != *" $integration "* ]] ||
@@ -294,7 +310,7 @@ else
 fi
 owner_type="$(gh api "repos/$REPO" --jq .owner.type)"
 if [ -z "$NO_TAGS" ]; then
-    rulesets+=("$(tags_ruleset "$owner_type")")
+    rulesets+=("$(tags_ruleset "$owner_type" base)" "$(tags_ruleset "$owner_type" version)")
     if [ "$owner_type" = Organization ]; then
         t ci.proteger.tags_org
         tags_msg="$REPLY"
@@ -454,6 +470,34 @@ rulesets_sans_bypass() {
 SIG_EN_LIGNE='(.rules | map(select(.type == "pull_request"))[0].parameters) as $p
     | "approbations=\($p.required_approving_review_count) dernier_push=\($p.require_last_push_approval) codeowners=\($p.require_code_owner_review) deploiement=\([.rules[] | select(.type == "required_deployments") | .parameters.required_deployment_environments[]] | join(",")) verifications=\([.rules[] | select(.type == "required_status_checks") | .parameters.required_status_checks[].context] | sort | join(","))"'
 
+# Ruleset des tags $name, en ligne : absent, règle update couvrant un tag majeur
+# (le job tag-major serait refusé), ou App de repowarden sans bypass. Compte les
+# écarts dans $ecarts. Le tag majeur doit rester mobile, d'où ce contrôle.
+# shellcheck disable=SC2016 # expressions jq (gh --jq), pas du shell
+verifier_tags() {
+    local tid ligne
+    tid="$(gh api "repos/$REPO/rulesets" --jq ".[] | select(.name == \"$name\") | .id")"
+    if [ -z "$tid" ]; then
+        err_t ci.proteger.verify_missing "$name"
+        ecarts=$((ecarts + 1))
+        return 0
+    fi
+    ligne="$(gh api "repos/$REPO/rulesets/$tid" --jq \
+        'select(any(.rules[]?; .type == "update") and (.conditions.ref_name.include != ["refs/tags/v*.*.*"]))
+        | .conditions.ref_name.include | join(" ")')"
+    if [ -n "$ligne" ]; then
+        err_t ci.proteger.verify_tags_major "$name" "$tid" "$ligne"
+        ecarts=$((ecarts + 1))
+    fi
+    [ -n "${app_id:-}" ] && [ -n "$app_bypass_tags" ] || return 0
+    ligne="$(gh api "repos/$REPO/rulesets/$tid" --jq \
+        "select([.bypass_actors[]? | select(.actor_type == \"Integration\" and .actor_id == $app_id)] | length == 0) | .name")"
+    if [ -n "$ligne" ]; then
+        err_t ci.proteger.verify_tags_bypass "$name" "$tid"
+        ecarts=$((ecarts + 1))
+    fi
+}
+
 if [ -n "$VERIFY" ] && [ -z "$RULESETS_OK" ]; then
     err_t ci.proteger.rulesets_unavailable "$REPO"
     exit 1
@@ -461,8 +505,12 @@ fi
 if [ -n "$VERIFY" ]; then
     ecarts=0
     for ruleset in "${rulesets[@]}"; do
-        grep -q '"target": "branch"' <<<"$ruleset" || continue
         name="$(sed -n 's/^  "name": "\(.*\)",$/\1/p' <<<"$ruleset")"
+        if grep -q '"target": "tag"' <<<"$ruleset"; then
+            verifier_tags
+            continue
+        fi
+        grep -q '"target": "branch"' <<<"$ruleset" || continue
         attendu="$(sig_attendue "$ruleset")"
         id="$(gh api "repos/$REPO/rulesets" --jq ".[] | select(.name == \"$name\") | .id")"
         en_ligne=""
@@ -587,6 +635,8 @@ for ruleset in ${rulesets[@]+"${rulesets[@]}"}; do
     else
         methode=POST chemin="repos/$REPO/rulesets"
     fi
+    kind_tags=base
+    [ "$name" != "repowarden (tags de version)" ] || kind_tags=version
     # Réponse gardée : en cas de refus, le détail de GitHub est affiché
     if reponse="$(gh api -X "$methode" "$chemin" --input - <<<"$ruleset" 2>&1)"; then
         if [ -n "$repris" ]; then
@@ -596,9 +646,9 @@ for ruleset in ${rulesets[@]+"${rulesets[@]}"}; do
         else
             ok_t ci.proteger.11 "$name"
         fi
-    elif [ "$name" = "repowarden (tags)" ] && [ "$owner_type" = Organization ] &&
+    elif [[ "$name" == "repowarden (tags"* ]] && [ "$owner_type" = Organization ] &&
         [[ "$reponse" == *"ruleset source or owner organization"* ]] &&
-        gh api -X "$methode" "$chemin" --input - <<<"$(tags_ruleset User)" >/dev/null 2>&1; then
+        gh api -X "$methode" "$chemin" --input - <<<"$(tags_ruleset User "$kind_tags")" >/dev/null 2>&1; then
         # Exception GitHub Actions refusée (App non installée dans l'organisation) :
         # règle des comptes personnels, tags ni déplacés ni supprimés
         attention_t ci.proteger.tags_fallback

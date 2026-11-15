@@ -107,7 +107,7 @@ One PR = one commit on `main`, whose message is the **PR title**: a clean change
 repowarden proteger --checks "repowarden,build"   # comma-separated checks; gh logged in (admin)
 ```
 
-The script sets up the "repowarden" ruleset (PR required, required checks up to date, no deletion and no force push), the merge methods (squash; with a `develop` flow: merge commit on `main`, **squash only** on `develop` (one commit per work PR: intermediate commits never get in), which becomes the default branch; in this flow, PRs need not be up to date with their target: a delivery's merge commit only exists on `main` and would otherwise block the next delivery), reserves `v*` tags for workflows ("repowarden (tags)" ruleset), uses the PR title as the commit message and allows GitHub Actions to create PRs (automatic releases).
+The script sets up the "repowarden" ruleset (PR required, required checks up to date, no deletion and no force push), the merge methods (squash; with a `develop` flow: merge commit on `main`, **squash only** on `develop` (one commit per work PR: intermediate commits never get in), which becomes the default branch; in this flow, PRs need not be up to date with their target: a delivery's merge commit only exists on `main` and would otherwise block the next delivery), reserves `v*` tags for workflows ("repowarden (tags)" and "repowarden (tags de version)" rulesets: version tags frozen, major tag movable), uses the PR title as the commit message and allows GitHub Actions to create PRs (automatic releases).
 
 With a `develop` flow, it also creates the `urgent` label if missing: merging a PR with it triggers the delivery request right away.
 
