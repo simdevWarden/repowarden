@@ -45,7 +45,7 @@ release_a_publier() {
     [ -n "$output" ]
 }
 
-@test "release-tag : v4 et v4.17.5 sur le même commit -> v4.17.5" {
+@test "release-tag : v4 et v4.17.5 sur le meme commit -> v4.17.5" {
     git tag v4
     git tag v4.17.5
     run release_a_publier
@@ -53,7 +53,7 @@ release_a_publier() {
     [ "$output" = "v4.17.5" ]
 }
 
-@test "release-tag : préversion plus récente non retenue -> dernier stable" {
+@test "release-tag : preversion plus recente non retenue -> dernier stable" {
     git tag v4.17.5
     commit_suivant "préversion"
     git tag v4.17.6-next.1
@@ -62,7 +62,7 @@ release_a_publier() {
     [ "$output" = "v4.17.5" ]
 }
 
-@test "release-tag : v4.17 seul non retenu -> erreur, rien à publier" {
+@test "release-tag : v4.17 seul non retenu -> erreur, rien a publier" {
     git tag v4.17
     run release_a_publier
     [ "$status" -ne 0 ]
