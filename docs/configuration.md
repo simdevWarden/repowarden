@@ -25,7 +25,7 @@ Versionné à la racine du projet, au format `git config`, lu **par les hooks et
     sensitiveFiles = .env .env.* *.pem  # noms signalés s'ils ne sont ni suivis ni ignorés (voir Hooks)
     # Bot d'organisation (repowarden bot)
     bot = auto                          # auto (défaut) : protection appliquée et PR de migration ; pr : PR seulement ; off : ignoré
-    requiredChecks = repowarden,tests   # vérifications exigées posées par le bot ; défaut : celles en ligne
+    requiredChecks = repowarden,tests (ubuntu-latest),tests (windows-latest)   # vérifications exigées posées par le bot ; défaut : celles en ligne
 ```
 
 `version` : si repowarden est plus ancien sur un poste, les hooks le signalent avec la commande de mise à jour (`npm update -g repowarden`, ou `git pull` pour un clone). C'est un avertissement seulement : la CI vérifie chaque PR à sa propre version.
