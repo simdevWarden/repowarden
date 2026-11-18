@@ -57,3 +57,7 @@ missing_checks() {
     [ "$status" -eq 0 ]
     [ "$output" = "tests (nowhere-latest)" ]
 }
+
+@test "required checks: ESSAI #590, test rouge volontaire, PR jetable jamais fusionnee" {
+    false
+}
