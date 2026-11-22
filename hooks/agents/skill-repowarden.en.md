@@ -21,6 +21,7 @@ Follow the repowarden workflow in the repo: no change without a ticket, written 
 ## Useful commands
 - `repowarden ticket <n>` / `repowarden ticket comment <n> "<text>"`
 - `repowarden cc --dry-run -m "<description>" --type <type> --scope <scope> --body "<why>" --refs "Ticket : #<n>"`
+- `repowarden pr body <n> (--file <file> | --text "<text>") [--dry-run]`: replaces the description of an open PR (keeps `Ticket : #N`)
 - `repowarden pr checks <n>`, `repowarden run rerun <id|--failed|--workflow>`
 - `REPOWARDEN_TICKET=<n> gh …`: GitHub write outside the workflow, tied to ticket <n>
 - `opencode run --auto "<instruction>" < /dev/null`: non-interactive opencode (without `--auto` every permission is denied, without `< /dev/null` it waits silently)
