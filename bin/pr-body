@@ -106,7 +106,7 @@ info_t pr.body.target "$n" "$titre" "$tete"
 # ligne de l'ancienne est reprise si le nouveau texte n'en a pas
 if ! grep -Eq '^Ticket : #[0-9]+' "$tmp"; then
     ancien="$(gh pr view "$n" --json body --jq .body)"
-    ligne="$(printf '%s\n' "$ancien" | tr -d '\r' | grep -Eo '^Ticket : #[0-9]+' | head -n 1 || true)"
+    ligne="$(printf '%s\n' "$ancien" | tr -d '\r' | grep -Eo -m1 '^Ticket : #[0-9]+' || true)"
     if [ -n "$ligne" ]; then
         [ -z "$(tail -c1 "$tmp")" ] || printf '\n' >>"$tmp"
         printf '\n%s\n' "$ligne" >>"$tmp"
