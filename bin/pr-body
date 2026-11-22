@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# Remplacer la description d'une PR GitHub (ouverte seulement)
+#   repowarden pr body <n> (--file <fichier> | --text "<texte>") [--dry-run]
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+# shellcheck source=../hooks/lib/common.sh
+source "$ROOT/hooks/lib/common.sh"
+# shellcheck source=../hooks/lib/i18n.sh
+source "$ROOT/hooks/lib/i18n.sh"
+# shellcheck source=../hooks/lib/forge.sh
+source "$ROOT/hooks/lib/forge.sh"
+
+# Aide sur la sortie standard : une seule source (clé help.pr), partagée
+# avec pr label et pr checks, pour que les trois commandes restent décrites ensemble
+aide() {
+    _tr help.pr
+    printf '%b\n' "$_T"
+}
+
+case "${1:-}" in
+    -h | --help) aide; exit 0 ;;
+esac
+
+n=""
+fichier=""
+texte=""
+avec_fichier=false
+avec_texte=false
+dry_run=false
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --file)
+            [ $# -ge 2 ] || { err_t pr.body.missing_value "$1"; exit 1; }
+            fichier="$2"
+            avec_fichier=true
+            shift
+            ;;
+        --text)
+            [ $# -ge 2 ] || { err_t pr.body.missing_value "$1"; exit 1; }
+            texte="$2"
+            avec_texte=true
+            shift
+            ;;
+        --dry-run) dry_run=true ;;
+        -*) err_t install.unknown_arg "$1"; exit 1 ;;
+        *)
+            [ -z "$n" ] || { err_t install.unknown_arg "$1"; exit 1; }
+            n="${1#\#}"
+            ;;
+    esac
+    shift
+done
+
+# Les refus qui ne demandent pas GitHub passent d'abord : ils n'ont besoin
+# ni de gh ni du réseau
+[[ "$n" =~ ^[0-9]+$ ]] || { err_t pr.body.no_number; exit 1; }
+if [ "$avec_fichier" = true ] && [ "$avec_texte" = true ]; then
+    err_t pr.body.two_sources
+    exit 1
+fi
+if [ "$avec_fichier" = false ] && [ "$avec_texte" = false ]; then
+    err_t pr.body.no_source
+    exit 1
+fi
+if [ "$avec_fichier" = true ] && [ ! -r "$fichier" ]; then
+    err_t pr.body.file_unreadable "$fichier"
+    exit 1
+fi
+gh_ready || exit 1
+
+# Fichier temporaire : gh pr edit --body-file reçoit le texte tel quel, sans
+# que guillemets, $ ou retours ligne passent par la ligne de commande
+tmp="$(mktemp)"
+trap 'rm -f "$tmp"' EXIT
+if [ "$avec_fichier" = true ]; then
+    cp "$fichier" "$tmp"
+else
+    printf '%s' "$texte" >"$tmp"
+fi
+if ! grep -q '[^[:space:]]' "$tmp"; then
+    err_t pr.body.empty
+    exit 1
+fi
+
+# La cible est lue et affichée avant toute écriture : c'est le garde-fou
+# contre une PR périmée ou déjà fusionnée
+meta="$(gh pr view "$n" --json state,title,headRefName \
+    --jq '.state, .title, .headRefName' 2>/dev/null)" || {
+    err_t pr.body.not_found "$n"
+    exit 1
+}
+{
+    IFS= read -r etat
+    IFS= read -r titre
+    IFS= read -r tete
+} <<<"$meta"
+if [ "$etat" != OPEN ]; then
+    err_t pr.body.not_open "$n" "$etat"
+    exit 1
+fi
+info_t pr.body.target "$n" "$titre" "$tete"
+
+# La vérification « ticket » lit « Ticket : #N » dans la description : la
+# ligne de l'ancienne est reprise si le nouveau texte n'en a pas
+if ! grep -Eq '^Ticket : #[0-9]+' "$tmp"; then
+    ancien="$(gh pr view "$n" --json body --jq .body)"
+    ligne="$(printf '%s\n' "$ancien" | tr -d '\r' | grep -Eo '^Ticket : #[0-9]+' | head -n 1 || true)"
+    if [ -n "$ligne" ]; then
+        [ -z "$(tail -c1 "$tmp")" ] || printf '\n' >>"$tmp"
+        printf '\n%s\n' "$ligne" >>"$tmp"
+        info_t pr.body.ticket_kept "$ligne"
+    fi
+fi
+
+if [ "$dry_run" = true ]; then
+    info_t pr.body.dry_run "$n"
+    exit 0
+fi
+
+step_t pr.body.writing "$n"
+gh pr edit "$n" --body-file "$tmp" >/dev/null
+ok_t pr.body.done "$n"
