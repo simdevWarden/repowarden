@@ -229,6 +229,8 @@ TXT
 }
 
 @test "pr body : gh absent refuse avec son message" {
+    # Le PATH reduit se fait avec des liens symboliques, impossibles sous Git Bash
+    case "$(uname -s)" in MINGW* | MSYS* | CYGWIN*) skip "liens symboliques absents sous Windows" ;; esac
     faux_gh
     sans="$BATS_TEST_TMPDIR/sans-gh"
     mkdir -p "$sans"
