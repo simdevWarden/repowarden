@@ -404,6 +404,7 @@ Anciens noms acceptés : statut, code-mort, carte, proteger, migrer, npm-publica
         ci.proteger.verify_tags_bypass) _M="%s (id %s): App missing from bypass actors; it will not be able to set tags" ;;
         ci.proteger.bypass_added) _M="%s: App added to bypass actors (%s)" ;;
         ci.proteger.no_app)_M="Unknown App (REPOWARDEN_APP_SLUG variable missing): %s will not be aligned automatically after a delivery. Run repowarden app init." ;;
+        ci.proteger.app_not_found) _M="App %s not found (private App?). Set the variable REPOWARDEN_APP_ID (its identifier is read in the App's settings): %s will not be aligned automatically after a delivery." ;;
         ci.version.usage) _M="Usage: ci/version.sh next|notes|notes-livraison [ref]" ;;
         ci.version.breaking) _M="Breaking changes" ;;
         ci.version.features) _M="Features" ;;
