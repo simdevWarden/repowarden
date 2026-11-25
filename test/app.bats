@@ -72,6 +72,7 @@ NAV
     ! grep -q 'administration' "$F/page"
     [ "$(cat "$F/var.REPOWARDEN_APP_CLIENT_ID")" = Iv1.abc ]
     [ "$(cat "$F/var.REPOWARDEN_APP_SLUG")" = repowarden-moi ]
+    [ "$(cat "$F/var.REPOWARDEN_APP_ID")" = 7 ]
     grep -q "BEGIN RSA PRIVATE KEY" "$F/secret.REPOWARDEN_APP_KEY"
     [[ "$output" != *"PRIVATE KEY"* ]] || false
     [[ "$output" == *"repowarden-moi installée sur moi/projet"* ]] || false

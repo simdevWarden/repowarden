@@ -405,6 +405,7 @@ Anciens noms acceptés : statut, code-mort, carte, proteger, migrer, npm-publica
         ci.proteger.verify_tags_bypass) _M="%s (id %s) : App absente des acteurs de contournement ; elle ne pourra pas poser les tags" ;;
         ci.proteger.bypass_added) _M="%s : App ajoutée aux acteurs de contournement (%s)" ;;
         ci.proteger.no_app)_M="App inconnue (variable REPOWARDEN_APP_SLUG absente) : %s ne sera pas alignée automatiquement après une livraison. Lancer repowarden app init." ;;
+        ci.proteger.app_not_found) _M="App %s introuvable (App privée ?). Poser la variable REPOWARDEN_APP_ID (son identifiant se lit dans les réglages de l'App) : %s ne sera pas alignée automatiquement après une livraison." ;;
         ci.version.usage) _M="Usage : ci/version.sh next|notes|notes-livraison [ref]" ;;
         ci.version.breaking) _M="Changements incompatibles" ;;
         ci.version.features) _M="Fonctionnalités" ;;

@@ -151,18 +151,50 @@ branch_ruleset() {
 JSON
 }
 
+# Recherche dans $app_id de l'identifiant numérique de l'App, dans cet ordre et
+# au premier trouvé : variable REPOWARDEN_APP_ID ; apps/<slug> (App publique) ;
+# commentaire du bot <slug>[bot] sur les issues du dépôt (App privée, une seule
+# page). Une valeur non numérique n'est pas acceptée. $app_id_var est non vide
+# si l'identifiant a été trouvé par la variable.
+app_id_rechercher() {
+    app_id=""
+    app_id_var=""
+    app_id="$(gh variable get REPOWARDEN_APP_ID --repo "$REPO" 2>/dev/null || true)"
+    if [[ "$app_id" =~ ^[0-9]+$ ]]; then
+        app_id_var=1
+        return 0
+    fi
+    app_id=""
+    app_id="$(gh api "apps/$app_slug" --jq .id 2>/dev/null || true)"
+    if [[ "$app_id" =~ ^[0-9]+$ ]]; then
+        return 0
+    fi
+    # Un seul appel, une seule page : pas de suivi de pagination
+    app_id="$(gh api "repos/$REPO/issues/comments?sort=created&direction=desc&per_page=100" \
+        --jq "[.[] | select(.user.login == \"${app_slug}[bot]\")][0].performed_via_github_app.id" 2>/dev/null || true)"
+    [[ "$app_id" =~ ^[0-9]+$ ]] || app_id=""
+    return 0
+}
+
 # GitHub App de repowarden : GitHub exige son identifiant numérique, lu par son
 # slug public (variable REPOWARDEN_APP_SLUG, posée par repowarden app init),
 # sans jeton d'App. Sert au bypass des rulesets de develop et des tags.
 app_bypass=""
 app_bypass_tags=""
 app_slug="$(gh variable get REPOWARDEN_APP_SLUG --repo "$REPO" 2>/dev/null || true)"
+app_id=""
 if [ -n "$app_slug" ]; then
-    app_id="$(gh api "apps/$app_slug" --jq .id 2>/dev/null || true)"
-    if [[ "$app_id" =~ ^[0-9]+$ ]]; then
-        app_bypass_tags="{\"actor_id\": $app_id, \"actor_type\": \"Integration\", \"bypass_mode\": \"always\"}"
-        app_bypass="[$app_bypass_tags]"
+    app_id_rechercher
+    # Trouvé par b ou c et hors --dry-run : posé dans REPOWARDEN_APP_ID pour
+    # les fois suivantes ; échec de l'écriture ignoré, l'identifiant sert
+    # quand même
+    if [ -z "${app_id_var:-}" ] && [ -n "$app_id" ] && [ -z "$DRY_RUN" ]; then
+        gh variable set REPOWARDEN_APP_ID --repo "$REPO" --body "$app_id" 2>/dev/null || true
     fi
+fi
+if [ -n "$app_slug" ] && [[ "$app_id" =~ ^[0-9]+$ ]]; then
+    app_bypass_tags="{\"actor_id\": $app_id, \"actor_type\": \"Integration\", \"bypass_mode\": \"always\"}"
+    app_bypass="[$app_bypass_tags]"
 fi
 
 # Tags v* : le tag de version (vX.Y.Z, vX.Y.Z-next.N) est figé, le tag majeur
@@ -255,7 +287,13 @@ if [ -n "$integration" ]; then
     # La GitHub App doit pouvoir pousser develop après une livraison sur main
     # (aligner-develop, jamais --force) ; main garde bypass_actors vide.
     # Sans identifiant, aucun bypass : ne pas empêcher develop d'être protégée
-    [ -n "$app_bypass" ] || attention_t ci.proteger.no_app "$integration"
+    if [ -z "$app_bypass" ]; then
+        if [ -n "$app_slug" ]; then
+            attention_t ci.proteger.app_not_found "$app_slug" "$integration"
+        else
+            attention_t ci.proteger.no_app "$integration"
+        fi
+    fi
     [[ " $existing " != *" $integration "* ]] ||
         rulesets+=("$(branch_ruleset "repowarden ($integration)" "$integration" '"squash"' false "" "" "" \
             "$app_bypass")")
