@@ -14,6 +14,7 @@
 #   repowarden ticket label <n> <label> [--remove]  gère les labels d'un ticket
 #   repowarden pr label <n> <label> [--remove]     gère les labels d'une PR
 #   repowarden pr checks <n>                      vérifie les checks d'une PR
+#   repowarden pr body <n> (--file <f> | --text "<t>")  remplace la description d'une PR
 #   repowarden run rerun <id|--failed|--workflow> relance un workflow
 #   repowarden run list [--workflow <nom>]        liste les runs récents
 #   repowarden tickets init                        suivi des tickets (GitHub)
@@ -122,6 +123,7 @@ case "$cmd" in
             case "$1" in
                 label) exec bash "$ROOT/bin/pr-label" "${@:2}" ;;
                 checks) exec bash "$ROOT/bin/pr-checks" "${@:2}" ;;
+                body) exec bash "$ROOT/bin/pr-body" "${@:2}" ;;
                 *) err_t install.unknown_arg "$1"; _tr help.pr; printf '%b\n' "$_T" >&2; exit 1 ;;
             esac
         else

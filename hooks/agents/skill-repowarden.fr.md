@@ -21,6 +21,7 @@ Appliquer le circuit repowarden dans le dépôt : pas de changement sans ticket,
 ## Commandes utiles
 - `repowarden ticket <n>` / `repowarden ticket comment <n> "<texte>"`
 - `repowarden cc --dry-run -m "<description>" --type <type> --scope <portée> --body "<pourquoi>" --refs "Ticket : #<n>"`
+- `repowarden pr body <n> (--file <fichier> | --text "<texte>") [--dry-run]` : remplace la description d'une PR ouverte (reprend `Ticket : #N`)
 - `repowarden pr checks <n>`, `repowarden run rerun <id|--failed|--workflow>`
 - `REPOWARDEN_TICKET=<n> gh …` : écriture GitHub hors circuit, rattachée au ticket <n>
 - `opencode run --auto "<consigne>" < /dev/null` : opencode non interactif (sans `--auto` chaque permission est refusée, sans `< /dev/null` il attend en silence)
