@@ -522,11 +522,27 @@ if [ -n "${GH_RULESETS_403:-}" ] && [[ "$*" == *"repos/moi/projet/rulesets"* ]];
 fi
 case "$*" in
     "repo view"*) echo moi/projet ;;
-    # GitHub App : slug rangé par repowarden app init, identifiant public par slug
+    # GitHub App : slug rangé par repowarden app init ; protect lit l'identifiant
+    # dans REPOWARDEN_APP_ID (vide par défaut : protect continue sur apps/<slug>)
     "variable get REPOWARDEN_APP_SLUG --repo moi/projet")
         v="${GH_APP_SLUG-repowarden-moi}"; [ -n "$v" ] || exit 1; echo "$v" ;;
+    "variable get REPOWARDEN_APP_ID --repo moi/projet")
+        [ -n "${GH_APP_ID_VAR:-}" ] && echo "$GH_APP_ID_VAR"
+        exit 0 ;;
+    # App publique (apps/<slug> répond un id) ; App privée si $GH_APP_PRIVEE
     "api apps/"*" --jq .id")
+        [ -n "${GH_APP_PRIVEE:-}" ] && exit 1
         v="${GH_APP_ID-12345}"; [ -n "$v" ] || exit 1; echo "$v" ;;
+    # App privée : le commentaire du bot <slug>[bot] répond avec
+    # performed_via_github_app.id (id dans $GH_BOT_ID, vide : pas de commentaire)
+    "api repos/moi/projet/issues/comments"*)
+        [ -n "${GH_BOT_ID:-}" ] && echo "$GH_BOT_ID" ;;
+    # Variable posée par protect (identifiant trouvé par b ou c) : valeur dans
+    # $BATS_TEST_TMPDIR/var.<nom> ; lu par var_val
+    "variable set"*)
+        n="$3"; v=""
+        while [ $# -gt 0 ]; do [ "$1" = --body ] && v="$2"; shift; done
+        printf '%s' "$v" >"$BATS_TEST_TMPDIR/var.$n" ;;
     "api user --jq .login") echo moi ;;
     "api repos/moi/projet --jq .owner.type") echo "${GH_OWNER_TYPE:-User}" ;;
     "api repos/moi/projet --jq .default_branch") echo "${GH_DEFAULT_BRANCH:-main}" ;;
@@ -584,6 +600,9 @@ while i < len(t):
     o,i=d.raw_decode(t,i); out.append(o)
 print(json.dumps(out))' <<<"$(sed -n '/^{/,$p' <<<"$1")"
 }
+
+# Valeur posée dans la variable $1 par le faux gh (variable set) ; vide si absente
+var_val() { cat "$BATS_TEST_TMPDIR/var.$1" 2>/dev/null || true; }
 
 @test "proteger : flux main seul -> squash, branches supprimees au merge, tags reserves" {
     require python3
@@ -684,6 +703,70 @@ print(json.dumps(out))' <<<"$(sed -n '/^{/,$p' <<<"$1")"
     [ "$status" -eq 0 ]
     [[ "$output" == *"App inconnue"* ]] || false
     [[ "$output" == *"ne sera pas alignée automatiquement"* ]] || false
+    python3 -c 'import json,sys; r=json.loads(sys.argv[1]); m,d=r[0],r[1]; \
+        assert m["bypass_actors"]==[] and d["bypass_actors"]==[]' \
+        "$(rulesets_json "$output")"
+}
+
+@test "proteger : identifiant en variable REPOWARDEN_APP_ID -> bypass, apps/<slug> pas appele" {
+    require python3
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    : >"$GH_LOG"
+    GH_APP_ID_VAR=998877 GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
+    [ "$status" -eq 0 ]
+    ! grep -q "^api apps/" "$GH_LOG"
+    python3 -c 'import json,sys; r=json.loads(sys.argv[1]); m,d=r[0],r[1]; \
+        assert m["bypass_actors"]==[] and \
+            d["bypass_actors"]==[{"actor_id":998877,"actor_type":"Integration","bypass_mode":"always"}]' \
+        "$(rulesets_json "$output")"
+}
+
+@test "proteger : App publique -> bypass, variable REPOWARDEN_APP_ID posee (hors dry-run)" {
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    : >"$GH_LOG"
+    GH_BRANCHES="main develop" run "$PROTEGER"
+    [ "$status" -eq 0 ]
+    grep -q "^api apps/repowarden-moi --jq .id" "$GH_LOG"
+    [ "$(var_val REPOWARDEN_APP_ID)" = 12345 ]
+    grep -q '"actor_id": 12345' "$GH_LOG"
+}
+
+@test "proteger : App privee (apps/<slug> 404) + commentaire du bot -> bypass avec l'id du commentaire, variable posee" {
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    : >"$GH_LOG"
+    GH_APP_PRIVEE=1 GH_BOT_ID=987654 GH_BRANCHES="main develop" run "$PROTEGER"
+    [ "$status" -eq 0 ]
+    grep -q "^api apps/repowarden-moi --jq .id" "$GH_LOG"
+    grep -q "^api repos/moi/projet/issues/comments" "$GH_LOG"
+    [ "$(var_val REPOWARDEN_APP_ID)" = 987654 ]
+    grep -q '"actor_id": 987654' "$GH_LOG"
+}
+
+@test "proteger : App privee + commentaire du bot, en --dry-run : aucune variable posee" {
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    : >"$GH_LOG"
+    GH_APP_PRIVEE=1 GH_BOT_ID=987654 GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
+    [ "$status" -eq 0 ]
+    [ -z "$(var_val REPOWARDEN_APP_ID)" ]
+}
+
+@test "proteger : App privee sans commentaire du bot -> message app_not_found, aucun bypass" {
+    require python3
+    fake_gh_repo
+    git config repowarden.integrationBranch develop
+    git config repowarden.protectedBranches "main develop"
+    GH_APP_PRIVEE=1 GH_BRANCHES="main develop" run "$PROTEGER" --dry-run
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"introuvable"* ]] || false
+    [[ "$output" == *"REPOWARDEN_APP_ID"* ]] || false
     python3 -c 'import json,sys; r=json.loads(sys.argv[1]); m,d=r[0],r[1]; \
         assert m["bypass_actors"]==[] and d["bypass_actors"]==[]' \
         "$(rulesets_json "$output")"

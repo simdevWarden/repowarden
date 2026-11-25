@@ -180,12 +180,14 @@ else
     reponse="$(gh api -X POST "app-manifests/$code/conversions")"
     client_id="$(node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).client_id' <<<"$reponse")"
     slug="$(node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).slug' <<<"$reponse")"
+    app_id="$(node -p 'JSON.parse(require("fs").readFileSync(0, "utf8")).id' <<<"$reponse")"
     # Clé gardée en mémoire le temps de vérifier l'installation, jamais affichée
     cle="$(node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(0, "utf8")).pem)' <<<"$reponse")"
     printf '%s' "$cle" | gh secret set "${PREFIXE}_KEY" --repo "$REPO"
     reponse=""
     gh variable set "${PREFIXE}_CLIENT_ID" --repo "$REPO" --body "$client_id"
     gh variable set "${PREFIXE}_SLUG" --repo "$REPO" --body "$slug"
+    gh variable set "${PREFIXE}_ID" --repo "$REPO" --body "$app_id"
     ok_t app.created "$slug" "${PREFIXE}_CLIENT_ID" "${PREFIXE}_KEY"
 fi
 
