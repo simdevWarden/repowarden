@@ -123,3 +123,20 @@ fusion_retrait() {
     [ "$status" -ne 0 ]
     [ ! -e "$BATS_TEST_TMPDIR/pr/appels" ]
 }
+
+@test "tests declares : tests_declares_r reussit avec gh et jeton (PR 12)" {
+    faux_gh
+    fusion_retrait un 12 $'Retire b.\n\nTests retirés : doublon'
+    source "$BATS_TEST_DIRNAME/../hooks/lib/tests-declares.sh"
+    run tests_declares_r "$REPOWARDEN_BASE"
+    [ "$status" -eq 0 ]
+}
+
+@test "tests declares : tests_declares_r echoue sans GITHUB_TOKEN (PR 12)" {
+    faux_gh
+    unset GITHUB_TOKEN
+    fusion_retrait un 12 $'Retire b.\n\nTests retirés : doublon'
+    source "$BATS_TEST_DIRNAME/../hooks/lib/tests-declares.sh"
+    run tests_declares_r "$REPOWARDEN_BASE"
+    [ "$status" -ne 0 ]
+}

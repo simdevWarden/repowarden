@@ -88,6 +88,7 @@ runs:
         REPOWARDEN_TARGET: ${{ env.REPOWARDEN_FIXED_TARGET }}
         REPOWARDEN_BASE: ${{ env.REPOWARDEN_FIXED_BASE }}
         GITHUB_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        GITHUB_TOKEN: ${{ github.token }}
         FORCE_COLOR: "1" # charte visuelle dans les logs
       run: bash "$GITHUB_ACTION_PATH/ci/check.sh"
 
